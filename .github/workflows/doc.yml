@@ -26,6 +26,9 @@ jobs:
         id: build-docgen
         continue-on-error: true
         uses: leanprover-community/docgen-action@v1
+        with:
+          api-docs: false
+          build-page: false
 
       - uses: leanprover/lean-action@v1.4.0
         if: steps.build-docgen.outputs.name == ''
@@ -46,3 +49,6 @@ jobs:
         id: build-docgen2
         if: steps.build-docgen.outputs.name == ''
         uses: leanprover-community/docgen-action@v1
+        with:
+          api-docs: false
+          build-page: false
