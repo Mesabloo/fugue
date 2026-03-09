@@ -17,3 +17,7 @@ namespace Std.Format
     paren' (· > p_op) (p1 ++ x ++ p2 ++ f dom 0 ++ p3 ++ f' pred 0 ++ p4)
 
   def indent (n : Int) (f : Format) : Format := (.line ++ f).nest n
+
+  /-- Curly brackets. -/
+  @[inline] def cbracket (f : Std.Format) : Std.Format :=
+    .bracket "{" f "}"

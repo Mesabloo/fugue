@@ -13,6 +13,8 @@ function join_by {
 
 DEBUG_OPTS=(
     "dumpdir=.fugue"
+    "dump-tokens"
+    "dump-cst"
     "dump-guarded"
     "dump-network"
 )

@@ -64,6 +64,10 @@ instance : ParseableType Option' where
 structure DebugOptions where
   /-- The path to the directory where to dump files. -/
   dumpDir : String := ".pcvc"
+  /-- Do we dump the tokens, along with their positions, returned by the Lexer? -/
+  dumpTokens : Bool := false
+  /-- Do we dump the CST? -/
+  dumpCST : Bool := false
   /-- Do we dump the internal Guarded PlusCal? -/
   dumpGuarded : Bool := false
   /-- Do we dump the internal Network PlusCal? -/
@@ -83,7 +87,10 @@ def DebugOptions.from (args : Array Option') : IO DebugOptions := do
   let opts ← args'.foldM (init := ({} : DebugOptions)) λ opts k v ↦ match k, v with
     | "dumpdir", some path => pure { opts with dumpDir := path }
     | k@"dumpdir", none => throw ↑s!"Missing path argument for debugging option '{k}'"
+    | "dump-tokens", none => pure { opts with dumpTokens := true }
+    | "dump-cst", none => pure { opts with dumpCST := true }
     | "dump-guarded", none => pure { opts with dumpGuarded := true }
+    | k@"dump-tokens", some _
     | k@"dump-guarded", some _ --=> throw ↑s!"Unexpected value for debugging flag '{k}'"
     | k@"dump-network", some _
     | k@"dump-gocal", some _ => throw ↑s!"Unexpected value for debugging flag '{k}'"
@@ -173,6 +180,15 @@ private partial def runCli (p : Parsed) : IO UInt32 := do
         printErrorAndExit e lines
       | .inr mod => pure mod
 
+    if dopts.dumpTokens then
+      let _ {α : Type _} [ToString α] : ToString (Located' α) := ⟨λ ⟨pos, x⟩ ↦ s!"(* {pos} *) {x}"⟩
+      let _ {α : Type _} [Std.ToFormat α] : Std.ToFormat (Located' α) := ⟨λ ⟨pos, x⟩ ↦ f!"(* {pos} *) {x}"⟩
+      let _ : Std.ToFormat SurfacePlusCal.Token := ⟨λ tk ↦ toString tk⟩
+      let _ {α : Type _} [Std.ToFormat α] [ToString α] : Std.ToFormat (SurfaceTLAPlus.Token α) := ⟨λ | .pcal tks => Std.format tks | tk => toString tk⟩
+
+      dumpFormatToFile tks ((← IO.currentDir) / dopts.dumpDir / s!"{inputFile}-tokens")
+      pure ()
+
     let mod ← match SurfaceTLAPlus.Parser.parseModule tks with
       | .inl e =>
         let _ {α} [ToString α] : ToString (Located' α) := ⟨λ x ↦ toString x.data⟩
@@ -180,6 +196,9 @@ private partial def runCli (p : Parsed) : IO UInt32 := do
         printErrorAndExit e lines
       | .inr mod =>
         pure mod
+
+    if dopts.dumpCST then
+      dumpFormatToFile mod ((← IO.currentDir) / dopts.dumpDir / s!"{inputFile}-cst")
 
     spinner.setTitle "Parsing annotations…"
     let mod ← match resolveAnnotations mod with
