@@ -141,6 +141,8 @@ private def dumpFormatToFile.{u} {α : Type u} [Std.ToFormat α] (x : α) (path 
       IO.FS.createDirAll parent
   IO.FS.writeFile path (Std.format x |>.pretty (width := width))
 
+-- TODO: move CLI parsing (and flags) into a separate directory
+
 private partial def runCli (p : Parsed) : IO UInt32 := do
   -- Get debugging options, if there are any
   let dopts : DebugOptions ← match p.flag? "dopt" with
@@ -283,11 +285,11 @@ Please make sure that it is located at the start of a multiline comment."
   return 0
 
 private def cli : Cmd := `[Cli|
-  "pcvc" VIA runCli; ["1.0.0"]
-  "Distributed PlusCal Verified Compiler"
+  "fugue" VIA runCli; ["1.0.0"]
+  "Fugue ─ A verified compiler for Distributed PlusCal targeting Go"
 
   FLAGS:
-    o, output : System.FilePath; "The .go file to output code to. If not specified, the code will be printed on the standard output.\nThe file extension will be replaced by .go no matter what, so it is not necessary to specify it."
+    o, output : System.FilePath; "The file to output code to. If not specified, the code will be printed on the standard output.\nThe file extension will be replaced no matter what, so it is not necessary to specify it."
     p, package : String; "The package name for the output file.\nOnly applicable with the Go target."
     -- NOTE: Sometimes in the future, perhaps a flag -t|--target to specify which language to target.
     D, dopt : Array Option'; "Debugging options."

@@ -199,7 +199,7 @@ namespace NetworkPlusCal
         body := [
           .make "done" (.channel (.record [])) (.inl (.some ⟨1⟩)),
           .assign ⟨"_", .record [], []⟩ <|
-            .opcall (.var (blocks.head (List.ne_nil_iff_exists_cons.mpr ⟨_, _, h⟩) |>.label) (.const "PLACEHOLDER"))
+            .opcall (.var (blocks.head (List.ne_nil_iff_exists_cons.mpr ⟨_, _, h⟩) |>.label) (.operator (.address :: .channel (.record []) :: vars.map λ ⟨_, τ, _⟩ ↦ .channel τ) (.record [])))
               (.var "self" .address :: .var "done" (.channel (.record [])) :: vars.map λ ⟨v, τ, _⟩ ↦ .var (chan_from_name! v) (.channel τ)),
           .return [.var "done" (.channel (.record []))]
         ]
@@ -256,9 +256,11 @@ namespace NetworkPlusCal
         | ⟨.rx _ rx τ inbox, _⟩ => .inr (rx_thread!(P.name, rx, inbox), τ)
 
     let calls : List (GoCal.Statement Typ (Expression Typ) GoCal.Typ.initArgs) := threads.map λ v ↦ .make s!"done_{v}" (.channel (.record [])) <| .inr <|
-      .opcall (.var v (.const "PLACEHOLDER")) (.var "self" .address :: (vars ++ params).map λ ⟨v, τ, _⟩ ↦ .var v (.channel τ))
+      .opcall (.var v (.operator (.address :: (vars ++ params).map λ ⟨_, τ, _⟩ ↦ (.channel τ)) (.record [])))
+        <| .var "self" .address :: (vars ++ params).map λ ⟨v, τ, _⟩ ↦ .var v (.channel τ)
     let calls' : List (GoCal.Statement Typ (Expression Typ) GoCal.Typ.initArgs) := channels.map λ ⟨v, τ⟩ ↦ .assign ⟨"_", .record [], []⟩ <|
-      .opcall (.var v (.const "PLACEHOLDER")) <| .var "self" .address :: .var chan!(v) τ :: ((vars ++ params).map λ ⟨v, τ, _⟩ ↦ .var v (.channel τ))
+      .opcall (.var v (.operator (.address :: τ :: (vars ++ params).map λ ⟨_, τ, _⟩ ↦ (.channel τ)) (.record [])))
+        <| .var "self" .address :: .var chan!(v) τ :: (vars ++ params).map λ ⟨v, τ, _⟩ ↦ .var v (.channel τ)
 
     fns.concat {
       name := P.name
@@ -274,6 +276,7 @@ namespace NetworkPlusCal
             .make v (.channel τ) (.inl (.some ⟨1⟩)),
             .send (.var v (.channel τ)) (.var (chan_from_name! v) τ) ]) ++
         -- Initialize channels to receive message from the outside world
+        -- TODO: parameter for buffer size instead of fixed 10000
         (channels.map λ ⟨v, τ⟩ ↦ .make chan!(v) (.channel τ) (.inl (some ⟨10000⟩))) ++
         -- Call every thread in parallel
         calls ++
