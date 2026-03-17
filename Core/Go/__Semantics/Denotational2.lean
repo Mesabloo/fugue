@@ -14,6 +14,9 @@ import Mathlib.Topology.MetricSpace.HausdorffDistance
 import Mathlib.Topology.Defs.Induced
 import Mathlib.Data.ENNReal.Basic
 import Mathlib.Order.CompleteLattice.Group
+import Mathlib.Topology.Sets.Closeds
+import Mathlib.Topology.MetricSpace.Closeds
+import Mathlib.Topology.MetricSpace.Contracting
 
 /- Some general stuff, don't care. -/
 
@@ -426,19 +429,19 @@ section
     }
 end
 
-open Classical in
-noncomputable def Functor.Contracting.fixedPointMeasure
-  {F : Obj ⥤ Obj} {contracting : Functor.Contracting F} {hom_contracting : Functor.HomContracting F} {D fix fix_unique}
-  (h : ⟨D, fix, fix_unique⟩ = Functor.exists_unique_fixed_point_of_contracting_of_hom_contracting F contracting hom_contracting)
-  (x : D.Type) :
-    ℕ∞ :=
-  letI γ := (directLimit ⟨D'' F, ι'' F⟩ (jsp F ‹_› ‹_›)).1.2
-  haveI D_eq := PSigma.noConfusion h λ fst_eq snd_eq ↦ fst_eq
+-- open Classical in
+-- noncomputable def Functor.Contracting.fixedPointMeasure
+--   {F : Obj ⥤ Obj} {contracting : Functor.Contracting F} {hom_contracting : Functor.HomContracting F} {D fix fix_unique}
+--   (h : ⟨D, fix, fix_unique⟩ = Functor.exists_unique_fixed_point_of_contracting_of_hom_contracting F contracting hom_contracting)
+--   (x : D.Type) :
+--     ℕ∞ :=
+--   letI γ := (directLimit ⟨D'' F, ι'' F⟩ (jsp F ‹_› ‹_›)).1.2
+--   haveI D_eq := PSigma.noConfusion h λ fst_eq snd_eq ↦ fst_eq
 
-  if h : ∃ (k : ℕ), i (D_eq ▸ γ (k + 1)) (j (F.map (γ k)) (D_eq ▸ i fix.inv x)) = x then
-    ↑(choose h)
-  else
-    ⊤
+--   if h : ∃ (k : ℕ), i (D_eq ▸ γ (k + 1)) (j (F.map (γ k)) (D_eq ▸ i fix.inv x)) = x then
+--     ↑(choose h)
+--   else
+--     ⊤
 
 /-! # Functors
 -/
@@ -542,11 +545,11 @@ section Functors
         property := by admit
       }
 
-  theorem ENNReal.ofReal_max {x y : ℝ} : ENNReal.ofReal (max x y) = max (ENNReal.ofReal x) (ENNReal.ofReal y) := by
-    unfold ENNReal.ofReal
-    -- erw [Real.coe_toNNReal' (max x y)]
+  -- theorem ENNReal.ofReal_max {x y : ℝ} : ENNReal.ofReal (max x y) = max (ENNReal.ofReal x) (ENNReal.ofReal y) := by
+  --   unfold ENNReal.ofReal
+  --   -- erw [Real.coe_toNNReal' (max x y)]
 
-    admit
+  --   admit
 
   theorem Prod.map.isometry_of_isometry {α β γ δ : Type _} {f : α → β} {g : γ → δ}
     [PseudoMetricSpace α] [PseudoMetricSpace β] [PseudoMetricSpace γ] [PseudoMetricSpace δ]
@@ -574,24 +577,25 @@ section Functors
           · admit
       }
 
-  open scoped Function in
-  noncomputable instance {α} [CompleteEMetricSpace α] : CompleteEMetricSpace {s : Set α // IsClosed s} where
-    -- TODO: find the proof somewhere
-    edist := EMetric.hausdorffEdist on Subtype.val
-    edist_self := λ ⟨s, _⟩ ↦ EMetric.hausdorffEdist_self
-    edist_comm := λ ⟨s, _⟩ ⟨t, _⟩ ↦ EMetric.hausdorffEdist_comm
-    edist_triangle := λ ⟨s, _⟩ ⟨t, _⟩ ⟨u, _⟩ ↦ EMetric.hausdorffEdist_triangle
-    eq_of_edist_eq_zero := by
-      rintro ⟨x, hx⟩ ⟨y, hy⟩ h
-      admit
-      -- rw [IsClosed.hausdorffEdist_zero_iff_eq hx hy] at h
-      -- · simp [h]
-      -- ·
-      --   admit
-    complete := by admit
+  -- open scoped Function in
+  -- noncomputable instance {α} [CompleteEMetricSpace α] : CompleteEMetricSpace (TopologicalSpace.Closeds α) where
+  --   -- TODO: find the proof somewhere
+  --   -- __ := inferInstanceAs (EMetricSpace (TopologicalSpace.Closeds α))
+  --   -- edist := EMetric.hausdorffEdist on Subtype.val
+  --   -- edist_self := λ ⟨s, _⟩ ↦ EMetric.hausdorffEdist_self
+  --   -- edist_comm := λ ⟨s, _⟩ ⟨t, _⟩ ↦ EMetric.hausdorffEdist_comm
+  --   -- edist_triangle := λ ⟨s, _⟩ ⟨t, _⟩ ⟨u, _⟩ ↦ EMetric.hausdorffEdist_triangle
+  --   -- eq_of_edist_eq_zero := by
+  --   --   rintro ⟨x, hx⟩ ⟨y, hy⟩ h
+  --   --   admit
+  --   --   -- rw [IsClosed.hausdorffEdist_zero_iff_eq hx hy] at h
+  --   --   -- · simp [h]
+  --   --   -- ·
+  --   --   --   admit
+  --   -- complete := by admit
 
   noncomputable def Power.{u, v} (F : Obj.{u} ⥤ Obj.{v}) : Obj.{u} ⥤ Obj.{v} where
-    obj P := @Obj.mk { s : Set (F.obj P).α // IsClosed s } ⟨⟨∅, isClosed_empty⟩⟩ inferInstance
+    obj P := @Obj.mk (TopologicalSpace.Closeds (F.obj P).α) ⟨⟨∅, isClosed_empty⟩⟩ inferInstance
     map ι :=
       let ⟨⟨i, j⟩, ⟨iso_i, embed_i, _, _⟩⟩ := F.map ι
       { val := ⟨λ ⟨X, h⟩ ↦ ⟨i '' X, by rwa [← Topology.IsClosedEmbedding.isClosed_iff_image_isClosed iso_i.isClosedEmbedding]⟩,
@@ -741,41 +745,32 @@ namespace Proc
 
   noncomputable instance : CompleteEMetricSpace Prop := inferInstance
 
-  instance : MetricSpace Bool where
-    __ := MetricSpace.ofDistTopology (λ x y ↦ if x = y then 0 else 1)
-      (λ x ↦ if_pos rfl)
-      (λ x y ↦ by conv_lhs => enter [0, x, y, 1]; apply propext eq_comm)
-      (λ x y z ↦ by
-        beta_reduce
-        split_ifs <;> solve
-          | norm_num
-          | subst_vars; contradiction)
-      (λ s ↦ by
-        beta_reduce
-        admit)
-      (λ x y h ↦ by
-        beta_reduce at h
-        split_ifs at h <;> solve
-          | assumption
-          | simp at h)
 
-  instance : CompleteEMetricSpace Bool := inferInstance
+  attribute [local instance] Metric.metricSpaceSum in
+  noncomputable instance : EMetricSpace Bool :=
+    EMetricSpace.induced.{0, 0}
+      (λ | false => Sum.inl PUnit.unit | true => Sum.inr PUnit.unit)
+      (by simp only [Bool.injective_iff, ne_eq, reduceCtorEq, not_false_eq_true])
+      inferInstance
+
+  -- noncomputable instance : CompleteEMetricSpace Bool := inferInstance
 
   open scoped Func in
   section
-    noncomputable abbrev Branch.F.{u} (α β γ δ : Type u) [Inhabited α] [Inhabited β] [Inhabited γ] [Inhabited δ] [CompleteEMetricSpace α] [CompleteEMetricSpace β] [CompleteEMetricSpace γ] [CompleteEMetricSpace δ] :
-        Func.{u} :=
+    universe u
+    variable (α β γ δ : Type u) [Inhabited α] [Inhabited β] [Inhabited γ] [Inhabited δ] [CompleteEMetricSpace α] [CompleteEMetricSpace β] [CompleteEMetricSpace γ] [CompleteEMetricSpace δ]
+
+    noncomputable abbrev Branch.F : Func.{u} :=
          𝓀(γ) ×ᶠ (𝓀(α) ×ᶠ 𝓀(ULift Bool) ⟶₁ᶠ 𝟙⟨1/2⟩)
       ⊕ᶠ 𝓀(γ) ×ᶠ 𝓀(α) ×ᶠ 𝟙⟨1/2⟩
       ⊕ᶠ 𝓀(γ) ×ᶠ 𝟙⟨1/2⟩
       ⊕ᶠ 𝓀(γ) ×ᶠ 𝟙⟨1/2⟩
       ⊕ᶠ 𝓀(δ) ×ᶠ 𝟙⟨1/2⟩
 
-    noncomputable abbrev F.{u} (α β γ δ : Type u) [Inhabited α] [Inhabited β] [Inhabited γ] [Inhabited δ] [CompleteEMetricSpace α] [CompleteEMetricSpace β] [CompleteEMetricSpace γ] [CompleteEMetricSpace δ] :
-        Func.{u} :=
+    noncomputable abbrev F : Func.{u} :=
          𝓀(β)
       ⊕ᶠ 𝓀(PUnit)
-      ⊕ᶠ (𝓀(δ) ⟶ᶠ 𝒫ᶜˡ(Branch.F α β γ δ))
+      ⊕ᶠ (𝓀(δ) ⟶ᶠ 𝒫ᶜˡ(Branch.F α γ δ))
   end
 
   theorem F.interp_eq.{u} {α β γ δ : Type u} [Inhabited α] [Inhabited β] [Inhabited γ] [Inhabited δ] [CompleteEMetricSpace α] [CompleteEMetricSpace β] [CompleteEMetricSpace γ] [CompleteEMetricSpace δ] :
@@ -804,11 +799,60 @@ namespace Proc
   lemma jsp₆ {D D' D''} (iso : D ≅ D') (iso' : D' ≅ D'') {x} : i (iso ≪≫ iso').hom x = i iso'.hom (i iso.hom x) := by
     rw [Iso.trans_hom, ← comp_i_eq_i_comp, Function.comp_def]
 
-  lemma dom_fixpoint_eq.{u} {α β γ δ : Type u} [Inhabited α] [Inhabited β] [Inhabited γ] [Inhabited δ] [CompleteEMetricSpace α] [CompleteEMetricSpace β] [CompleteEMetricSpace γ] [CompleteEMetricSpace δ]
-    {P fix fix_unique} (h : ⟨P, fix, fix_unique⟩ = Func.exists_iso_of_contracting (Proc.F α β γ δ) Proc.F.contractCoeff_lt_one) :
-      P = (directLimit ⟨D'' (Proc.F α β γ δ).interp, ι'' (Proc.F α β γ δ).interp⟩
-                       (jsp _ (Func.contracting_of_contractCoeff_lt_one _ Proc.F.contractCoeff_lt_one) (Func.homContracting_of_contractCoeff_lt_one _ Proc.F.contractCoeff_lt_one))).1.1 := by
-    injection h with _ _
+
+----------------------------
+
+  instance {x y : Obj} : CompleteSpace (x ⟶ y) := sorry
+
+  section Operators
+    open scoped Func
+
+    universe u
+    variable {α β β' γ δ : Type u} [Inhabited α] [Inhabited β] [Inhabited β'] [Inhabited γ] [Inhabited δ] [CompleteEMetricSpace α] [CompleteEMetricSpace β] [CompleteEMetricSpace β'] [CompleteEMetricSpace γ] [CompleteEMetricSpace δ]
+
+    def F.apply_map {P P'} (f : β → β') (g : P ⟶ P') : (F α β γ δ).interp.obj P ⟶ (F α β' γ δ).interp.obj P' where
+      val := by admit
+      property := by admit
+
+
+
+    noncomputable def F.mapLeaf {P P'} (f : β → β') (κ : P ≅ (F α β γ δ).interp.obj P) (κ' : P' ≅ (F α β' γ δ).interp.obj P') (g : P ⟶ P') :
+        P ⟶ P' :=
+      κ.hom ≫ F.apply_map f g ≫ κ'.inv
+
+    theorem F.mapLeaf_lipschitz {P P'} {f : β → β'} {κ : P ≅ (F α β γ δ).interp.obj P} {κ' : P' ≅ (F α β' γ δ).interp.obj P'} :
+        LipschitzWith (F α β γ δ).contractCoeff.toNNReal (mapLeaf f κ κ') := by
+      intros x y
+      rw [ENNReal.coe_toNNReal]
+      · -- TODO: perhaps there is a way to generalize `jsp₅` to arbitrary functions?
+        admit
+      · have : (F α β γ δ).contractCoeff < ∞ := by
+          trans 1
+          · exact F.contractCoeff_lt_one
+          · exact one_lt_top
+        grind
+
+    noncomputable def F.map {P P'} (f : β → β') (κ : P ≅ (F α β γ δ).interp.obj P) (κ' : P' ≅ (F α β' γ δ).interp.obj P')
+      (x : P ⟶ P') (hx : edist x (F.mapLeaf f κ κ' x) ≠ ∞) :
+        P ⟶ P' :=
+      have f_contracting : ContractingWith (F α β γ δ).contractCoeff.toNNReal (F.mapLeaf f κ κ') := by
+        have : (F α β γ δ).contractCoeff < 1 := F.contractCoeff_lt_one
+
+        constructor
+        · apply toNNReal_lt_of_lt_coe
+          exact this
+        · apply F.mapLeaf_lipschitz
+      ContractingWith.efixedPoint (α := P ⟶ P') (F.mapLeaf f κ κ') f_contracting x hx
+
+
+
+  end Operators
+
+  -- lemma dom_fixpoint_eq.{u} {α β γ δ : Type u} [Inhabited α] [Inhabited β] [Inhabited γ] [Inhabited δ] [CompleteEMetricSpace α] [CompleteEMetricSpace β] [CompleteEMetricSpace γ] [CompleteEMetricSpace δ]
+  --   {P fix fix_unique} (h : ⟨P, fix, fix_unique⟩ = Func.exists_iso_of_contracting (Proc.F α β γ δ) Proc.F.contractCoeff_lt_one) :
+  --     P = (directLimit ⟨D'' (Proc.F α β γ δ).interp, ι'' (Proc.F α β γ δ).interp⟩
+  --                      (jsp _ (Func.contracting_of_contractCoeff_lt_one _ Proc.F.contractCoeff_lt_one) (Func.homContracting_of_contractCoeff_lt_one _ Proc.F.contractCoeff_lt_one))).1.1 := by
+  --   injection h with _ _
 
   -- theorem Proc.recOn'.extracted_2.{u} {α β γ δ : Type u} [inst : Inhabited α] [inst_1 : Inhabited β]
   --   [inst_2 : Inhabited γ] [inst_3 : Inhabited δ] [inst_4 : CompleteEMetricSpace α] [inst_5 : CompleteEMetricSpace β]
@@ -835,206 +879,206 @@ namespace Proc
   --   admit
 
 
-  noncomputable def F.map.{u} {α β γ δ : Type u} [Inhabited α] [Inhabited β] [Inhabited γ] [Inhabited δ] [CompleteEMetricSpace α] [CompleteEMetricSpace β] [CompleteEMetricSpace γ] [CompleteEMetricSpace δ]
-    {P D : Obj} (f : P.α → D.α) :
-      ((Proc.F α β γ δ).interp.obj P).α → ((Proc.F α β γ δ).interp.obj D).α
-    | Sum.inl v => Sum.inl v
-    | Sum.inr (Sum.inl .unit) => Sum.inr (Sum.inl .unit)
-    | Sum.inr (Sum.inr g) => Sum.inr (Sum.inr λ σ ↦ ⟨closure (f' '' (g σ).val), isClosed_closure⟩)
-  where
-    f' : ((Branch.F α β γ δ).interp.obj P).α → ((Branch.F α β γ δ).interp.obj D).α
-      | Sum.inl ⟨c, π⟩ => Sum.inl ⟨c, λ v ↦ f (π v)⟩
-      | Sum.inr (Sum.inl ⟨c, v, p⟩) => Sum.inr (Sum.inl ⟨c, v, f p⟩)
-      | Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩)) => Sum.inr (Sum.inr (Sum.inl ⟨c, f p⟩))
-      | Sum.inr (Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩))) => Sum.inr (Sum.inr (Sum.inr (Sum.inl ⟨c, f p⟩)))
-      | Sum.inr (Sum.inr (Sum.inr (Sum.inr ⟨σ, p⟩))) => Sum.inr (Sum.inr (Sum.inr (Sum.inr ⟨σ, f p⟩)))
+  -- noncomputable def F.map.{u} {α β γ δ : Type u} [Inhabited α] [Inhabited β] [Inhabited γ] [Inhabited δ] [CompleteEMetricSpace α] [CompleteEMetricSpace β] [CompleteEMetricSpace γ] [CompleteEMetricSpace δ]
+  --   {P D : Obj} (f : P.α → D.α) :
+  --     ((Proc.F α β γ δ).interp.obj P).α → ((Proc.F α β γ δ).interp.obj D).α
+  --   | Sum.inl v => Sum.inl v
+  --   | Sum.inr (Sum.inl .unit) => Sum.inr (Sum.inl .unit)
+  --   | Sum.inr (Sum.inr g) => Sum.inr (Sum.inr λ σ ↦ ⟨closure (f' '' (g σ).val), isClosed_closure⟩)
+  -- where
+  --   f' : ((Branch.F α β γ δ).interp.obj P).α → ((Branch.F α β γ δ).interp.obj D).α
+  --     | Sum.inl ⟨c, π⟩ => Sum.inl ⟨c, λ v ↦ f (π v)⟩
+  --     | Sum.inr (Sum.inl ⟨c, v, p⟩) => Sum.inr (Sum.inl ⟨c, v, f p⟩)
+  --     | Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩)) => Sum.inr (Sum.inr (Sum.inl ⟨c, f p⟩))
+  --     | Sum.inr (Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩))) => Sum.inr (Sum.inr (Sum.inr (Sum.inl ⟨c, f p⟩)))
+  --     | Sum.inr (Sum.inr (Sum.inr (Sum.inr ⟨σ, p⟩))) => Sum.inr (Sum.inr (Sum.inr (Sum.inr ⟨σ, f p⟩)))
 
-  noncomputable def cata₁.{u} {α β γ δ : Type u} [Inhabited α] [Inhabited β] [Inhabited γ] [Inhabited δ] [CompleteEMetricSpace α] [CompleteEMetricSpace β] [CompleteEMetricSpace γ] [CompleteEMetricSpace δ]
-    {P fix fix_unique} (h : ⟨P, fix, fix_unique⟩ = Func.exists_iso_of_contracting (Proc.F α β γ δ) Proc.F.contractCoeff_lt_one)
-    {D : Obj} (φ : ((Proc.F α β γ δ).interp.obj D).α → D.α) :
-      P.α → D.α :=
-    -- fix.inv ≫ (Proc.F α β γ δ).interp.map (Proc.cata h φ) ≫ φ
-    λ x ↦ φ <| F.map (Proc.cata₁ h φ) <| i fix.inv x
-  termination_by x => 0
-  decreasing_by
-    -- TODO: assume termination for now, but it should hold…right?
-    all: admit
-
-  noncomputable def cata₂.{u} {α β γ δ : Type u} [Inhabited α] [Inhabited β] [Inhabited γ] [Inhabited δ] [CompleteEMetricSpace α] [CompleteEMetricSpace β] [CompleteEMetricSpace γ] [CompleteEMetricSpace δ]
-    {P fix fix_unique} (h : ⟨P, fix, fix_unique⟩ = Func.exists_iso_of_contracting (Proc.F α β γ δ) Proc.F.contractCoeff_lt_one)
-    {D : Obj} (φ : ((Proc.F α β γ δ).interp.obj D).α → ((Proc.F α β γ δ).interp.obj D).α → D.α) :
-      P.α → P.α → D.α :=
-    -- TODO: check that this does what we actually want
-    letI D' := Obj.mk (P.α → D.α)
-    letI φ' : ((Proc.F α β γ δ).interp.obj D').α → D'.α := λ x y ↦
-      Proc.cata₁ (D := D) h (φ (F.map (λ z : D'.α ↦ z y) x)) y
-    Proc.cata₁ (D := D') h φ'
-
-  -- noncomputable def Proc.recOn₁.{u, v, w} {α β γ δ : Type u} [Inhabited α] [Inhabited β] [Inhabited γ] [Inhabited δ] [CompleteEMetricSpace α] [CompleteEMetricSpace β] [CompleteEMetricSpace γ] [CompleteEMetricSpace δ]
-  --   {P fix fix_unique} (h : ⟨P, fix, fix_unique⟩ = Func.exists_iso_of_contracting (Proc.F α β γ δ) Proc.F.contractCoeff_lt_one) (x : P.α)
-  --   {motive₁ : P.α → Sort v} {motive₂ : _ ⊕ _ ⊕ _ ⊕ _ ⊕ _ → Sort w}
-  --   ----- Processes
-  --   (leaf : ∀ (v : β), motive₁ (i fix.hom (Sum.inl v)))
-  --   (abort : motive₁ (i fix.hom (Sum.inr (Sum.inl PUnit.unit))))
-  --   (branch : ∀ f : _ → { s : Set _ // _}, (∀ σ, ∀ b ∈ (f σ).1, motive₂ b) → motive₁ (i fix.hom (Sum.inr (Sum.inr f))))
-  --   ----- Branches
-  --   (recv : ∀ (c : γ) (π : α × ULift Bool → P.α), (∀ v b, motive₁ (π ⟨v, b⟩)) → motive₂ (Sum.inl (c, π)))
-  --   (send : ∀ (c : γ) (v : α) (p : P.α), motive₁ p → motive₂ (Sum.inr (Sum.inl (c, v, p))))
-  --   (close : ∀ (c : γ) (p : P.α), motive₁ p → motive₂ (Sum.inr (Sum.inr (Sum.inl (c, p)))))
-  --   (sync : ∀ (c : γ) (p : P.α), motive₁ p → motive₂ (Sum.inr (Sum.inr (Sum.inr (Sum.inl (c, p))))))
-  --   (next : ∀ (σ : δ) (p : P.α), motive₁ p → motive₂ (Sum.inr (Sum.inr (Sum.inr (Sum.inr (σ, p)))))) :
-  --     motive₁ x :=
-  --   i_hom_i_inv_eq_id fix x ▸ match h' : i fix.inv x with
-  --     | .inl v => h'.symm ▸ leaf v
-  --     | .inr (.inl .unit) => h'.symm ▸ abort
-  --     | .inr (.inr f) => h'.symm ▸ branch f (λ y b _b_in ↦ match h'' : b with
-  --       | Sum.inl ⟨c, π⟩ => recv c π (λ v ok ↦ Proc.recOn₁ h (π ⟨v, ok⟩) leaf abort branch recv send close sync next)
-  --       | Sum.inr (Sum.inl ⟨c, v, p⟩) => send c v p (Proc.recOn₁ h p leaf abort branch recv send close sync next)
-  --       | Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩)) => close c p (Proc.recOn₁ h p leaf abort branch recv send close sync next)
-  --       | Sum.inr (Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩))) => sync c p (Proc.recOn₁ h p leaf abort branch recv send close sync next)
-  --       | Sum.inr (Sum.inr (Sum.inr (Sum.inr ⟨σ, p⟩))) => next σ p (Proc.recOn₁ h p leaf abort branch recv send close sync next))
-  -- termination_by Functor.Contracting.fixedPointMeasure h x
+  -- noncomputable def cata₁.{u} {α β γ δ : Type u} [Inhabited α] [Inhabited β] [Inhabited γ] [Inhabited δ] [CompleteEMetricSpace α] [CompleteEMetricSpace β] [CompleteEMetricSpace γ] [CompleteEMetricSpace δ]
+  --   {P fix fix_unique} (h : ⟨P, fix, fix_unique⟩ = Func.exists_iso_of_contracting (Proc.F α β γ δ) Proc.F.contractCoeff_lt_one)
+  --   {D : Obj} (φ : ((Proc.F α β γ δ).interp.obj D).α → D.α) :
+  --     P.α → D.α :=
+  --   -- fix.inv ≫ (Proc.F α β γ δ).interp.map (Proc.cata h φ) ≫ φ
+  --   λ x ↦ φ <| F.map (Proc.cata₁ h φ) <| i fix.inv x
+  -- termination_by x => 0
   -- decreasing_by
-  --   -- TODO: let us assume this for now…
-  --   all:
-  --     apply_fun i fix.hom at h'
-  --     rw [i_hom_i_inv_eq_id] at h'
+  --   -- TODO: assume termination for now, but it should hold…right?
+  --   all: admit
 
-  --     subst h'' h'
+  -- noncomputable def cata₂.{u} {α β γ δ : Type u} [Inhabited α] [Inhabited β] [Inhabited γ] [Inhabited δ] [CompleteEMetricSpace α] [CompleteEMetricSpace β] [CompleteEMetricSpace γ] [CompleteEMetricSpace δ]
+  --   {P fix fix_unique} (h : ⟨P, fix, fix_unique⟩ = Func.exists_iso_of_contracting (Proc.F α β γ δ) Proc.F.contractCoeff_lt_one)
+  --   {D : Obj} (φ : ((Proc.F α β γ δ).interp.obj D).α → ((Proc.F α β γ δ).interp.obj D).α → D.α) :
+  --     P.α → P.α → D.α :=
+  --   -- TODO: check that this does what we actually want
+  --   letI D' := Obj.mk (P.α → D.α)
+  --   letI φ' : ((Proc.F α β γ δ).interp.obj D').α → D'.α := λ x y ↦
+  --     Proc.cata₁ (D := D) h (φ (F.map (λ z : D'.α ↦ z y) x)) y
+  --   Proc.cata₁ (D := D') h φ'
 
-  --   · -- next
-  --     admit
-  --   · -- sync
-  --     admit
-  --   · -- close
-  --     admit
-  --   · -- send
-  --     admit
-  --   · -- recv
-  --     admit
+  -- -- noncomputable def Proc.recOn₁.{u, v, w} {α β γ δ : Type u} [Inhabited α] [Inhabited β] [Inhabited γ] [Inhabited δ] [CompleteEMetricSpace α] [CompleteEMetricSpace β] [CompleteEMetricSpace γ] [CompleteEMetricSpace δ]
+  -- --   {P fix fix_unique} (h : ⟨P, fix, fix_unique⟩ = Func.exists_iso_of_contracting (Proc.F α β γ δ) Proc.F.contractCoeff_lt_one) (x : P.α)
+  -- --   {motive₁ : P.α → Sort v} {motive₂ : _ ⊕ _ ⊕ _ ⊕ _ ⊕ _ → Sort w}
+  -- --   ----- Processes
+  -- --   (leaf : ∀ (v : β), motive₁ (i fix.hom (Sum.inl v)))
+  -- --   (abort : motive₁ (i fix.hom (Sum.inr (Sum.inl PUnit.unit))))
+  -- --   (branch : ∀ f : _ → { s : Set _ // _}, (∀ σ, ∀ b ∈ (f σ).1, motive₂ b) → motive₁ (i fix.hom (Sum.inr (Sum.inr f))))
+  -- --   ----- Branches
+  -- --   (recv : ∀ (c : γ) (π : α × ULift Bool → P.α), (∀ v b, motive₁ (π ⟨v, b⟩)) → motive₂ (Sum.inl (c, π)))
+  -- --   (send : ∀ (c : γ) (v : α) (p : P.α), motive₁ p → motive₂ (Sum.inr (Sum.inl (c, v, p))))
+  -- --   (close : ∀ (c : γ) (p : P.α), motive₁ p → motive₂ (Sum.inr (Sum.inr (Sum.inl (c, p)))))
+  -- --   (sync : ∀ (c : γ) (p : P.α), motive₁ p → motive₂ (Sum.inr (Sum.inr (Sum.inr (Sum.inl (c, p))))))
+  -- --   (next : ∀ (σ : δ) (p : P.α), motive₁ p → motive₂ (Sum.inr (Sum.inr (Sum.inr (Sum.inr (σ, p)))))) :
+  -- --     motive₁ x :=
+  -- --   i_hom_i_inv_eq_id fix x ▸ match h' : i fix.inv x with
+  -- --     | .inl v => h'.symm ▸ leaf v
+  -- --     | .inr (.inl .unit) => h'.symm ▸ abort
+  -- --     | .inr (.inr f) => h'.symm ▸ branch f (λ y b _b_in ↦ match h'' : b with
+  -- --       | Sum.inl ⟨c, π⟩ => recv c π (λ v ok ↦ Proc.recOn₁ h (π ⟨v, ok⟩) leaf abort branch recv send close sync next)
+  -- --       | Sum.inr (Sum.inl ⟨c, v, p⟩) => send c v p (Proc.recOn₁ h p leaf abort branch recv send close sync next)
+  -- --       | Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩)) => close c p (Proc.recOn₁ h p leaf abort branch recv send close sync next)
+  -- --       | Sum.inr (Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩))) => sync c p (Proc.recOn₁ h p leaf abort branch recv send close sync next)
+  -- --       | Sum.inr (Sum.inr (Sum.inr (Sum.inr ⟨σ, p⟩))) => next σ p (Proc.recOn₁ h p leaf abort branch recv send close sync next))
+  -- -- termination_by Functor.Contracting.fixedPointMeasure h x
+  -- -- decreasing_by
+  -- --   -- TODO: let us assume this for now…
+  -- --   all:
+  -- --     apply_fun i fix.hom at h'
+  -- --     rw [i_hom_i_inv_eq_id] at h'
 
-  -- attribute [-instance] instTopologicalSpaceSigma in
-  -- noncomputable def Proc.recOn'.{u, v, w} {α β γ δ : Type u} [Inhabited α] [Inhabited β] [Inhabited γ] [Inhabited δ] [CompleteEMetricSpace α] [CompleteEMetricSpace β] [CompleteEMetricSpace γ] [CompleteEMetricSpace δ]
-  --   {P fix fix_unique} (h : ⟨P, fix, fix_unique⟩ = Func.exists_iso_of_contracting (Proc.F α β γ δ) Proc.F.contractCoeff_lt_one) (x : P.α)
-  --   {motive₁ : _ ⊕ _ ⊕ _ → Sort v} {motive₂ : _ ⊕ _ ⊕ _ ⊕ _ ⊕ _ → Sort w}
-  --   ----- Processes
-  --   (leaf : ∀ (v : β), motive₁ (Sum.inl v))
-  --   (abort : motive₁ (Sum.inr (Sum.inl PUnit.unit)))
-  --   (branch : ∀ f, (∀ σ, ∀ b ∈ (f σ).1, motive₂ b) → motive₁ (Sum.inr (Sum.inr f)))
-  --   ----- Branches
-  --   (recv : ∀ (c : γ) (π : α × ULift Bool → P.α), (∀ v b, motive₁ (i fix.inv (π ⟨v, b⟩))) → motive₂ (Sum.inl (c, π)))
-  --   (send : ∀ (c : γ) (v : α) (p : P.α), motive₁ (i fix.inv p) → motive₂ (Sum.inr (Sum.inl (c, v, p))))
-  --   (close : ∀ (c : γ) (p : P.α), motive₁ (i fix.inv p) → motive₂ (Sum.inr (Sum.inr (Sum.inl (c, p)))))
-  --   (sync : ∀ (c : γ) (p : P.α), motive₁ (i fix.inv p) → motive₂ (Sum.inr (Sum.inr (Sum.inr (Sum.inl (c, p))))))
-  --   (next : ∀ (σ : δ) (p : P.α), motive₁ (i fix.inv p) → motive₂ (Sum.inr (Sum.inr (Sum.inr (Sum.inr (σ, p)))))) :
-  --     motive₁ (i fix.inv x) :=
-  --   match h' : i fix.inv x with
-  --     | .inl v => h' ▸ leaf v
-  --     | .inr (.inl .unit) => h' ▸ abort
-  --     | .inr (.inr f) =>
-  --       h' ▸ branch f (λ y b _b_in ↦ match h' : b with
-  --         | Sum.inl ⟨c, π⟩ => recv c π (λ v ok ↦ Proc.recOn' h (π ⟨v, ok⟩) leaf abort branch recv send close sync next)
-  --         | Sum.inr (Sum.inl ⟨c, v, p⟩) => send c v p (Proc.recOn' h p leaf abort branch recv send close sync next)
-  --         | Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩)) => close c p (Proc.recOn' h p leaf abort branch recv send close sync next)
-  --         | Sum.inr (Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩))) => sync c p (Proc.recOn' h p leaf abort branch recv send close sync next)
-  --         | Sum.inr (Sum.inr (Sum.inr (Sum.inr ⟨σ, p⟩))) => next σ p (Proc.recOn' h p leaf abort branch recv send close sync next))
-  -- termination_by Functor.Contracting.fixedPointMeasure h x
-  -- decreasing_by classical
-  --   all:
-  --     have : x = i fix.hom (Sum.inr (Sum.inr f)) := by rw [← ‹_ = Sum.inr (Sum.inr f)›, i_hom_i_inv_eq_id]
+  -- --     subst h'' h'
 
-  --     subst h' ‹x = _›
-  --     clear h'
+  -- --   · -- next
+  -- --     admit
+  -- --   · -- sync
+  -- --     admit
+  -- --   · -- close
+  -- --     admit
+  -- --   · -- send
+  -- --     admit
+  -- --   · -- recv
+  -- --     admit
 
-  --     simp_wf
-
-  --   · -- next
-  --     admit
-  --   · -- sync
-  --     unfold Functor.Contracting.fixedPointMeasure
-
-  --     split_ifs with h₁ h₂ h₃
-  --     · have spec_h₁ := Classical.choose_spec h₁
-  --       have spec_h₂ := Classical.choose_spec h₂
-
-  --       simp [i_inv_i_hom_eq_id] at spec_h₂
-
-  --       rw [ENat.coe_lt_coe]
-  --       admit
-  --     · apply ENat.coe_lt_top
-  --     · -- ↯
-  --       admit
-  --     · -- ↯
-  --       admit
-  --   · -- close
-  --     admit
-  --   · -- send
-  --     admit
-  --   · -- recv
-  --     admit
-
-  -- -- noncomputable def Proc.recOn'.{u, v, w} {α β γ δ : Type u} [Inhabited α] [Inhabited β] [Inhabited γ] [Inhabited δ] [CompleteMetricSpace α] [CompleteMetricSpace β] [CompleteMetricSpace γ] [CompleteMetricSpace δ]
-  -- --   {P : Obj} (fix : (Proc.F α β γ δ).interp.obj P ≅ P)
+  -- -- attribute [-instance] instTopologicalSpaceSigma in
+  -- -- noncomputable def Proc.recOn'.{u, v, w} {α β γ δ : Type u} [Inhabited α] [Inhabited β] [Inhabited γ] [Inhabited δ] [CompleteEMetricSpace α] [CompleteEMetricSpace β] [CompleteEMetricSpace γ] [CompleteEMetricSpace δ]
+  -- --   {P fix fix_unique} (h : ⟨P, fix, fix_unique⟩ = Func.exists_iso_of_contracting (Proc.F α β γ δ) Proc.F.contractCoeff_lt_one) (x : P.α)
   -- --   {motive₁ : _ ⊕ _ ⊕ _ → Sort v} {motive₂ : _ ⊕ _ ⊕ _ ⊕ _ ⊕ _ → Sort w}
   -- --   ----- Processes
   -- --   (leaf : ∀ (v : β), motive₁ (Sum.inl v))
-  -- --   (close : ∀ (c : γ) (p : P.Type), motive₁ (i fix.inv p) → motive₂ (Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩))))
-  -- --   (sync : ∀ (c : γ) (p : P.Type), motive₁ (i fix.inv p) → motive₂ (Sum.inr (Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩)))))
-  -- --   (next : ∀ (σ : δ) (p : P.Type), motive₁ (i fix.inv p) → motive₂ (Sum.inr (Sum.inr (Sum.inr (Sum.inr ⟨σ, p⟩)))))
-  -- --   (x : P.Type) :
+  -- --   (abort : motive₁ (Sum.inr (Sum.inl PUnit.unit)))
+  -- --   (branch : ∀ f, (∀ σ, ∀ b ∈ (f σ).1, motive₂ b) → motive₁ (Sum.inr (Sum.inr f)))
+  -- --   ----- Branches
+  -- --   (recv : ∀ (c : γ) (π : α × ULift Bool → P.α), (∀ v b, motive₁ (i fix.inv (π ⟨v, b⟩))) → motive₂ (Sum.inl (c, π)))
+  -- --   (send : ∀ (c : γ) (v : α) (p : P.α), motive₁ (i fix.inv p) → motive₂ (Sum.inr (Sum.inl (c, v, p))))
+  -- --   (close : ∀ (c : γ) (p : P.α), motive₁ (i fix.inv p) → motive₂ (Sum.inr (Sum.inr (Sum.inl (c, p)))))
+  -- --   (sync : ∀ (c : γ) (p : P.α), motive₁ (i fix.inv p) → motive₂ (Sum.inr (Sum.inr (Sum.inr (Sum.inl (c, p))))))
+  -- --   (next : ∀ (σ : δ) (p : P.α), motive₁ (i fix.inv p) → motive₂ (Sum.inr (Sum.inr (Sum.inr (Sum.inr (σ, p)))))) :
   -- --     motive₁ (i fix.inv x) :=
-  -- --   match h : i fix.inv x with
-  -- --     | .inl v => h ▸ leaf v
-  -- --     | .inr (.inl .unit) => h ▸ abort
+  -- --   match h' : i fix.inv x with
+  -- --     | .inl v => h' ▸ leaf v
+  -- --     | .inr (.inl .unit) => h' ▸ abort
   -- --     | .inr (.inr f) =>
-  -- --       h ▸ branch f (λ x b _b_in ↦ match h' : b with
-  -- --         | Sum.inl ⟨c, π⟩ => recv c π (λ v b ↦ Proc.recOn' fix leaf abort branch recv send close sync next (π ⟨v, b⟩))
-  -- --         | Sum.inr (Sum.inl ⟨c, v, p⟩) => send c v p (Proc.recOn' fix leaf abort branch recv send close sync next p)
-  -- --         | Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩)) => close c p (Proc.recOn' fix leaf abort branch recv send close sync next p)
-  -- --         | Sum.inr (Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩))) => sync c p (Proc.recOn' fix leaf abort branch recv send close sync next p)
-  -- --         | Sum.inr (Sum.inr (Sum.inr (Sum.inr ⟨σ, p⟩))) => next σ p (Proc.recOn' fix leaf abort branch recv send close sync next p))
+  -- --       h' ▸ branch f (λ y b _b_in ↦ match h' : b with
+  -- --         | Sum.inl ⟨c, π⟩ => recv c π (λ v ok ↦ Proc.recOn' h (π ⟨v, ok⟩) leaf abort branch recv send close sync next)
+  -- --         | Sum.inr (Sum.inl ⟨c, v, p⟩) => send c v p (Proc.recOn' h p leaf abort branch recv send close sync next)
+  -- --         | Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩)) => close c p (Proc.recOn' h p leaf abort branch recv send close sync next)
+  -- --         | Sum.inr (Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩))) => sync c p (Proc.recOn' h p leaf abort branch recv send close sync next)
+  -- --         | Sum.inr (Sum.inr (Sum.inr (Sum.inr ⟨σ, p⟩))) => next σ p (Proc.recOn' h p leaf abort branch recv send close sync next))
+  -- -- termination_by Functor.Contracting.fixedPointMeasure h x
+  -- -- decreasing_by classical
+  -- --   all:
+  -- --     have : x = i fix.hom (Sum.inr (Sum.inr f)) := by rw [← ‹_ = Sum.inr (Sum.inr f)›, i_hom_i_inv_eq_id]
 
-  --   --   by
-  --   -- let (eq := h) ⟨P', fix', fix'_unique⟩ := Func.exists_iso_of_contracting (Proc.F α β γ δ) Proc.F.contractCoeff_lt_one
-  --   -- let iso : P' ≅ P := fix'_unique _ fix
-  --   -- -- let iso' := fix' ≪≫ iso ≪≫ fix.symm
+  -- --     subst h' ‹x = _›
+  -- --     clear h'
 
-  --   -- injection h with P'_eq _
-  --   -- have converging := Functor.exists_unique_fixed_point_of_contracting_of_hom_contracting._proof_1.{u} (Proc.F α β γ δ).interp
-  --   -- dsimp [directLimit, D, Tower.ι, Tower.D] at P'_eq
-  --   -- dsimp [Tower.IsConverging, Tower.ι, _root_.δ] at converging
+  -- --     simp_wf
 
-  --   -- let (eq := h') ⟨xn, xn_def⟩ := P'_eq ▸ i iso.inv x
-  --   -- sorry
-  -- -- decreasing_by
-  -- --   all:  simp_wf
-  -- --         admit
+  -- --   · -- next
+  -- --     admit
+  -- --   · -- sync
+  -- --     unfold Functor.Contracting.fixedPointMeasure
 
-  protected noncomputable abbrev map.{u} {α β γ δ ε : Type u} [Inhabited α] [Inhabited β] [Inhabited γ] [Inhabited δ] [Inhabited ε] [CompleteEMetricSpace α] [CompleteEMetricSpace β] [CompleteEMetricSpace γ] [CompleteEMetricSpace δ] [CompleteEMetricSpace ε]
-    {P P' fix fix' fix_unique fix_unique'}
-    (h₁ : ⟨P, fix, fix_unique⟩ = Func.exists_iso_of_contracting (Proc.F α β γ δ) Proc.F.contractCoeff_lt_one)
-    (h₂ : ⟨P', fix', fix_unique'⟩ = Func.exists_iso_of_contracting (Proc.F α ε γ δ) Proc.F.contractCoeff_lt_one)
-    (f : β → ε) :
-      P.α → P'.α :=
-    cata₁ h₁ <| i fix'.hom ∘' λ
-      | Sum.inl v => Sum.inl (f v)
-      | Sum.inr (Sum.inl .unit) => Sum.inr (Sum.inl .unit)
-      | Sum.inr (Sum.inr g) =>
-        let f'
-          | Sum.inl ⟨c, π⟩ => Sum.inl ⟨c, π⟩
-          | Sum.inr (Sum.inl ⟨c, v, p⟩) => Sum.inr (Sum.inl ⟨c, v, p⟩)
-          | Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩)) => Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩))
-          | Sum.inr (Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩))) => Sum.inr (Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩)))
-          | Sum.inr (Sum.inr (Sum.inr (Sum.inr ⟨σ, p⟩))) => Sum.inr (Sum.inr (Sum.inr (Sum.inr ⟨σ, p⟩)))
-        have embed_f' : Topology.IsClosedEmbedding f' := by
-          constructor
-          · -- YES
-            admit
-          · -- MAYBE?
-            admit
-        Sum.inr (Sum.inr λ σ ↦ ⟨f' '' (g σ).val, by
-          rw [← Topology.IsClosedEmbedding.isClosed_iff_image_isClosed]
-          · exact (g σ).property
-          · assumption
-        ⟩)
+  -- --     split_ifs with h₁ h₂ h₃
+  -- --     · have spec_h₁ := Classical.choose_spec h₁
+  -- --       have spec_h₂ := Classical.choose_spec h₂
+
+  -- --       simp [i_inv_i_hom_eq_id] at spec_h₂
+
+  -- --       rw [ENat.coe_lt_coe]
+  -- --       admit
+  -- --     · apply ENat.coe_lt_top
+  -- --     · -- ↯
+  -- --       admit
+  -- --     · -- ↯
+  -- --       admit
+  -- --   · -- close
+  -- --     admit
+  -- --   · -- send
+  -- --     admit
+  -- --   · -- recv
+  -- --     admit
+
+  -- -- -- noncomputable def Proc.recOn'.{u, v, w} {α β γ δ : Type u} [Inhabited α] [Inhabited β] [Inhabited γ] [Inhabited δ] [CompleteMetricSpace α] [CompleteMetricSpace β] [CompleteMetricSpace γ] [CompleteMetricSpace δ]
+  -- -- --   {P : Obj} (fix : (Proc.F α β γ δ).interp.obj P ≅ P)
+  -- -- --   {motive₁ : _ ⊕ _ ⊕ _ → Sort v} {motive₂ : _ ⊕ _ ⊕ _ ⊕ _ ⊕ _ → Sort w}
+  -- -- --   ----- Processes
+  -- -- --   (leaf : ∀ (v : β), motive₁ (Sum.inl v))
+  -- -- --   (close : ∀ (c : γ) (p : P.Type), motive₁ (i fix.inv p) → motive₂ (Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩))))
+  -- -- --   (sync : ∀ (c : γ) (p : P.Type), motive₁ (i fix.inv p) → motive₂ (Sum.inr (Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩)))))
+  -- -- --   (next : ∀ (σ : δ) (p : P.Type), motive₁ (i fix.inv p) → motive₂ (Sum.inr (Sum.inr (Sum.inr (Sum.inr ⟨σ, p⟩)))))
+  -- -- --   (x : P.Type) :
+  -- -- --     motive₁ (i fix.inv x) :=
+  -- -- --   match h : i fix.inv x with
+  -- -- --     | .inl v => h ▸ leaf v
+  -- -- --     | .inr (.inl .unit) => h ▸ abort
+  -- -- --     | .inr (.inr f) =>
+  -- -- --       h ▸ branch f (λ x b _b_in ↦ match h' : b with
+  -- -- --         | Sum.inl ⟨c, π⟩ => recv c π (λ v b ↦ Proc.recOn' fix leaf abort branch recv send close sync next (π ⟨v, b⟩))
+  -- -- --         | Sum.inr (Sum.inl ⟨c, v, p⟩) => send c v p (Proc.recOn' fix leaf abort branch recv send close sync next p)
+  -- -- --         | Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩)) => close c p (Proc.recOn' fix leaf abort branch recv send close sync next p)
+  -- -- --         | Sum.inr (Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩))) => sync c p (Proc.recOn' fix leaf abort branch recv send close sync next p)
+  -- -- --         | Sum.inr (Sum.inr (Sum.inr (Sum.inr ⟨σ, p⟩))) => next σ p (Proc.recOn' fix leaf abort branch recv send close sync next p))
+
+  -- --   --   by
+  -- --   -- let (eq := h) ⟨P', fix', fix'_unique⟩ := Func.exists_iso_of_contracting (Proc.F α β γ δ) Proc.F.contractCoeff_lt_one
+  -- --   -- let iso : P' ≅ P := fix'_unique _ fix
+  -- --   -- -- let iso' := fix' ≪≫ iso ≪≫ fix.symm
+
+  -- --   -- injection h with P'_eq _
+  -- --   -- have converging := Functor.exists_unique_fixed_point_of_contracting_of_hom_contracting._proof_1.{u} (Proc.F α β γ δ).interp
+  -- --   -- dsimp [directLimit, D, Tower.ι, Tower.D] at P'_eq
+  -- --   -- dsimp [Tower.IsConverging, Tower.ι, _root_.δ] at converging
+
+  -- --   -- let (eq := h') ⟨xn, xn_def⟩ := P'_eq ▸ i iso.inv x
+  -- --   -- sorry
+  -- -- -- decreasing_by
+  -- -- --   all:  simp_wf
+  -- -- --         admit
+
+  -- protected noncomputable abbrev map.{u} {α β γ δ ε : Type u} [Inhabited α] [Inhabited β] [Inhabited γ] [Inhabited δ] [Inhabited ε] [CompleteEMetricSpace α] [CompleteEMetricSpace β] [CompleteEMetricSpace γ] [CompleteEMetricSpace δ] [CompleteEMetricSpace ε]
+  --   {P P' fix fix' fix_unique fix_unique'}
+  --   (h₁ : ⟨P, fix, fix_unique⟩ = Func.exists_iso_of_contracting (Proc.F α β γ δ) Proc.F.contractCoeff_lt_one)
+  --   (h₂ : ⟨P', fix', fix_unique'⟩ = Func.exists_iso_of_contracting (Proc.F α ε γ δ) Proc.F.contractCoeff_lt_one)
+  --   (f : β → ε) :
+  --     P.α → P'.α :=
+  --   cata₁ h₁ <| i fix'.hom ∘' λ
+  --     | Sum.inl v => Sum.inl (f v)
+  --     | Sum.inr (Sum.inl .unit) => Sum.inr (Sum.inl .unit)
+  --     | Sum.inr (Sum.inr g) =>
+  --       let f'
+  --         | Sum.inl ⟨c, π⟩ => Sum.inl ⟨c, π⟩
+  --         | Sum.inr (Sum.inl ⟨c, v, p⟩) => Sum.inr (Sum.inl ⟨c, v, p⟩)
+  --         | Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩)) => Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩))
+  --         | Sum.inr (Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩))) => Sum.inr (Sum.inr (Sum.inr (Sum.inl ⟨c, p⟩)))
+  --         | Sum.inr (Sum.inr (Sum.inr (Sum.inr ⟨σ, p⟩))) => Sum.inr (Sum.inr (Sum.inr (Sum.inr ⟨σ, p⟩)))
+  --       have embed_f' : Topology.IsClosedEmbedding f' := by
+  --         constructor
+  --         · -- YES
+  --           admit
+  --         · -- MAYBE?
+  --           admit
+  --       Sum.inr (Sum.inr λ σ ↦ ⟨f' '' (g σ).val, by
+  --         rw [← Topology.IsClosedEmbedding.isClosed_iff_image_isClosed]
+  --         · exact (g σ).property
+  --         · assumption
+  --       ⟩)
 end Proc

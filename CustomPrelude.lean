@@ -18,6 +18,7 @@ import Mathlib.Tactic.FindSyntax
 import Batteries.Tactic.SeqFocus
 import Mathlib.Tactic.DefEqTransformations
 import Mathlib.Tactic.GuardGoalNums
+import Mathlib.Tactic.Bound
 
 import Mathlib.Util.WhatsNew
 import Mathlib.Util.Delaborators
