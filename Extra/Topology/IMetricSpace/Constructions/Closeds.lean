@@ -1,7 +1,7 @@
 import Extra.Topology.IMetricSpace
 import Mathlib.Topology.Sets.Closeds
 import Mathlib.Topology.UniformSpace.Closeds
-import Mathlib.Topology.Sets.VietorisTopology
+import Extra.Topology.ClosedEmbedding.Tactic
 
 open TopologicalSpace (Closeds)
 
@@ -52,3 +52,5 @@ theorem Topology.IsClosedEmbedding.Closeds.map {α β} [IMetricSpace α] [IMetri
     Topology.IsClosedEmbedding (Closeds.map _ hf) := by
 
   admit
+
+macro_rules | `(tactic| is_closed_embedding_step) => `(tactic| apply Topology.IsClosedEmbedding.Closeds.map)

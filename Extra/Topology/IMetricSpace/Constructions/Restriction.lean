@@ -57,3 +57,8 @@ theorem Restriction.map.isClosedEmbedding {α β ε h} [TopologicalSpace α] [To
   (hf : Topology.IsClosedEmbedding f) :
     Topology.IsClosedEmbedding (Restriction.map (ε := ε) (h := h) f) :=
   hf
+
+macro_rules
+| `(tactic| is_closed_embedding_step) =>
+  `(tactic| guard_target =ₛ Topology.IsClosedEmbedding (Restriction.map ?_);
+            apply Restriction.map.isClosedEmbedding)

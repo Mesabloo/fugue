@@ -1,4 +1,6 @@
 import Mathlib.Topology.Constructions.SumProd
+import Mathlib.Topology.Constructions
+import Extra.Topology.ClosedEmbedding.Tactic
 
 namespace Topology
   variable {W X Y Z} [TopologicalSpace W] [TopologicalSpace X] [TopologicalSpace Y] [TopologicalSpace Z]
@@ -31,3 +33,8 @@ namespace Topology
         · exact Sum.inr_injective
         · exact hg.injective
       · rintro w y (_|_)
+
+  macro_rules | `(tactic| is_closed_embedding_step) => `(tactic| exact IsClosedEmbedding.id)
+  macro_rules | `(tactic| is_closed_embedding_step) => `(tactic| refine IsClosedEmbedding.piMap λ _ ↦ ?_)
+  macro_rules | `(tactic| is_closed_embedding_step) => `(tactic| apply IsClosedEmbedding.prodMap)
+  macro_rules | `(tactic| is_closed_embedding_step) => `(tactic| apply IsClosedEmbedding.sumMap)

@@ -1,4 +1,5 @@
 import Extra.Topology.IMetricSpace
+import Extra.Topology.ClosedEmbedding
 
 universe u v
 
@@ -24,3 +25,9 @@ noncomputable instance {α : Type u} {β : Type v} [Nonempty α] [IMetricSpace �
 
 instance {α : Type u} {β : Type v} [UniformSpace β] [CompleteSpace β] : CompleteSpace (α → β) :=
   Pi.complete (λ _ ↦ β)
+
+noncomputable instance {α β} [Nonempty α] [TopologicalSpace α] [IMetricSpace β] : IMetricSpace (α ↪c β) :=
+  .induced ClosedEmbedding.toFun ClosedEmbedding.injective_toFun inferInstance
+
+instance {α β} [Nonempty α] [TopologicalSpace α] [IMetricSpace β] [CompleteSpace β] : CompleteSpace (α ↪c β) :=
+  sorry

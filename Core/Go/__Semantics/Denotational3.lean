@@ -102,7 +102,7 @@ section Domain
 
   section Operators
     section Map
-      /-! ## Functorial mapping -/
+      /-! ## Functor -/
 
       noncomputable def Branch.map {γ'} [CompleteIMetricSpace γ'] (g : γ ↪c γ') :
           (Branch «Σ» Γ α γ) ↪c (Branch «Σ» Γ α γ') where
@@ -113,53 +113,57 @@ section Domain
           Sum.map (Prod.map id (Restriction.map g.toFun))
                   (Prod.map id (Restriction.map g.toFun))
         isClosedEmbedding := by
-          apply Topology.IsClosedEmbedding.sumMap
-          · apply Topology.IsClosedEmbedding.prodMap
-            · exact Topology.IsClosedEmbedding.id
-            · refine Topology.IsClosedEmbedding.piMap λ _ ↦ ?_
-              refine Topology.IsClosedEmbedding.piMap λ _ ↦ ?_
-              apply Restriction.map.isClosedEmbedding
-              exact g.isClosedEmbedding
-          · apply Topology.IsClosedEmbedding.sumMap
-            · apply Topology.IsClosedEmbedding.prodMap
-              · exact Topology.IsClosedEmbedding.id
-              · apply Topology.IsClosedEmbedding.prodMap
-                · exact Topology.IsClosedEmbedding.id
-                · apply Restriction.map.isClosedEmbedding
-                  exact g.isClosedEmbedding
-            · apply Topology.IsClosedEmbedding.sumMap
-              · apply Topology.IsClosedEmbedding.prodMap
-                · exact Topology.IsClosedEmbedding.id
-                · apply Restriction.map.isClosedEmbedding
-                  exact g.isClosedEmbedding
-              · apply Topology.IsClosedEmbedding.sumMap
-                · apply Topology.IsClosedEmbedding.prodMap
-                  · exact Topology.IsClosedEmbedding.id
-                  · apply Restriction.map.isClosedEmbedding
-                    exact g.isClosedEmbedding
-                · apply Topology.IsClosedEmbedding.prodMap
-                  · exact Topology.IsClosedEmbedding.id
-                  · apply Restriction.map.isClosedEmbedding
-                    exact g.isClosedEmbedding
+          is_closed_embedding
+
+          -- apply Topology.IsClosedEmbedding.sumMap
+          -- · apply Topology.IsClosedEmbedding.prodMap
+          --   · exact Topology.IsClosedEmbedding.id
+          --   · refine Topology.IsClosedEmbedding.piMap λ _ ↦ ?_
+          --     refine Topology.IsClosedEmbedding.piMap λ _ ↦ ?_
+          --     apply Restriction.map.isClosedEmbedding
+          --     exact ClosedEmbedding.isClosedEmbedding _
+          -- · apply Topology.IsClosedEmbedding.sumMap
+          --   · apply Topology.IsClosedEmbedding.prodMap
+          --     · exact Topology.IsClosedEmbedding.id
+          --     · apply Topology.IsClosedEmbedding.prodMap
+          --       · exact Topology.IsClosedEmbedding.id
+          --       · apply Restriction.map.isClosedEmbedding
+          --         exact ClosedEmbedding.isClosedEmbedding _
+          --   · apply Topology.IsClosedEmbedding.sumMap
+          --     · apply Topology.IsClosedEmbedding.prodMap
+          --       · exact Topology.IsClosedEmbedding.id
+          --       · apply Restriction.map.isClosedEmbedding
+          --         exact ClosedEmbedding.isClosedEmbedding _
+          --     · apply Topology.IsClosedEmbedding.sumMap
+          --       · apply Topology.IsClosedEmbedding.prodMap
+          --         · exact Topology.IsClosedEmbedding.id
+          --         · apply Restriction.map.isClosedEmbedding
+          --           exact ClosedEmbedding.isClosedEmbedding _
+          --       · apply Topology.IsClosedEmbedding.prodMap
+          --         · exact Topology.IsClosedEmbedding.id
+          --         · apply Restriction.map.isClosedEmbedding
+          --           exact ClosedEmbedding.isClosedEmbedding _
 
       noncomputable def IterativeDomain.map {β'} [CompleteIMetricSpace β'] (f : β ↪c β') {n} :
           (IterativeDomain «Σ» Γ α β n).carrier ↪c (IterativeDomain «Σ» Γ α β' n).carrier := match n with
         | 0 => {
           toFun := Sum.map f.toFun id
           isClosedEmbedding := by
-            apply Topology.IsClosedEmbedding.sumMap
-            · exact f.isClosedEmbedding
-            · exact Topology.IsClosedEmbedding.id
+            is_closed_embedding
+            -- apply Topology.IsClosedEmbedding.sumMap
+            -- · exact f.isClosedEmbedding
+            -- · exact Topology.IsClosedEmbedding.id
         }
         | n + 1 => {
           toFun := Sum.map f.toFun <| Sum.map id <| Pi.map λ _ ↦ Closeds.map _ (Branch.map (IterativeDomain.map f)).isClosedEmbedding
           isClosedEmbedding := by
-            apply Topology.IsClosedEmbedding.sumMap
-            · exact f.isClosedEmbedding
-            · apply Topology.IsClosedEmbedding.sumMap
-              · exact Topology.IsClosedEmbedding.id
-              · refine Topology.IsClosedEmbedding.piMap λ σ ↦ ?_
-                apply Topology.IsClosedEmbedding.Closeds.map
+            is_closed_embedding
+            -- apply Topology.IsClosedEmbedding.sumMap
+            -- · exact ClosedEmbedding.isClosedEmbedding _
+            -- · apply Topology.IsClosedEmbedding.sumMap
+            --   · exact Topology.IsClosedEmbedding.id
+            --   · refine Topology.IsClosedEmbedding.piMap λ σ ↦ ?_
+            --     apply Topology.IsClosedEmbedding.Closeds.map
         }
 
       noncomputable def Domain.map {β'} [CompleteIMetricSpace β'] (f : β ↪c β') :
@@ -167,11 +171,35 @@ section Domain
         UniformSpace.Completion.map <| Sigma.map id λ _ ↦ (IterativeDomain.map f).toFun
     end Map
 
-    section Ap
+    section Lift
+      /-! ## Lifting depth of trees -/
 
+      noncomputable def IterativeDomain.lift {m n} (h : m ≤ n := by linarith) :
+          (IterativeDomain «Σ» Γ α β m).carrier → (IterativeDomain «Σ» Γ α β n).carrier :=
+        sorry
+    end Lift
+
+    section Ap
+      /-! ## Applicative functor -/
+
+      private lemma reorder {m n : ℕ} : m + 1 + n = m + n + 1 := by
+        simp +arith only
+
+      noncomputable def IterativeDomain.ap {m n} [Nonempty β] :
+          (IterativeDomain «Σ» Γ α (β ↪c γ) m).carrier → (IterativeDomain «Σ» Γ α β n).carrier → (IterativeDomain «Σ» Γ α γ (m + n)).carrier := match m with
+        | 0 => Sum.elim
+          (λ f t ↦ (IterativeDomain.map f).toFun ((Nat.zero_add n).symm ▸ t))
+          (λ _ _ ↦ match n with | 0 => .inr .unit | n + 1 => .inr (.inl .unit))
+        | m + 1 => Sum.elim
+          (λ f t ↦ (IterativeDomain.map f).toFun ((IterativeDomain.lift) t))
+          (Sum.elim
+            (λ _ _ ↦ reorder ▸ .inr (.inl .unit))
+            sorry)
     end Ap
 
     section Bind
+      /-! ## Monad -/
+
       -- noncomputable def Domain.bind
     end Bind
   end Operators
