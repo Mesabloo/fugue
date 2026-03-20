@@ -25,9 +25,9 @@ class abbrev CompleteIMetricSpace (α : Type _) := IMetricSpace α, CompleteSpac
 
 structure Object.{u} where
   carrier : Type u
-  [completeMetricSpace : CompleteIMetricSpace carrier]
+  [MetricSpace : IMetricSpace carrier]
 
-instance {o : Object} : CompleteIMetricSpace o.carrier := o.completeMetricSpace
+instance {o : Object} : IMetricSpace o.carrier := o.MetricSpace
 
 noncomputable section Domain
   universe u v w x y z
@@ -77,7 +77,7 @@ noncomputable section Domain
       inferInstanceAs (CompleteSpace (_ ⊕ _ ⊕ _ ⊕ _ ⊕ _))
   end Branch
 
-  variable [Nonempty «Σ»] [Nonempty α] [CompleteIMetricSpace β] [CompleteIMetricSpace «Σ»] [CompleteIMetricSpace Γ] [CompleteIMetricSpace α]
+  variable [Nonempty «Σ»] [Nonempty α] [IMetricSpace β] [IMetricSpace «Σ»] [IMetricSpace Γ] [IMetricSpace α]
 
   open TopologicalSpace (Closeds)
 
@@ -88,65 +88,227 @@ noncomputable section Domain
     | 0 => { carrier := β ⊕ PUnit.{max u v w + 1} }
     | n + 1 => { carrier := β ⊕ PUnit.{u + 1} ⊕ («Σ» → Closeds (Branch «Σ» Γ α (IterativeDomain n).carrier)) }
 
-  def DomainUnion : Object where
-    carrier := Σ n, (IterativeDomain «Σ» Γ α β n).carrier
+  section
+    variable {«Σ» Γ α β γ δ} [IMetricSpace γ]
 
-  abbrev Domain := UniformSpace.Completion (DomainUnion «Σ» Γ α β).carrier
+    theorem LipschitzWith.isClosedEmbedding {α β} [PseudoEMetricSpace α] [PseudoEMetricSpace β] {f : α → β} {K}
+      (hf : LipschitzWith K f) (inj_f : Function.Injective f) (closed_range : IsClosedMap f) :
+        Topology.IsClosedEmbedding f := by
+      rw [Topology.IsClosedEmbedding.isClosedEmbedding_iff_continuous_injective_isClosedMap]
+      and_intros
+      · exact LipschitzWith.continuous hf
+      · exact inj_f
+      · exact closed_range
+  end
 
-  instance : MetricSpace (Domain «Σ» Γ α β) :=
-    UniformSpace.Completion.instMetricSpace
+  section
+    variable {«Σ» Γ α β γ δ} [IMetricSpace γ]
 
-  instance : CompleteSpace (Domain «Σ» Γ α β) :=
-    UniformSpace.Completion.completeSpace _
+    @[match_pattern]
+    def IterativeDomain.abort {n} : (IterativeDomain «Σ» Γ α β n).carrier := match n with
+      | 0 => .inr .unit
+      | _ + 1 => .inr (.inl .unit)
 
-  variable {«Σ» Γ α β γ δ} [CompleteIMetricSpace γ]
-
-  @[match_pattern]
-  def IterativeDomain.abort {n} : (IterativeDomain «Σ» Γ α β n).carrier := match n with
-    | 0 => .inr .unit
-    | _ + 1 => .inr (.inl .unit)
-
-  @[match_pattern]
-  def IterativeDomain.branch {n} (f : «Σ» → Closeds (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n).carrier)) :
-      (IterativeDomain «Σ» Γ α β (n + 1)).carrier :=
-    .inr <| .inr f
-
-  section Operators
-    section Functor
-      /-! ## Functor -/
-
-      def Branch.map {γ'} [CompleteIMetricSpace γ'] (g : γ → γ') :
-          (Branch «Σ» Γ α γ) → (Branch «Σ» Γ α γ') :=
-        Sum.map (Prod.map id (Pi.map λ _ ↦ Pi.map λ _ ↦ Restriction.map g)) <|
-        Sum.map (Prod.map id (Prod.map id (Restriction.map g))) <|
-        Sum.map (Prod.map id (Restriction.map g)) <|
-        Sum.map (Prod.map id (Restriction.map g)) <|
-                (Prod.map id (Restriction.map g))
-
-      def IterativeDomain.map {β'} [CompleteIMetricSpace β'] (f : β → β') {n} :
-          (IterativeDomain «Σ» Γ α β n).carrier → (IterativeDomain «Σ» Γ α β' n).carrier := match n with
-        | 0 => Sum.map f id
-        | _ + 1 =>
-          Sum.map f <|
-          Sum.map id <|
-          Pi.map λ _ ↦ Closeds.closed_map (Branch.map (IterativeDomain.map f))
-
-      theorem DomainUnion.map.uniform_continuous {β'} [CompleteIMetricSpace β'] (f : β → β') :
-          UniformContinuous (Sigma.map id λ _ ↦ IterativeDomain.map f : _ → (DomainUnion «Σ» Γ α _).carrier) := by
-        admit
-
-      def Domain.map {β'} [CompleteIMetricSpace β'] (f : β → β') :
-          Domain «Σ» Γ α β → Domain «Σ» Γ α β' :=
-        UniformSpace.Completion.map <| Sigma.map id λ _ ↦ IterativeDomain.map f
-    end Functor
+    @[match_pattern]
+    def IterativeDomain.branch {n} (f : «Σ» → Closeds (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n).carrier)) :
+        (IterativeDomain «Σ» Γ α β (n + 1)).carrier :=
+      .inr <| .inr f
 
     section Lift
       /-! ## Lifting depth of trees -/
 
+      def Branch.map {γ'} [IMetricSpace γ'] (g : γ ↪c γ') :
+          (Branch «Σ» Γ α γ) ↪c (Branch «Σ» Γ α γ') where
+        toFun :=
+          Sum.map (Prod.map id (Pi.map λ _ ↦ Pi.map λ _ ↦ Restriction.map g)) <|
+          Sum.map (Prod.map id (Prod.map id (Restriction.map g))) <|
+          Sum.map (Prod.map id (Restriction.map g)) <|
+          Sum.map (Prod.map id (Restriction.map g)) <|
+                  (Prod.map id (Restriction.map g))
+
+      theorem Branch.map_isometry' {γ'} [IMetricSpace γ'] {g : γ ↪c γ'} (hg : ∀ x y : γ, idist (g.toFun x) (g.toFun y) = idist x y) :
+          ∀ (x y : Branch «Σ» Γ α γ), idist ((Branch.map g).toFun x) ((Branch.map g).toFun y) = idist x y := by
+        admit
+
+      theorem Branch.map_isometry {γ'} [IMetricSpace γ'] {g : γ ↪c γ'} (hg : Isometry g.toFun) :
+          Isometry (Branch.map («Σ» := «Σ») (Γ := Γ) (α := α) g).toFun := by
+        apply Isometry.of_idist_eq
+        apply Branch.map_isometry'
+        apply Isometry.to_idist_eq
+        assumption
+
+      omit [Nonempty «Σ»] in
+      theorem Branch.map_comp {γ' γ''} [IMetricSpace γ'] [IMetricSpace γ''] (f : γ ↪c γ') (g : γ' ↪c γ'') :
+          (Branch.map («Σ» := «Σ») (Γ := Γ) (α := α) g).toFun ∘ (Branch.map f).toFun = (Branch.map (g.comp f)).toFun := by
+        funext b
+        cases b <;> simp [Branch.map, Sum.map, Prod.map, Function.comp] <;> rfl
+
+      omit [Nonempty «Σ»] in
+      theorem Branch.map_id : (Branch.map («Σ» := «Σ») (Γ := Γ) (α := α) (γ := γ) { toFun := id }).toFun = id := by
+        funext b
+        simp [Branch.map]
+
       def IterativeDomain.lift {m n} (h : m ≤ n := by linarith) :
-          (IterativeDomain «Σ» Γ α β m).carrier → (IterativeDomain «Σ» Γ α β n).carrier :=
-        sorry
+          (IterativeDomain «Σ» Γ α β m).carrier ↪c (IterativeDomain «Σ» Γ α β n).carrier := match _hm : m, n with
+        | 0, 0 => { toFun := id }
+        | 0, n + 1 => { toFun := Sum.elim (λ v ↦ .inl v) (λ .unit ↦ IterativeDomain.abort) }
+        | m + 1, n + 1 => {
+          toFun :=
+            Sum.map id <|
+            Sum.map id <|
+            Pi.map λ _ ↦ Closeds.map _ (Branch.map (IterativeDomain.lift (m := m))).isClosedEmbedding
+        }
+
+      theorem IterativeDomain.lift_injective {m n} (h : m ≤ n := by linarith) :
+          Function.Injective (lift («Σ» := «Σ») (Γ := Γ) (α := α) (β := β) h).toFun :=
+        (lift h).isClosedEmbedding.injective
+
+      theorem IterativeDomain.lift_refl {m} :
+          lift («Σ» := «Σ») (Γ := Γ) (α := α) (β := β) (n := m) (Nat.le_of_eq rfl) = { toFun := id } := by
+        cases m with
+        | zero => rfl
+        | succ m =>
+          ext x : 2
+          match x with
+          | .inl _ | .inr (.inl _) => rfl
+          | .inr (.inr f) =>
+            dsimp [lift]
+            congr 2
+            funext b
+            rw [Pi.map_apply, Closeds.map]
+            ext : 1
+            dsimp
+            convert Set.image_id _
+            convert Branch.map_id
+            rw [lift_refl]
+
+      theorem IterativeDomain.lift_refl' {m} :
+          (lift («Σ» := «Σ») (Γ := Γ) (α := α) (β := β) (n := m) (Nat.le_of_eq rfl)).toFun = id := by
+        rw [lift_refl]
+
+      theorem IterativeDomain.lifl_refl_of_eq {k k' m n} (h : m = n) (h' : k = k') {h'' : m ≤ k} :
+          lift («Σ» := «Σ») (Γ := Γ) (α := α) (β := β) h'' = h ▸ h' ▸ lift («Σ» := «Σ») (Γ := Γ) (α := α) (β := β) (m := n) (n := k') (h ▸ h' ▸ h'') := by
+        cases h
+        cases h'
+        rfl
+
+      theorem IterativeDomain.lift_isometry' {m n} (h : m ≤ n) {x y : (IterativeDomain «Σ» Γ α β m).carrier} :
+          idist ((lift h).toFun x) ((lift h).toFun y) = idist x y := by
+        match m, n with
+        | 0, 0 =>
+          rcases x, y with ⟨_|_, _|_⟩ <;> rfl
+        | 0, n + 1 =>
+          rcases x, y with ⟨_|_, _|_⟩ <;> rfl
+        | m + 1, n + 1 =>
+          rcases x, y with ⟨_|_|g, _|_|g'⟩
+          1-8: rfl
+          · dsimp [lift]
+
+            apply Isometry.piMap''
+            intros i x y
+            apply Closeds.map_isometry'
+            intros b₁ b₂
+            apply Branch.map_isometry'
+            intros p q
+            apply IterativeDomain.lift_isometry'
+
+      theorem IterativeDomain.lift_isometry {m n} (h : m ≤ n) :
+          Isometry (lift («Σ» := «Σ») (Γ := Γ) (α := α) (β := β) h).toFun := by
+        apply Isometry.of_idist_eq
+        intro x y
+        rw [IterativeDomain.lift_isometry']
+
+      theorem IterativeDomain.lift_lift {m n o} (h₁ : m ≤ n) (h₂ : n ≤ o) :
+          (lift («Σ» := «Σ») (Γ := Γ) (α := α) (β := β) h₂).toFun ∘ (lift h₁).toFun = (lift (le_trans h₁ h₂)).toFun := by
+        funext x
+        match m, n, o with
+        | 0, 0, 0 | 0, 0, o + 1 => rfl
+        | 0, n + 1, o + 1 => cases x <;> rfl
+        | m + 1, n + 1, o + 1 =>
+          match x with
+          | .inl b | .inr (.inl _) => rfl
+          | .inr (.inr f) =>
+            dsimp [lift]
+            congr 2; funext σ
+            rw [Pi.map_apply, Pi.map_apply, Pi.map_apply]
+            change (Closeds.map _ _ ∘ Closeds.map _ _) (f σ) = _
+            rw! [Closeds.map_comp, Branch.map_comp]
+            congr 3
+            ext : 1
+            apply lift_lift
     end Lift
+  end
+
+  def DomainUnion := Σ n, (IterativeDomain «Σ» Γ α β n).carrier
+
+  section
+    variable {«Σ» Γ α β γ δ} [IMetricSpace γ]
+
+    nonrec abbrev DomainUnion.idist : DomainUnion «Σ» Γ α β → DomainUnion «Σ» Γ α β → unitInterval
+      | ⟨m, p⟩, ⟨n, q⟩ => idist ((IterativeDomain.lift (le_max_left m n)).toFun p) ((IterativeDomain.lift (le_max_right m n)).toFun q)
+
+    theorem DomainUnion.idist_self (x : DomainUnion «Σ» Γ α β) : DomainUnion.idist x x = 0 := by
+      let ⟨m, p⟩ := x
+      grind only [PseudoIMetricSpace.idist_self, unitInterval.coe_ne_zero]
+
+    theorem DomainUnion.idist_comm (x y : DomainUnion «Σ» Γ α β) : DomainUnion.idist x y = DomainUnion.idist y x := by
+      let ⟨m, p⟩ := x; let ⟨n, q⟩ := y
+      grind only [PseudoIMetricSpace.idist_comm]
+
+    nonrec theorem DomainUnion.idist_triangle (x y z : DomainUnion «Σ» Γ α β) : (DomainUnion.idist x z : ℝ) ≤ (DomainUnion.idist x y) + (DomainUnion.idist y z) := by
+      let ⟨m, p⟩ := x; let ⟨n, q⟩ := y; let ⟨o, r⟩ := z
+
+      let k := max m (max n o)
+
+      dsimp only [DomainUnion.idist]
+      rw [← IterativeDomain.lift_isometry' (by grind only [= max_def] : max m o ≤ k),
+          ← IterativeDomain.lift_isometry' (by grind only [= max_def] : max m n ≤ k),
+          ← IterativeDomain.lift_isometry' (by grind only [= max_def] : max n o ≤ k)]
+      change (IDist.idist ((_ ∘ _) p) ((_ ∘ _) r) : ℝ) ≤ IDist.idist ((_ ∘ _) p) ((_ ∘ _) q) + IDist.idist ((_ ∘ _) q) ((_ ∘ _) r)
+      repeat rw [IterativeDomain.lift_lift]
+      apply idist_triangle _ _ _
+
+    instance : PseudoIMetricSpace (DomainUnion «Σ» Γ α β) where
+      idist := DomainUnion.idist
+      idist_self := DomainUnion.idist_self
+      idist_comm := DomainUnion.idist_comm
+      idist_triangle := DomainUnion.idist_triangle
+  end
+
+  abbrev Domain := UniformSpace.Completion (DomainUnion «Σ» Γ α β)
+
+  instance : MetricSpace (Domain «Σ» Γ α β) := inferInstance
+
+  instance : CompleteSpace (Domain «Σ» Γ α β) := inferInstance
+
+  variable {«Σ» Γ α β γ δ} [IMetricSpace γ]
+
+/-
+  section Operators
+    section Functor
+      /-! ## Functor -/
+
+      def IterativeDomain.map {β'} [CompleteIMetricSpace β'] (f : β ↪c β') {n} :
+          (IterativeDomain «Σ» Γ α β n).carrier ↪c (IterativeDomain «Σ» Γ α β' n).carrier := match n with
+        | 0 => { toFun := Sum.map f id }
+        | _ + 1 => {
+          toFun :=
+            Sum.map f <|
+            Sum.map id <|
+            Pi.map λ _ ↦ Closeds.map _ (Branch.map (IterativeDomain.map f)).isClosedEmbedding
+        }
+
+      theorem DomainUnion.map.uniform_continuous {β'} [CompleteIMetricSpace β'] (f : β ↪c β') :
+          UniformContinuous (Sigma.map id λ _ ↦ (IterativeDomain.map f).toFun : _ → (DomainUnion «Σ» Γ α _)) := by
+        admit
+
+      def Domain.map {β'} [CompleteIMetricSpace β'] (f : β ↪c β') :
+          Domain «Σ» Γ α β → Domain «Σ» Γ α β' :=
+        UniformSpace.Completion.map <|
+          Quotient.map (Sigma.map id λ _ ↦ (IterativeDomain.map f).toFun) λ x y ⟨k, hm, hn, eq⟩ ↦ by
+            exists k, hm, hn
+            admit
+    end Functor
 
     section Close
       /-! ## Channel closure -/
@@ -170,7 +332,7 @@ noncomputable section Domain
       end
 
       theorem DomainUnion.syncClose.uniform_continuous [DecidableEq Γ] {c : Γ} :
-          UniformContinuous (Sigma.map id λ n ↦ IterativeDomain.syncClose zero c : _ → (DomainUnion «Σ» _ α β).carrier) := by
+          UniformContinuous (Sigma.map id λ n ↦ IterativeDomain.syncClose zero c : _ → (DomainUnion «Σ» _ α β)) := by
         admit
 
       def Domain.syncClose [DecidableEq Γ] (c : Γ) : Domain «Σ» Γ α β → Domain «Σ» Γ α β :=
@@ -213,11 +375,11 @@ noncomputable section Domain
       end
 
       theorem DomainUnion.IterativeDomain.ap.uniform_continuous [DecidableEq Γ] [Nonempty β] {m} {p : (IterativeDomain «Σ» Γ α (β → γ) m).carrier} :
-          UniformContinuous (Sigma.map (m + ·) λ _ ↦ IterativeDomain.ap zero p : _ → (DomainUnion «Σ» Γ α γ).carrier) := by
+          UniformContinuous (Sigma.map (m + ·) λ _ ↦ IterativeDomain.ap zero p : _ → (DomainUnion «Σ» Γ α γ)) := by
         admit
 
       theorem DomainUnion.IterativeUnion.ap.uniform_continuous₂ [DecidableEq Γ] [Nonempty β] :
-          UniformContinuous (λ ⟨m, p⟩ ↦ UniformSpace.Completion.map (Sigma.map (m + ·) λ _ ↦ IterativeDomain.ap zero p) : (DomainUnion «Σ» Γ α (β → γ)).carrier → _ → Domain «Σ» Γ α γ) := by
+          UniformContinuous (λ ⟨m, p⟩ ↦ UniformSpace.Completion.map (Sigma.map (m + ·) λ _ ↦ IterativeDomain.ap zero p) : (DomainUnion «Σ» Γ α (β → γ)) → _ → Domain «Σ» Γ α γ) := by
         admit
 
       def Domain.ap [DecidableEq Γ] [Nonempty β] :
@@ -228,7 +390,17 @@ noncomputable section Domain
     section Monad
       /-! ## Monad -/
 
+      mutual
+        def IterativeDomain.bind {m} {n : β → _} [DecidableEq Γ] (p : (IterativeDomain «Σ» Γ α β m).carrier) (f : (x : β) → (IterativeDomain «Σ» Γ α γ (n x)).carrier) :
+            (IterativeDomain «Σ» Γ α γ (m + ⨆ x, n x)).carrier := match m with
+          | 0 =>
+            p.elim (λ x ↦ IterativeDomain.lift (by admit) (f x)) _
+          | m + 1 =>
+            sorry
+      end
+
       -- def Domain.bind
     end Monad
   end Operators
+-/
 end Domain

@@ -191,3 +191,18 @@ theorem Isometry.of_idist_eq.{u, v} {α : Type u} {β : Type v} [PseudoIMetricSp
   apply Isometry.of_dist_eq
   change ∀ x y, (idist (f x) (f y) : ℝ) = idist x y
   solve_by_elim
+
+theorem Isometry.to_idist_eq.{u, v} {α : Type u} {β : Type v} [PseudoIMetricSpace α] [PseudoIMetricSpace β] {f : α → β}
+    (h : Isometry f) : ∀ (x y : α), idist (f x) (f y) = idist x y := by
+  intros x y
+
+  change ∀ x y, _ at h
+  conv at h => enter [2, 2]; rw [edist_dist, edist_dist]
+  change ∀ x y, ENNReal.ofReal (idist (f x) (f y) : ℝ) = ENNReal.ofReal (idist x y) at h
+
+  specialize h x y
+  injections _ h
+  rw [max_eq_left, max_eq_left] at h
+  · grind only
+  · grind only [= Set.mem_Icc]
+  · grind only [= Set.mem_Icc]

@@ -1,6 +1,8 @@
 import Mathlib.Topology.Maps.Basic
 import Mathlib.Topology.Separation.Basic
 import Extra.Topology.ClosedEmbedding
+import Extra.Topology.IMetricSpace
+import Extra.Topology.IMetricSpace.Constructions.Function
 
 lemma Set.range_const' {α β} [Nonempty α] {v : β} : Set.range (Function.const α v) = {v} := by
   unfold Set.range
@@ -18,3 +20,22 @@ theorem Topology.IsClosedEmbedding.const' {α β} [Nonempty α] [TopologicalSpac
 
 macro_rules | `(tactic| is_closed_embedding_step) => `(tactic| apply Topology.IsClosedEmbedding.const)
 macro_rules | `(tactic| is_closed_embedding_step) => `(tactic| apply Topology.IsClosedEmbedding.const')
+
+protected theorem Isometry.piMap''.{u, v} {ι : Type u} {α β : ι → Type v} [Nonempty ι]
+  [∀ i, PseudoIMetricSpace (α i)]
+  [∀ i, PseudoIMetricSpace (β i)] (f : ∀ i, α i → β i)
+  (hf : ∀ i x y, idist (f i x) (f i y) = idist x y) :
+    ∀ x y, idist (Pi.map f x) (Pi.map f y) = idist x y := by
+  intros g g'
+  change ⨆ x, idist (Pi.map f g x) (Pi.map f g' x) = ⨆ x, idist (g x) (g' x)
+  simp [Pi.map_apply]
+  congr 1 with x
+  specialize hf x (g x) (g' x)
+  solve_by_elim
+
+protected theorem Isometry.piMap'.{u, v} {ι : Type u} {α β : ι → Type v} [Nonempty ι]
+  [∀ i, PseudoIMetricSpace (α i)]
+  [∀ i, PseudoIMetricSpace (β i)] (f : ∀ i, α i → β i) (hf : ∀ i, Isometry (f i)) :
+    Isometry (Pi.map f) := by
+  apply Isometry.of_idist_eq
+  apply Isometry.piMap'' _ λ i x y ↦ to_idist_eq (hf i) x y
