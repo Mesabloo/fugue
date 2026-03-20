@@ -134,11 +134,45 @@ noncomputable section Domain
           assumption
         }
 
-      theorem Branch.map_isometry' {γ'} [IMetricSpace γ'] {g : γ → γ'} (hg : ∀ x y : γ, idist (g x) (g y) = idist x y) :
+      omit [Nonempty «Σ»] in
+      theorem Branch.map_isometry' {γ' : Type y} [IMetricSpace γ'] {g : γ → γ'} (hg : ∀ x y : γ, idist (g x) (g y) = idist x y) :
           ∀ (x y : Branch «Σ» Γ α γ), idist (Branch.map g x) (Branch.map g y) = idist x y := by
-        admit
+        rintro (_|_|_|_|_) (_|_|_|_|_) <;> first | rfl | dsimp [map]
+        · apply Isometry.prodMap'
+          · exact λ _ _ ↦ rfl
+          · intros _ _
+            apply Isometry.piMap''
+            intros _ _ _
+            apply Isometry.piMap''
+            intros _ _ _
+            apply Restriction.map_isometry'
+            exact hg
+        · apply Isometry.prodMap'
+          · exact λ _ _ ↦ rfl
+          · intros _ _
+            apply Isometry.prodMap'
+            · exact λ _ _ ↦ rfl
+            · intros _ _
+              apply Restriction.map_isometry'
+              exact hg
+        · apply Isometry.prodMap'
+          · exact λ _ _ ↦ rfl
+          · intros _ _
+            apply Restriction.map_isometry'
+            exact hg
+        · apply Isometry.prodMap'
+          · exact λ _ _ ↦ rfl
+          · intros _ _
+            apply Restriction.map_isometry'
+            exact hg
+        · apply Isometry.prodMap'
+          · exact λ _ _ ↦ rfl
+          · intros _ _
+            apply Restriction.map_isometry'
+            exact hg
 
-      theorem Branch.map_isometry {γ'} [IMetricSpace γ'] {g : γ → γ'} (hg : Isometry g) :
+      omit [Nonempty «Σ»] in
+      theorem Branch.map_isometry {γ' : Type y} [IMetricSpace γ'] {g : γ → γ'} (hg : Isometry g) :
           Isometry (Branch.map («Σ» := «Σ») (Γ := Γ) (α := α) g) := by
         apply Isometry.of_idist_eq
         apply Branch.map_isometry'

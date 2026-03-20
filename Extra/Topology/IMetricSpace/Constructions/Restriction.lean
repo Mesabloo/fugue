@@ -62,3 +62,13 @@ macro_rules
 | `(tactic| is_closed_embedding_step) =>
   `(tactic| guard_target =ₛ Topology.IsClosedEmbedding (Restriction.map ?_);
             apply Restriction.map.isClosedEmbedding)
+
+theorem Restriction.map_isometry' {α β ε h} [IMetricSpace α] [IMetricSpace β] {f : α → β}
+  (hf : ∀ x y, idist (f x) (f y) = idist x y) :
+    ∀ x y, idist (@Restriction.map _ _ ε h f x) (Restriction.map f y) = idist x y :=
+  hf
+
+theorem Restriction.map_isometry {α β ε h} [IMetricSpace α] [IMetricSpace β] {f : α → β}
+  (hf : Isometry f) :
+    Isometry (@Restriction.map _ _ ε h f) :=
+  hf

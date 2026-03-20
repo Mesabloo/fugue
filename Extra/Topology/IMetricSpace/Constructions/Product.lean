@@ -6,3 +6,13 @@ instance Prod.instIMetricSpace {α β} [IMetricSpace α] [IMetricSpace β] : IMe
     apply max_le
     · exact unitInterval.le_one'
     · exact unitInterval.le_one'
+
+theorem Isometry.prodMap' {α β γ δ} [IMetricSpace α] [IMetricSpace β] [IMetricSpace γ] [IMetricSpace δ]
+  {f : α → β} {g : γ → δ} (hf : ∀ x y, idist (f x) (f y) = idist x y) (hg : ∀ x y, idist (g x) (g y) = idist x y) :
+    ∀ x y, idist (Prod.map f g x) (Prod.map f g y) = idist x y := by
+  apply Isometry.to_idist_eq
+  apply Isometry.prodMap
+  · apply Isometry.of_idist_eq
+    assumption
+  · apply Isometry.of_idist_eq
+    assumption
