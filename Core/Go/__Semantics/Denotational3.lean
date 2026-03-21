@@ -1,19 +1,10 @@
-import Extra.List
-import Mathlib.Data.Nat.Lattice
 import CustomPrelude
+import Core.Go.Syntax
 import Extra.Nat
 import Extra.AList
-import Core.Go.Syntax
 import Extra.Fin
 import Extra.List
-import Mathlib.Data.Fintype.Prod
-import Mathlib.Data.NNReal.Basic
-import Mathlib.Topology.MetricSpace.Basic
-import Mathlib.Topology.MetricSpace.Gluing
-import Mathlib.Topology.MetricSpace.HausdorffDistance
 import Mathlib.Topology.MetricSpace.Completion
-import Mathlib.Order.CompleteLattice.Group
-import Mathlib.Topology.MetricSpace.Closeds
 import Mathlib.Topology.UnitInterval
 import Mathlib.Topology.Maps.Basic
 import Extra.Topology.Constructions.SumProd
@@ -21,6 +12,7 @@ import Extra.Topology.Constructions.Maps
 import Extra.Topology.IMetricSpace.Constructions
 import Extra.Topology.ClosedEmbedding
 import Extra.Topology.IsometricEmbedding
+import Extra.Topology.UniformContinuousMap
 
 class abbrev CompleteIMetricSpace (α : Type _) := IMetricSpace α, CompleteSpace α
 
@@ -235,8 +227,19 @@ noncomputable section Domain
 
       theorem IterativeDomain.lift_isometry {m n} (h : m ≤ n) :
           Isometry (lift («Σ» := «Σ») (Γ := Γ) (α := α) (β := β) h) := by
-        -- exact (lift h).isIso
-        admit
+        match m, n with
+        | 0, 0 => exact isometry_id
+        | 0, n + 1 => rintro (_|_) (_|_) <;> rfl
+        | m + 1, n + 1 =>
+          apply Isometry.sumMap
+          · exact isometry_id
+          · apply Isometry.sumMap
+            · exact isometry_id
+            · apply Isometry.piMap'
+              intros _
+              apply Set.image_isometry
+              apply Branch.map_isometry
+              apply lift_isometry
 
       theorem IterativeDomain.lift_isometry' {m n} (h : m ≤ n) {x y : (IterativeDomain «Σ» Γ α β m).carrier} :
           idist (lift h x) (lift h y) = idist x y := by
@@ -318,18 +321,22 @@ noncomputable section Domain
 
   variable {«Σ» Γ α β γ δ} [IMetricSpace γ]
 
-  def Domain.iso :
+  /--
+    We establish the equivalence in order to prove that our defined domain is a solution
+    to the original equation.
+  -/
+  private def Domain.isSolution :
       Domain «Σ» Γ α β ≃ β ⊕ PUnit ⊕ («Σ» → Closeds (Branch «Σ» Γ α (Domain «Σ» Γ α β))) where
     toFun x := sorry
     invFun x := sorry
     left_inv := sorry
     right_inv := sorry
 
-/-
   section Operators
     section Functor
       /-! ## Functor -/
 
+/-
       def IterativeDomain.map {β'} [CompleteIMetricSpace β'] (f : β ↪c β') {n} :
           (IterativeDomain «Σ» Γ α β n).carrier ↪c (IterativeDomain «Σ» Γ α β' n).carrier := match n with
         | 0 => { toFun := Sum.map f id }
@@ -350,8 +357,10 @@ noncomputable section Domain
           Quotient.map (Sigma.map id λ _ ↦ (IterativeDomain.map f).toFun) λ x y ⟨k, hm, hn, eq⟩ ↦ by
             exists k, hm, hn
             admit
+-/
     end Functor
 
+/-
     section Close
       /-! ## Channel closure -/
 
@@ -443,6 +452,6 @@ noncomputable section Domain
 
       -- def Domain.bind
     end Monad
-  end Operators
 -/
+  end Operators
 end Domain

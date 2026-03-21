@@ -18,7 +18,7 @@ theorem IMetric.hausdorffIDist_image {α β} [PseudoIMetricSpace α] [PseudoIMet
     hausdorffIDist (Φ '' s) (Φ '' t) = hausdorffIDist s t :=
   sorry
 
-noncomputable instance PseudoIMetricSpace.hausdorff {α} [IMetricSpace α] : PseudoIMetricSpace (Set α) where
+noncomputable instance PseudoIMetricSpace.hausdorff {α} [PseudoIMetricSpace α] : PseudoIMetricSpace (Set α) where
   idist := IMetric.hausdorffIDist
   idist_self := sorry
   idist_comm := sorry
@@ -36,6 +36,11 @@ noncomputable instance IMetricSpace.hausdorff {α} [IMetricSpace α] : IMetricSp
 theorem _root_.IsClosed.hausdorffIDist_zero_iff {α} {s t : Set α} [PseudoIMetricSpace α] (hs : IsClosed s) (ht : IsClosed t) :
     IMetric.hausdorffIDist s t = 0 ↔ s = t := by
   admit
+
+theorem Set.image_isometry {α β} {f : α → β} [PseudoIMetricSpace α] [PseudoIMetricSpace β] (hf : Isometry f) :
+    Isometry (Set.image f) := by
+  apply Isometry.of_idist_eq λ x y ↦ ?_
+  exact IMetric.hausdorffIDist_image hf
 
 noncomputable instance {α : Type u} [IMetricSpace α] : IMetricSpace (Closeds α) :=
   IMetricSpace.hausdorff.induced SetLike.coe SetLike.coe_injective'
