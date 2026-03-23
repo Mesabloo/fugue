@@ -8,7 +8,7 @@ on:
     - main
 
 permissions:
-  contents: read # Read access to repository contents
+  contents: write
 
 jobs:
   doc:
