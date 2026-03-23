@@ -22,16 +22,7 @@ jobs:
         # with:
         #   fetch-depth: 0 # Fetch all history for all branches and tags
 
-      - name: Build project documentation
-        id: build-docgen
-        continue-on-error: true
-        uses: leanprover-community/docgen-action@7836f3de2f10facc0fed09c1309e6402e4cd5fd0
-        with:
-          api-docs: false
-          build-page: false
-
       - uses: leanprover/lean-action@v1.4.0
-        if: steps.build-docgen.outputs.name == ''
         with:
           auto-config: false
           build: false
@@ -41,14 +32,14 @@ jobs:
           use-mathlib-cache: false
 
       - name: Run lake translate-config toml
-        if: steps.build-docgen.outputs.name == ''
+        continue-on-error: true
         run: |
-          lake translate-config toml
+          lake translate-config toml || exit 0
 
-      - name: Build project documentation (v2)
-        id: build-docgen2
-        if: steps.build-docgen.outputs.name == ''
+      - name: Build project documentation
+        id: build-docgen
         uses: leanprover-community/docgen-action@7836f3de2f10facc0fed09c1309e6402e4cd5fd0
         with:
           api-docs: false
           build-page: false
+          blueprint: false
