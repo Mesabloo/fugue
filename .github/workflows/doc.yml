@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
-      - name: Checkout main 
+      - name: Checkout docs 
         uses: actions/checkout@v6
         with:
           ref: docs 
