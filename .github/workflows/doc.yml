@@ -15,18 +15,17 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
-      - name: Checkout project
+      - name: Checkout main 
         uses: actions/checkout@v6
         with:
+          ref: docs 
           fetch-depth: 0
-        #   fetch-depth: 0 # Fetch all history for all branches and tags
 
       - name: Rebase onto `docs` to trigger workflow
-        uses: martincostello/rebaser@v1
         id: rebase
-        with:
-          branch: docs
+        run: |
+          git rebase main docs && exit 0 || exit 1
 
       - name: Push
-        if : ${{ steps.rebase.outputs.result == 'success' }}
+        if: ${{ steps.rebase.outputs.result == 'success' }}
         run: git push --force-with-lease origin docs
