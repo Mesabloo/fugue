@@ -24,7 +24,8 @@ jobs:
       - name: Rebase onto `docs` to trigger workflow
         id: rebase
         run: |
-          git checkout -B main main
+          git fetch --all
+          git checkout -B main origin/main
           git rebase main docs && exit 0 || exit 1
 
       - name: Push
