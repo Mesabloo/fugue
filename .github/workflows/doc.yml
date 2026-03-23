@@ -1,4 +1,4 @@
-name: Build documentation and deploy
+name: Rebase onto `docs`
 
 on:
   workflow_run:
@@ -9,8 +9,6 @@ on:
 
 permissions:
   contents: read # Read access to repository contents
-  id-token: write # Required to upload the site to GitHub Pages
-  pages: write # Write access to GitHub Pages
 
 jobs:
   doc:
@@ -19,27 +17,16 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v6
-        # with:
+        with:
+          fetch-depth: 0
         #   fetch-depth: 0 # Fetch all history for all branches and tags
 
-      - uses: leanprover/lean-action@v1.4.0
+      - name: Rebase onto `docs` to trigger workflow
+        uses: martincostello/rebaser@v1
+        id: rebase
         with:
-          auto-config: false
-          build: false
-          test: false 
-          lint: false
-          mk_all-check: false
-          use-mathlib-cache: false
+          branch: docs
 
-      - name: Run lake translate-config toml
-        continue-on-error: true
-        run: |
-          lake translate-config toml || exit 0
-
-      - name: Build project documentation
-        id: build-docgen
-        uses: leanprover-community/docgen-action@7836f3de2f10facc0fed09c1309e6402e4cd5fd0
-        with:
-          api-docs: true
-          build-page: false
-          blueprint: false
+      - name: Push
+        if : ${{ steps.rebase.outputs.result == 'success' }}
+        run: git push --force-with-lease origin docs
