@@ -29,4 +29,6 @@ jobs:
           git rebase main docs && exit 0 || exit 1
 
       - name: Push
-        run: git push --force-with-lease origin docs
+        run: |
+          git commit --allow-empty -m 'deploy docs'
+          git push --force-with-lease origin docs
