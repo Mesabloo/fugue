@@ -465,7 +465,7 @@ noncomputable section Domain
         admit
 
       def Domain.syncClose [DecidableEq Γ] (c : Γ) : Domain «Σ» Γ α β → Domain «Σ» Γ α β :=
-        UniformSpace.Completion.map <| DomainUnion.syncClose («Σ» := «Σ») (β := β) zero c
+        UniformSpace.Completion.map <| DomainUnion.syncClose zero c
     end Close
 
     section Applicative
@@ -480,7 +480,7 @@ noncomputable section Domain
         | 0 | _ + 1 => .inl v
 
       def Domain.pure (v : β) : Domain «Σ» Γ α β :=
-        UniformSpace.Completion.coe' ⟨0, IterativeDomain.pure v⟩
+        (DomainUnion.mk (n := 0) (IterativeDomain.pure («Σ» := «Σ») (Γ := Γ) (α := α) v) : UniformSpace.Completion _)
 
       mutual
         def Branch.ap {m n} [DecidableEq Γ] [Nonempty β] (p' : (IterativeDomain «Σ» Γ α β n).carrier) :
@@ -517,7 +517,7 @@ noncomputable section Domain
 
       def Domain.ap [DecidableEq Γ] [Nonempty β] :
           Domain «Σ» Γ α (β → γ) → Domain «Σ» Γ α β → Domain «Σ» Γ α γ :=
-        UniformSpace.Completion.extension₂ (λ x y ↦ DomainUnion.ap zero («Σ» := «Σ») (β := β) (γ := γ) x y : _ → _ → UniformSpace.Completion _)
+        UniformSpace.Completion.extension₂ (λ x y ↦ DomainUnion.ap zero x y)
     end Applicative
 
     section Monad
@@ -543,5 +543,69 @@ noncomputable section Domain
 
       axiom Domain.bind : Domain «Σ» Γ α β → (β → Domain «Σ» Γ α γ) → Domain «Σ» Γ α γ
     end Monad
+
+    section Sequence
+      mutual
+        def Branch.seq {m n} (q : (IterativeDomain «Σ» Γ α PUnit n).carrier) : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α PUnit m).carrier → Branch «Σ» Γ α (IterativeDomain «Σ» Γ α PUnit (m + n)).carrier :=
+          Sum.map (Prod.map id (Pi.map λ _ ↦ Pi.map λ _ ↦ Restriction.map (IterativeDomain.seq · q))) <|
+          Sum.map (Prod.map id (Prod.map id (Restriction.map (IterativeDomain.seq · q)))) <|
+          Sum.map (Prod.map id (Restriction.map (IterativeDomain.seq · q))) <|
+          Sum.map (Prod.map id (Restriction.map (IterativeDomain.seq · q))) <|
+          Prod.map id (Restriction.map (IterativeDomain.seq · q))
+
+        def IterativeDomain.seq {m n} : (IterativeDomain «Σ» Γ α PUnit m).carrier → (IterativeDomain «Σ» Γ α PUnit n).carrier → (IterativeDomain «Σ» Γ α PUnit (m + n)).carrier :=
+          match m with
+          | 0 => Sum.elim (λ _ t ↦ Nat.zero_add _ ▸ t) (λ _ _ ↦ IterativeDomain.abort)
+          | m + 1 =>
+            Sum.elim (λ _ t ↦ IterativeDomain.lift (by grind only) t) <|
+            Sum.elim (λ _ _ ↦ IterativeDomain.abort) <|
+            λ g t ↦ reorder ▸ IterativeDomain.branch λ σ ↦ Branch.seq t '' g σ
+      end
+
+      theorem IterativeDomain.seq_uniform_continuous {m n} :
+          UniformContinuous₂ (IterativeDomain.seq («Σ» := «Σ») (Γ := Γ) (α := α) (m := m) (n := n)) := by
+        admit
+
+      def DomainUnion.seq : DomainUnion «Σ» Γ α PUnit → DomainUnion «Σ» Γ α PUnit → DomainUnion «Σ» Γ α PUnit :=
+        λ ⟨_, p⟩ ⟨_, q⟩ ↦ DomainUnion.mk (IterativeDomain.seq p q)
+
+      theorem DomainUnion.seq_uniform_continuous :
+          UniformContinuous₂ (DomainUnion.seq («Σ» := «Σ») (Γ := Γ) (α := α)) := by
+        admit
+
+      def Domain.seq : Domain «Σ» Γ α PUnit → Domain «Σ» Γ α PUnit → Domain «Σ» Γ α PUnit :=
+        UniformSpace.Completion.extension₂ (λ x y ↦ DomainUnion.seq x y)
+    end Sequence
+
+    section Choice
+      lemma max_succ {m n} : (m + 1) ⊔ (n + 1) = (m ⊔ n) + 1 := by
+        grind only [= max_def]
+
+      def IterativeDomain.choice {m n} (p : (IterativeDomain «Σ» Γ α PUnit m).carrier) (q : (IterativeDomain «Σ» Γ α PUnit n).carrier) :
+          (IterativeDomain «Σ» Γ α PUnit (m ⊔ n)).carrier :=
+        match m, n, p, q with
+        | 0, _, .inl _, q | _ + 1, _, .inl _, q => IterativeDomain.lift (by grind only [= max_def]) q
+        | _, 0, p, .inl _ | _, _ + 1, p, .inl _ => IterativeDomain.lift (by grind only [= max_def]) p
+        | 0, _, IterativeDomain.abort, q | _ + 1, _, IterativeDomain.abort, q => IterativeDomain.abort
+        | _, 0, p, IterativeDomain.abort | _, _ + 1, p, IterativeDomain.abort => IterativeDomain.abort
+        | m + 1, n + 1, IterativeDomain.branch g, IterativeDomain.branch g' =>
+          max_succ ▸ IterativeDomain.branch λ σ ↦
+            (Branch.map (IterativeDomain.lift (m := m) (n := max m n) (le_max_left m n)) '' g σ) ∪
+            (Branch.map (IterativeDomain.lift (m := n) (n := max m n) (le_max_right m n)) '' g' σ)
+
+      theorem IterativeDomain.choice_uniform_continuous {m n} :
+          UniformContinuous₂ (IterativeDomain.choice («Σ» := «Σ») (Γ := Γ) (α := α) (m := m) (n := n)) := by
+        admit
+
+      def DomainUnion.choice : DomainUnion «Σ» Γ α PUnit → DomainUnion «Σ» Γ α PUnit → DomainUnion «Σ» Γ α PUnit :=
+        λ ⟨_, p⟩ ⟨_, q⟩ ↦ DomainUnion.mk (IterativeDomain.choice p q)
+
+      theorem DomainUnion.choice_uniform_continuous :
+          UniformContinuous₂ (DomainUnion.choice («Σ» := «Σ») (Γ := Γ) (α := α)) := by
+        admit
+
+      def Domain.choice : Domain «Σ» Γ α PUnit → Domain «Σ» Γ α PUnit → Domain «Σ» Γ α PUnit :=
+        UniformSpace.Completion.extension₂ (λ x y ↦ DomainUnion.choice x y)
+    end Choice
   end Operators
 end Domain
