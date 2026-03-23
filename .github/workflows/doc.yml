@@ -29,5 +29,4 @@ jobs:
           git rebase main docs && exit 0 || exit 1
 
       - name: Push
-        if: ${{ steps.rebase.outputs.result == 'success' }}
         run: git push --force-with-lease origin docs
