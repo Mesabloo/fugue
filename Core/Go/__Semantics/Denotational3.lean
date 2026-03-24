@@ -98,6 +98,10 @@ noncomputable section Domain
     variable {«Σ» Γ α β γ δ} [IMetricSpace γ]
 
     @[match_pattern]
+    def IterativeDomain.leaf {n} (v : β) : (IterativeDomain «Σ» Γ α β n).carrier := match n with
+      | 0 | _ + 1 => .inl v
+
+    @[match_pattern]
     def IterativeDomain.abort {n} : (IterativeDomain «Σ» Γ α β n).carrier := match n with
       | 0 => .inr .unit
       | _ + 1 => .inr (.inl .unit)
@@ -607,5 +611,103 @@ noncomputable section Domain
       def Domain.choice : Domain «Σ» Γ α PUnit → Domain «Σ» Γ α PUnit → Domain «Σ» Γ α PUnit :=
         UniformSpace.Completion.extension₂ (λ x y ↦ DomainUnion.choice x y)
     end Choice
+
+    section EventHiding
+      /-! ## Event hiding -/
+
+      open Classical in
+      mutual
+        def Branch.hide [DecidableEq Γ] (σ : «Σ») (c : Γ) (Ω : Set Γ) {n} : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n).carrier → Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n).carrier) :=
+          Sum.elim (λ (c', π) ↦ if c = c' then ∅ else if c' ∈ Ω then {Branch.next σ (π (zero c') false)} else {Branch.recv c' λ v ok ↦ Restriction.map (IterativeDomain.hide c Ω) (π v ok)}) <|
+          Sum.elim (λ (c', v, p) ↦ if c = c' then ∅ else {Branch.send c' v (Restriction.map (IterativeDomain.hide c Ω) p)}) <|
+          Sum.elim (λ (c', p) ↦ if c = c' then {Branch.next σ (Restriction.map (IterativeDomain.hide c Ω) p)} else {Branch.close c' (Restriction.map (IterativeDomain.hide c (Ω ∪ {c'})) p)}) <|
+          Sum.elim (λ (c', p) ↦ if c = c' then ∅ else {Branch.sync c' (Restriction.map (IterativeDomain.hide c Ω) p)}) <|
+          λ (σ, p) ↦ {Branch.next σ (IterativeDomain.hide c Ω p)}
+
+        def IterativeDomain.hide [DecidableEq Γ] (c : Γ) (Ω : Set Γ) {n} : (IterativeDomain «Σ» Γ α β n).carrier → (IterativeDomain «Σ» Γ α β n).carrier :=
+          match n with
+          | 0 => id
+          | n + 1 =>
+            Sum.map id <|
+            Sum.map id <|
+            Pi.map λ σ X ↦
+              let Y := ⋃ b ∈ X, Branch.hide σ c Ω b
+              Y ∪ if Y = ∅ ∧ X ≠ ∅ then {Branch.next σ IterativeDomain.abort} else ∅
+      end
+
+      theorem IterativeDomain.hide_uniform_continuous [DecidableEq Γ] {c : Γ} {Ω : Set Γ} {n} :
+          UniformContinuous (IterativeDomain.hide («Σ» := «Σ») (α := α) (β := β) (n := n) zero c Ω) := by
+        admit
+
+      def DomainUnion.hide [DecidableEq Γ] (c : Γ) (Ω : Set Γ) : DomainUnion «Σ» Γ α β → DomainUnion «Σ» Γ α β :=
+        Sigma.map id λ _ ↦ IterativeDomain.hide zero c Ω
+
+      theorem DomainUnion.hide_uniform_continuous [DecidableEq Γ] {c : Γ} {Ω : Set Γ} :
+          UniformContinuous (DomainUnion.hide («Σ» := «Σ») (α := α) (β := β) zero c Ω) := by
+        admit
+
+      def Domain.hide [DecidableEq Γ] (c : Γ) (Ω : Set Γ) : Domain «Σ» Γ α β → Domain «Σ» Γ α β :=
+        UniformSpace.Completion.map (DomainUnion.hide zero c Ω)
+    end EventHiding
+
+    section Parallel
+      /-! ## Parallel composition -/
+
+      private lemma jsp {m n} : (m + 1).add n = m + (n + 1) := Nat.succ_add_eq_add_succ m n
+
+      mutual
+        def Branch.parallel_left {m n} (p' : (IterativeDomain «Σ» Γ α γ n).carrier) :
+            Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier → Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β × γ) (m + n)).carrier :=
+          Sum.map (Prod.map id (Pi.map λ _ ↦ Pi.map λ _ ↦ Restriction.map (IterativeDomain.parallel · p'))) <|
+          Sum.map (Prod.map id (Prod.map id (Restriction.map (IterativeDomain.parallel · p')))) <|
+          Sum.map (Prod.map id (Restriction.map (IterativeDomain.parallel · p'))) <|
+          Sum.map (Prod.map id (Restriction.map (IterativeDomain.parallel · p'))) <|
+                  (Prod.map id (Restriction.map (IterativeDomain.parallel · p')))
+
+        def Branch.parallel_right {m n} (p : (IterativeDomain «Σ» Γ α β m).carrier) :
+            Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier → Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β × γ) (m + n)).carrier :=
+          Sum.map (Prod.map id (Pi.map λ _ ↦ Pi.map λ _ ↦ Restriction.map (IterativeDomain.parallel p))) <|
+          Sum.map (Prod.map id (Prod.map id (Restriction.map (IterativeDomain.parallel p)))) <|
+          Sum.map (Prod.map id (Restriction.map (IterativeDomain.parallel p))) <|
+          Sum.map (Prod.map id (Restriction.map (IterativeDomain.parallel p))) <|
+                  (Prod.map id (Restriction.map (IterativeDomain.parallel p)))
+
+        def IterativeDomain.parallel {m n} (p : (IterativeDomain «Σ» Γ α β m).carrier) (p' : (IterativeDomain «Σ» Γ α γ n).carrier) : (IterativeDomain «Σ» Γ α (β × γ) (m + n)).carrier :=
+          match m, n, p, p' with
+          | 0, _, IterativeDomain.leaf v, p' | m + 1, _, IterativeDomain.leaf v, p' =>
+            IterativeDomain.lift (by grind only) <| IterativeDomain.map (v, ·) p'
+          | _, 0, p, IterativeDomain.leaf v | _, n + 1, p, IterativeDomain.leaf v =>
+            IterativeDomain.lift (by grind only) <| IterativeDomain.map (·, v) p
+          | 0, _, IterativeDomain.abort, _ | m + 1, _, IterativeDomain.abort, _
+          | _, 0, _, IterativeDomain.abort | _, n + 1, _, IterativeDomain.abort =>
+            IterativeDomain.abort
+          | m + 1, n + 1, IterativeDomain.branch g, IterativeDomain.branch g' => IterativeDomain.branch λ σ ↦
+            -- Interleavings
+              {jsp.symm ▸ Branch.parallel_left (IterativeDomain.branch (n := n) g') b | b ∈ g σ}
+            ∪ {Branch.parallel_right (IterativeDomain.branch g) b' | b' ∈ g' σ}
+            -- Synchronisations
+            ∪ {p | ∃ v γ p' π', .send γ v p' ∈ g σ ∧ .recv γ π' ∈ g' σ ∧ p = .sync γ (IterativeDomain.lift (by grind only) (IterativeDomain.parallel p' (π' v true)))}
+            ∪ {p | ∃ v γ p' π', .send γ v p' ∈ g' σ ∧ .recv γ π' ∈ g σ ∧ p = .sync γ (IterativeDomain.lift (by grind only) (IterativeDomain.parallel (π' v true) p'))}
+            -- Channel closure
+            ∪ {p | ∃ v γ p' p'', .send γ v p' ∈ g σ ∧ .close γ p'' ∈ g' σ ∧ p = .next σ IterativeDomain.abort}
+            ∪ {p | ∃ v γ p' p'', .send γ v p' ∈ g' σ ∧ .close γ p'' ∈ g σ ∧ p = .next σ IterativeDomain.abort}
+            ∪ {p | ∃ γ π' p', .recv γ π' ∈ g σ ∧ .close γ p' ∈ g' σ ∧ p = .close γ (IterativeDomain.lift (by grind only) (IterativeDomain.parallel (π' (zero γ) false) p'))}
+            ∪ {p | ∃ γ π' p', .recv γ π' ∈ g' σ ∧ .close γ p' ∈ g σ ∧ p = .close γ (IterativeDomain.lift (by grind only) (IterativeDomain.parallel p' (π' (zero γ) false)))}
+      end
+
+      theorem IterativeDomain.parallel_uniform_continuous {m n} :
+          UniformContinuous₂ (IterativeDomain.parallel zero («Σ» := «Σ») (β := β) (γ := γ) (m := m) (n := n)) := by
+        admit
+
+      def DomainUnion.parallel : DomainUnion «Σ» Γ α β → DomainUnion «Σ» Γ α γ → DomainUnion «Σ» Γ α (β × γ) :=
+        λ ⟨_, p⟩ ⟨_, q⟩ ↦ DomainUnion.mk (IterativeDomain.parallel zero p q)
+
+      theorem DomainUnion.parallel_uniform_continuous :
+          UniformContinuous₂ (DomainUnion.parallel zero («Σ» := «Σ») (β := β) (γ := γ)) := by
+        admit
+
+      def Domain.parallel : Domain «Σ» Γ α β → Domain «Σ» Γ α γ → Domain «Σ» Γ α (β × γ) :=
+        UniformSpace.Completion.extension₂ (λ x y ↦ DomainUnion.parallel zero x y)
+    end Parallel
   end Operators
 end Domain
