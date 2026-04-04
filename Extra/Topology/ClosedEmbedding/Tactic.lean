@@ -13,6 +13,8 @@ syntax "is_closed_embedding" : tactic
 syntax "is_closed_embedding_step" : tactic
 
 macro_rules
+| `(tactic| is_closed_embedding_step) => `(tactic| assumption)
+macro_rules
 | `(tactic| is_closed_embedding_step) =>
   `(tactic| guard_target =ₛ Topology.IsClosedEmbedding (_ ∘ _); apply Topology.IsClosedEmbedding.comp)
 

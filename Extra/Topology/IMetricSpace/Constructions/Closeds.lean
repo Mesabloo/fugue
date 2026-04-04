@@ -1,6 +1,7 @@
 import Extra.Topology.IMetricSpace
 import Mathlib.Topology.Sets.Closeds
 import Mathlib.Topology.UniformSpace.Closeds
+-- import Mathlib.Topology.MetricSpace.Closeds
 -- import Extra.Topology.ClosedEmbedding.Tactic
 import Extra.Topology.ClosedEmbedding
 
@@ -29,6 +30,10 @@ namespace IMetric
       hausdorffIDist s t = hausdorffIDist t s := by
     unfold hausdorffIDist
     erw [max_comm]
+
+  theorem hausdorffIDist_image_le {α β} [PseudoIMetricSpace α] [PseudoIMetricSpace β] {s t : Set α} {Φ : α → β} (h : ∀ x y, idist (Φ x) (Φ y) ≤ idist x y) :
+      hausdorffIDist (Φ '' s) (Φ '' t) ≤ hausdorffIDist s t :=
+    sorry
 
   theorem hausdorffIDist_image {α β} [PseudoIMetricSpace α] [PseudoIMetricSpace β] {s t : Set α} {Φ : α → β} (h : Isometry Φ) :
       hausdorffIDist (Φ '' s) (Φ '' t) = hausdorffIDist s t :=
@@ -70,6 +75,23 @@ theorem IMetric.hausdorffIDist_le_iff {α} [PseudoIMetricSpace α] {s t : Set α
     IMetric.hausdorffIDist s t ≤ r ↔ (∀ x ∈ s, ∃ y ∈ t, idist x y ≤ r) ∧ (∀ y ∈ t, ∃ x ∈ s, idist x y ≤ r) := by
   sorry
 
+open unitInterval in
+theorem IMetric.hausdorffIDist_image_le_of_le_sup {α} [PseudoIMetricSpace α] {s : Set α} {f : α → α} :
+    IMetric.hausdorffIDist s (f '' s) ≤ ⨆ x ∈ s, idist x (f x) := by
+  rw [IMetric.hausdorffIDist_le_iff]
+  constructor
+  · intros x x_in
+    rw [Set.exists_mem_image]
+    exists x, x_in
+    apply le_iSup₂ (f := λ x (_ : x ∈ s) ↦ idist x (f x))
+    assumption
+  · intros y y_in
+    rw [Set.mem_image] at y_in
+    obtain ⟨x, x_in, rfl⟩ := y_in
+    exists x, x_in
+    apply le_iSup₂ (f := λ x (_ : x ∈ s) ↦ idist x (f x))
+    assumption
+
 theorem Set.image_isometry {α β} {f : α → β} [PseudoIMetricSpace α] [PseudoIMetricSpace β] (hf : Isometry f) :
     Isometry (Set.image f) := by
   apply Isometry.of_idist_eq λ x y ↦ ?_
@@ -83,11 +105,13 @@ noncomputable instance {α : Type u} [IMetricSpace α] : IMetricSpace (Closeds �
   --   · exact s.isClosed
   --   · exact t.isClosed
 
-instance (priority := high) Closeds.instCompleteSpace {α : Type u} [IMetricSpace α] [CompleteSpace α] : CompleteSpace (Closeds α) := by
+instance (priority := high) Closeds.instCompleteSpace {α : Type u} [IMetricSpace α] [CompleteSpace α] : CompleteSpace (Closeds α) :=
+  -- This can't be equal to `TopologicalSpace.Closeds.instCompleteSpace` (from `Mathlib.Topology.MetricSpace.Closeds`)
+  -- otherwise there is an instance mismatch further down, when using the completeness of `Closeds α`.
+  -- In fact, this module cannot even be imported without clashing with this file's definitions.
+  --
+  -- So I'll guess we'll have to do the proof again.
   sorry
-
--- instance {α} [TopologicalSpace α] : TopologicalSpace (Closeds α) :=
---   .induced SetLike.coe (TopologicalSpace.vietoris α)
 
 def Closeds.map {α β} [IMetricSpace α] [IMetricSpace β] (f : α → β) (hf : Topology.IsClosedEmbedding f) (x : Closeds α) : Closeds β where
   carrier := f '' ↑x
@@ -156,5 +180,5 @@ theorem Closeds.map_comp {α β γ} [IMetricSpace α] [IMetricSpace β] [IMetric
   funext _
   simp [Closeds.map, Set.image_image]
 
-macro_rules | `(tactic| is_closed_embedding_step) => `(tactic| apply Topology.IsClosedEmbedding.Closeds.map)
+-- macro_rules | `(tactic| is_closed_embedding_step) => `(tactic| apply Topology.IsClosedEmbedding.Closeds.map)
 -- macro_rules | `(tactic| is_closed_embedding_step) => `(tactic| apply Topology.IsClosedEmbedding.Closeds.closed_map)

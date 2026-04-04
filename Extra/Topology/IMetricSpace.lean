@@ -245,3 +245,27 @@ theorem Isometry.to_idist_eq.{u, v} {α : Type u} {β : Type v} [PseudoIMetricSp
   · grind only
   · grind only [= Set.mem_Icc]
   · grind only [= Set.mem_Icc]
+
+lemma uniformContinuous_idist {α} [PseudoIMetricSpace α] :
+    UniformContinuous fun p : α × α => idist p.1 p.2 :=
+  Metric.uniformContinuous_iff.2 fun ε ε0 =>
+    ⟨ε / 2, half_pos ε0, fun {a b} h =>
+      calc dist (dist a.1 a.2) (dist b.1 b.2) ≤ dist a.1 b.1 + dist a.2 b.2 :=
+        dist_dist_dist_le _ _ _ _
+      _ ≤ dist a b + dist a b := add_le_add (le_max_left _ _) (le_max_right _ _)
+      _ < ε / 2 + ε / 2 := add_lt_add h h
+      _ = ε := add_halves ε⟩
+
+protected lemma UniformContinuous.idist {α β} [PseudoIMetricSpace α] [UniformSpace β] {f g : β → α} (hf : UniformContinuous f)
+    (hg : UniformContinuous g) : UniformContinuous λ b ↦ idist (f b) (g b) :=
+  uniformContinuous_idist.comp (hf.prodMk hg)
+
+@[continuity]
+lemma continuous_idist {α} [PseudoIMetricSpace α] :
+    Continuous fun p : α × α ↦ idist p.1 p.2 :=
+  uniformContinuous_idist.continuous
+
+@[continuity]
+nonrec theorem Continuous.idist {α β} [PseudoIMetricSpace α] [TopologicalSpace β] {f g : β → α} (hf : Continuous f) (hg : Continuous g) :
+    Continuous λ (b : β) ↦ idist (f b) (g b) :=
+  continuous_idist.comp₂ hf hg
