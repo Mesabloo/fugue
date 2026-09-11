@@ -273,14 +273,16 @@ private def Progress.logOn : Progress → IO.FS.Stream → String → IO Unit
     out.putStr s!"{line}\n"
     out.flush
 
-/-- Stop the animation, leaving nothing in its place. For the paths that end the process
-themselves: `IO.Process.exit` skips `withProgress`'s own cleanup, so the animation line would
-otherwise stay on screen with whatever is printed next running into it. -/
-private def Progress.stop : Progress → IO Unit
+/-- Stop the animation, persisting `msg` in its place — like `.fail`/`.success`, but with no
+dingbat, for a conclusion nothing else has claimed yet that isn't a fatal/success banner. For the
+paths that end the process themselves: `IO.Process.exit` skips `withProgress`'s own cleanup, so
+the animation line would otherwise stay on screen with whatever is printed next running into it. -/
+private def Progress.stop (p : Progress) (msg : String) : IO Unit :=
+  match p with
   | .spinner s => do
     unless ← s.isCancelled do
-      s.cancel .erase
-  | .quiet => pure ()
+      s.cancel (.replace msg)
+  | .quiet => IO.eprintln msg
 
 /-- Update the current status — a no-op when `.quiet`, since there's nothing ongoing to label. -/
 private def Progress.setTitle : Progress → String → IO Unit
@@ -401,9 +403,8 @@ private def runCli (p : Parsed) : IO UInt32 := do
       IO.Process.exit 1
     | some _, some line =>
       spinner.log line
-      spinner.log "Compilation failed."
       -- `exit` below skips `withProgress`'s cleanup, so the animation has to be ended here.
-      spinner.stop
+      spinner.stop "Compilation failed."
       IO.Process.exit 1
     | _, _ => pure ()
 
