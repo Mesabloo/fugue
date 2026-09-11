@@ -86,7 +86,7 @@ partial def resolveExprMVars (e : Expr) : m Expr := match_source e with
 /-- Substitutes every already-assigned metavariable inside `τ`, recursing into whatever
 `onUnassigned` returns for one that isn't. Shared by `resolveTypeMVars` (throws: every
 metavariable must be resolved by the time a declaration finishes checking) and
-`resolveTypeMVarsForDisplay` below (best-effort: an unresolved one is left as `Typ.mvar n`, since
+`instantiateMVars` below (best-effort: an unresolved one is left as `Typ.mvar n`, since
 it's only used to make a *thrown* error's carried types as concrete as possible). -/
 private partial def resolveTypeMVarsWith (onUnassigned : MVarId → m Typ) : Typ → m Typ
   | .mvar n => do
@@ -112,12 +112,21 @@ private partial def resolveTypeMVarsWith (onUnassigned : MVarId → m Typ) : Typ
 private def resolveTypeMVars (pos : SourceSpan) : Typ → m Typ :=
   resolveTypeMVarsWith λ _ ↦ throw (.unconstrainedMetavariable pos)
 
-/-- Best-effort metavariable substitution for a `Typ` about to be embedded in a *thrown*
-`TCError`: an already-resolved metavariable (e.g. pinned by an earlier operand in the same call)
-is substituted so the error shows a concrete type instead of a raw `?n`; one that's never been
-constrained is left as `Typ.mvar n` (rendered `?n`) rather than erroring — display only, not a
-checking-correctness concern. -/
-def resolveTypeMVarsForDisplay : Typ → m Typ :=
+/-- Best-effort metavariable substitution for a `Typ`, named after `Lean.Meta.instantiateMVars`
+since it does the same job for the same reason: an already-resolved metavariable (e.g. pinned by
+an earlier operand in the same call) is substituted with its solution; one that's never been
+constrained is left as `Typ.mvar n` (rendered `?n`) rather than erroring. Originally written for a
+`Typ` about to be embedded in a *thrown* `TCError` (so the message shows a concrete type instead of
+a raw `?n`), but the same gap shows up whenever a `Typ` obtained from `inferExpr` is about to be
+pattern-matched against a specific shape (`.record`/`.set`/`.function`/…): a scheme operator's
+result can carry a metavariable its own argument-checking already solved (`subtype`'s `_, .mvar b`
+case, in `Elaborator/Subtyping.lean`), but nothing rewrites the `Typ` tree in place, so a bare
+structural match sees `.mvar n` and not the solution — e.g. `\E m \in DOMAIN someBag : m.field`
+fails to elaborate `m.field` even though `m`'s type is fully known by then. Calling this before
+such a match (as `Elaborator/Expressions.lean`'s domain-binder/record-access/index/`EXCEPT`-step
+rules do) fixes that: read-only over the metavariable context, so calling it anywhere never affects
+checking's soundness, only whether an already-decided type is visible yet. -/
+def instantiateMVars : Typ → m Typ :=
   resolveTypeMVarsWith (pure ∘ .mvar)
 
 /-- Closes out an elaborated expression: `resolveExprMVars` above eliminates every

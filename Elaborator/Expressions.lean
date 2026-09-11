@@ -83,7 +83,7 @@ private def coerceInto (pos : SourceSpan) (τ : Typ) : Typ × Expr → m Expr
     | .success coe => return coe.apply e @@ pos
     | .pending n => return .mvar n e @@ pos
     | .failure => throw (.failedToConvertTypes pos
-        (← resolveTypeMVarsForDisplay τ) (← resolveTypeMVarsForDisplay τ'))
+        (← instantiateMVars τ) (← instantiateMVars τ'))
 
 /-- Needed for the `partial def`s below to type-check at all (an arbitrary `m` isn't otherwise
 known nonempty). -/
@@ -96,6 +96,10 @@ mutual
     covering all three, so which rule applies is a runtime dispatch on `τ`'s own shape.
   -/
   partial def indexInto (pos : SourceSpan) (τ : Typ) (idx : SrcExpr) : m (Typ × Expr) := do
+    -- `τ` may be a scheme operator's result with an already-solved metavariable at the head
+    -- (`Elaborator/Resolution.lean`'s `instantiateMVars` docstring) — resolve before
+    -- the structural match below, or a well-typed `e[e']` spuriously fails as not indexable.
+    let τ ← instantiateMVars τ
     match τ with
     /-
        Γ ⊢ e ⇑ τ₁ → τ       Γ ⊢ e' ⇓ τ₁
@@ -127,7 +131,11 @@ mutual
   /-- One `EXCEPT` path step (a path is a `List (String ⊕ SrcExpr)`: `.inl` a record field,
   `.inr` an index) applied to an already-known type `τ`. -/
   partial def stepInto (pos : SourceSpan) (τ : Typ) : (String ⊕ SrcExpr) → m (Typ × (String ⊕ Expr))
-    | .inl field => match τ with
+    | .inl field => do
+      -- same reason as `indexInto` above: resolve a possibly-solved-but-undereffed metavariable
+      -- before matching, or a well-typed `e.field` spuriously fails as not a record.
+      let τ ← instantiateMVars τ
+      match τ with
       /-
          Γ ⊢ e ⇑ [x₀ : τ₀, …, xₙ : τₙ]       y = xᵢ
         ────────────────────────────────────────────── [Record field access]
@@ -264,6 +272,8 @@ mutual
     -/
     | .collect x _ann domE pred, pos => do
       let (domTy, domE') ← inferExpr domE
+      -- same reason as `indexInto` above: `domE` may itself be a scheme operator's result.
+      let domTy ← instantiateMVars domTy
       match domTy with
       | .set τ => do
         let pred' ← extend x τ (checkExpr pred .bool)
@@ -276,6 +286,8 @@ mutual
     -/
     | .map' body x _ann domE, pos => do
       let (domTy, domE') ← inferExpr domE
+      -- same reason as `indexInto` above: `domE` may itself be a scheme operator's result.
+      let domTy ← instantiateMVars domTy
       match domTy with
       | .set τ => do
         let (τ', body') ← extend x τ (inferExpr body)
@@ -297,6 +309,8 @@ mutual
     -/
     | .fn x _ann domE body, pos => do
       let (domTy, domE') ← inferExpr domE
+      -- same reason as `indexInto` above: `domE` may itself be a scheme operator's result.
+      let domTy ← instantiateMVars domTy
       match domTy with
       | .set τ => do
         let (τ', body') ← extend x τ (inferExpr body)
@@ -310,6 +324,9 @@ mutual
     | .fnSet domE codE, pos => do
       let (domTy, domE') ← inferExpr domE
       let (codTy, codE') ← inferExpr codE
+      -- same reason as `indexInto` above: `domE`/`codE` may themselves be a scheme operator's result.
+      let domTy ← instantiateMVars domTy
+      let codTy ← instantiateMVars codTy
       match domTy, codTy with
       | .set τ, .set τ' => return (.set (.function τ τ'), .fnSet domE' codE' @@ pos)
       | .set _, _ => throw (.notASetType pos codTy)
@@ -335,6 +352,8 @@ mutual
     | .recordSet fields, pos => do
       let fields' ← fields.mapM λ (_ann, x, e) ↦ do
         let (τ, e') ← inferExpr e
+        -- same reason as `indexInto` above: `e` may itself be a scheme operator's result.
+        let τ ← instantiateMVars τ
         match τ with
         | .set τ' => return (τ', x, e')
         | _ => throw (.notASetType pos τ)
@@ -358,6 +377,11 @@ mutual
     -/
     | .recordAccess e x, pos => do
       let (τ, e') ← inferExpr e
+      -- same reason as `indexInto` above: `e` may itself be a scheme operator's result (e.g.
+      -- `DOMAIN` applied to a concretely-typed argument, per `Elaborator/Resolution.lean`'s
+      -- `instantiateMVars` docstring) — resolve before the structural match below, or
+      -- a well-typed `e.x` spuriously fails as not a record.
+      let τ ← instantiateMVars τ
       match τ with
       | .record fs => match fs.lookup x with
         | some τ' => return (τ', .recordAccess e' x @@ pos)
@@ -413,6 +437,8 @@ mutual
     -/
     | .forall x _ann (some domE) body, pos => do
       let (domTy, domE') ← inferExpr domE
+      -- same reason as `indexInto` above: `domE` may itself be a scheme operator's result.
+      let domTy ← instantiateMVars domTy
       match domTy with
       | .set τ => do
         let body' ← extend x τ (checkExpr body .bool)
@@ -431,6 +457,11 @@ mutual
       | none => throw (.expectedTypeAnnotation pos "unbounded ∀")
     | .exists x _ann (some domE) body, pos => do
       let (domTy, domE') ← inferExpr domE
+      -- same reason as `indexInto` above: `domE` may itself be a scheme operator's result.
+      -- This is the exact shape hit by `\E m \in DOMAIN someBag : m.field ...` — `DOMAIN`'s
+      -- generic `(a -> b) => Set(a)` leaves `?a` visible only via `assigned?`, not rewritten
+      -- into `domTy` itself, so `m`'s bound type must be resolved before it can be extended.
+      let domTy ← instantiateMVars domTy
       match domTy with
       | .set τ => do
         let body' ← extend x τ (checkExpr body .bool)
@@ -466,6 +497,8 @@ mutual
     -/
     | .choose x _ann (some domE) body, pos => do
       let (domTy, domE') ← inferExpr domE
+      -- same reason as `indexInto` above: `domE` may itself be a scheme operator's result.
+      let domTy ← instantiateMVars domTy
       match domTy with
       | .set τ => do
         let body' ← extend x τ (checkExpr body .bool)

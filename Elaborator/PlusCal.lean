@@ -48,7 +48,7 @@ abbrev SrcMulticast := CorePlusCal.Multicast (Option Typ) SrcExpr
 `Function`/`Set`/`Seq`/`Tuple`/`Record` recursively (a `Function` is showable when both its domain
 and range are). `Operator`/`Channel`/`Const`/rigid type variables, and anything containing them,
 are not showable. Pure and non-monadic — **callers must resolve `τ`'s metavariables first**
-(`resolveTypeMVarsForDisplay`, at the point of use) so `.mvar _ => false` only fires on a
+(`instantiateMVars`, at the point of use) so `.mvar _ => false` only fires on a
 genuinely unresolved metavariable, not one already pinned to something showable. `partial`: nested
 `List` recursion over `Tuple`/`Record`'s fields isn't visibly structurally decreasing to Lean. -/
 partial def showable : Typ → Bool
@@ -220,7 +220,7 @@ mutual
       -- `resolveMVars e'`'s traversal above may not have touched it: resolve it separately before
       -- testing `showable`, so an already-pinned metavariable is checked against its real type
       -- instead of unconditionally failing as `.mvar _`.
-      let τ ← resolveTypeMVarsForDisplay τ
+      let τ ← instantiateMVars τ
       if showable τ then return .print e' @@ pos
       else throw (.notShowable pos τ)
     /-
@@ -311,7 +311,7 @@ mutual
       | .channel elemTy => do
         let (refTy, r') ← inferRef pos r
         match ← subtype elemTy refTy with
-        | .failure => throw (.failedToConvertTypes pos (← resolveTypeMVarsForDisplay refTy) (← resolveTypeMVarsForDisplay elemTy))
+        | .failure => throw (.failedToConvertTypes pos (← instantiateMVars refTy) (← instantiateMVars elemTy))
         | .success coe => return .receive c' r' coe @@ pos
         | .pending _ => throw (.todo pos
             "unreachable: a channel/reference's declared type can never contain an unresolved metavariable")
