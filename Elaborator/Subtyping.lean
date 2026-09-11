@@ -101,6 +101,9 @@ private partial def tryAxioms (subtypeRec : Typ → Typ → m SubtypeResult) (τ
   | .seq τ₀ => do
     let i ← freshName "i"
     chainWith (.seqToFun τ₀ i) (.function .int τ₀)
+  | .bag τ₀ => do
+    let i ← freshName "i"
+    chainWith (.bagToFun τ₀ i) (.function τ₀ .int)
   | .tuple (τ₀ :: rest) =>
     if rest.all (· == τ₀) then
       chainWith (.tupleToSeq (rest.length + 1) τ₀ (Nat.succ_pos _)) (.seq τ₀)
@@ -154,6 +157,11 @@ partial def subtype (τ τ' : Typ) : m SubtypeResult := do
       let x ← freshName "x"
       return .success (.set x τ₀ τ₀' c)
   | .seq τ₀, .seq τ₀' => do
+    match ← subtype τ₀ τ₀' with
+    | .success .id => return .success .id
+    | .pending n => return .pending n
+    | _ => return .failure
+  | .bag τ₀, .bag τ₀' => do
     match ← subtype τ₀ τ₀' with
     | .success .id => return .success .id
     | .pending n => return .pending n

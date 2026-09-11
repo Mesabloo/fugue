@@ -99,20 +99,23 @@ private def finiteSetsDeclarations : List Decl :=
   [ builtinOp "FiniteSets" (.operator [.set (.var "a")] .bool) "IsFiniteSet" [("S", 0)],
     builtinOp "FiniteSets" (.operator [.set (.var "a")] .int) "Cardinality" [("S", 0)] ]
 
-/-- `Bags`'s operators — a bag of `a`s represented the same way the real module does, as a
-`Function(a, Int)` (`DOMAIN` gives the underlying set, application gives a copy count). `Sum` is
-`LOCAL` in the real module (a helper for `BagUnion`/`BagCardinality`'s own definitions), so it's
-not included here — matches `FiniteSets`/`Sequences` never exporting their own `LOCAL` helpers
-either. `EXTENDS TLC` and `LOCAL INSTANCE Naturals` in the real module both become `«extends»`
-edges here regardless of `LOCAL` (see `finiteSetsDeclarations`'s doc above), so `«extends» :=
-["TLC", "Naturals"]` — `TLC` itself is currently an empty stub so this has no effect yet.
+/-- `Bags`'s operators — a bag of `a`s is `Typ.bag a`, a dedicated type rather than the
+`Function(a, Int)` real TLA⁺ represents one as. `Bag(τ) <: τ → Int` (`Elaborator/Subtyping.lean`'s
+`tryAxioms`, `.bag` case) recovers the function view wherever one is needed — `DOMAIN`, function
+application — without every function-typed intrinsic having to special-case a bag operand. `Sum`
+is `LOCAL` in the real module (a helper for `BagUnion`/`BagCardinality`'s own definitions), so
+it's not included here — matches `FiniteSets`/`Sequences` never exporting their own `LOCAL`
+helpers either. `EXTENDS TLC` and `LOCAL INSTANCE Naturals` in the real module both become
+`«extends»` edges here regardless of `LOCAL` (see `finiteSetsDeclarations`'s doc above), so
+`«extends» := ["TLC", "Naturals"]` — `TLC` itself is currently an empty stub so this has no effect
+yet.
 
-`EmptyBag : Function(a, Int)` is genuinely polymorphic, matching real TLA⁺ — every reference gets
-its own fresh instantiation of `a`, since `Decl.bindings` (`Driver/Modules.lean`) marks every
-0-ary `operator` declaration a scheme (`Elaborator/Monad.lean`'s `Binding.isScheme`), freshened at
-each `Γ`-reference by `Elaborator/Expressions.lean`'s `inferExpr`. -/
+`EmptyBag : Bag(a)` is genuinely polymorphic, matching real TLA⁺ — every reference gets its own
+fresh instantiation of `a`, since `Decl.bindings` (`Driver/Modules.lean`) marks every 0-ary
+`operator` declaration a scheme (`Elaborator/Monad.lean`'s `Binding.isScheme`), freshened at each
+`Γ`-reference by `Elaborator/Expressions.lean`'s `inferExpr`. -/
 private def bagsDeclarations : List Decl :=
-  let bag : TypedTLAPlus.Typ := .function (.var "a") .int
+  let bag : TypedTLAPlus.Typ := .bag (.var "a")
   let binBag : TypedTLAPlus.Typ := .operator [bag, bag] bag
   [ builtinOp "Bags" (.operator [bag] .bool) "IsABag" [("B", 0)],
     builtinOp "Bags" (.operator [bag] (.set (.var "a"))) "BagToSet" [("B", 0)],

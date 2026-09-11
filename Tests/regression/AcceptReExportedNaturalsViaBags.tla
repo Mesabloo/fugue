@@ -6,9 +6,10 @@
 \* `compileBuiltinCall`'s `Bags` arm, which reports `E0061` ("the Bags module has no runtime
 \* representation") rather than `E0060` -- so it is worth its own fixture rather than being folded
 \* into the `Integers` one.
-\* No `Bags` operator is referenced, for the reason that `E0061` states: `Bags` has no runtime
-\* representation, so its own declarations cannot reach Go at all. The re-exported `Naturals`
-\* operators are the whole point here.
+\* No `Bags` operator is referenced -- most now have real Go codegen (`BagOfAll`/`BagCardinality`
+\* stay `E0061`-rejected), so a wrongly-`Bags`-tagged one would no longer reliably fail the way it
+\* did when this fixture was written. The re-exported `Naturals` operators are the whole point
+\* here regardless of that.
 
 EXTENDS Bags
 

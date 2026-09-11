@@ -433,7 +433,7 @@ partial def compileIntrinsic (pos : SourceSpan) (name : String) (τ : Typ)
 
 /-- A reference to a builtin operator that carries no arguments — a *value* exported by a standard
 module, not something to apply. -/
-partial def compileBuiltinVar (pos : SourceSpan) (mod name : String) (_τ : Typ) :
+partial def compileBuiltinVar (pos : SourceSpan) (mod name : String) (τ : Typ) :
     m ComputableGo.Expression :=
   match mod, name with
   -- Both denote infinite sets, and the representation is a finite sorted slice. Nothing is
@@ -442,6 +442,15 @@ partial def compileBuiltinVar (pos : SourceSpan) (mod name : String) (_τ : Typ)
   | "Naturals", "Nat" | "Integers", "Int" =>
     throw (.unsupported pos name
       "it denotes an infinite set, and sets are represented by their elements")
+  -- `EmptyBag`, like the empty `Set`/`Seq` literal, has nothing to infer a type parameter from,
+  -- so it is the one `Bags` value written as a bare composite literal rather than a runtime call —
+  -- trivially sorted, nothing to normalize.
+  | "Bags", "EmptyBag" =>
+    match τ with
+    | .bag ρ => return .sliceLit (tlaplusTyp "Bag" [← compileTyp ρ]) []
+    | _ =>
+      throw (.internalInvariantViolated pos
+        s!"'EmptyBag' has type {repr τ}, which type checking should already have rejected")
   | "Bags", _ =>
     throw (.unsupported pos s!"Bags!{name}" "the Bags module has no runtime representation")
   | _, _ =>
@@ -475,6 +484,60 @@ partial def compileBuiltinCall (pos : SourceSpan) (mod name : String) (τ : Typ)
   -- is constantly true and the count is the element count.
   | "FiniteSets", "IsFiniteSet", [_] => return tlaBool .true
   | "FiniteSets", "Cardinality", [s] => return tlaplusCall "Cardinality" [s]
+  -- Every `Bag` this compiler builds already has only positive multiplicities, same reasoning as
+  -- `FiniteSets!IsFiniteSet` above.
+  | "Bags", "IsABag", [_] => return tlaBool .true
+  | "Bags", "BagToSet", [b] =>
+    match τ with
+    | .operator [.bag ρ] _ => return tlaplusCall "BagToSet" [← ordDict ρ, b]
+    | _ =>
+      throw (.internalInvariantViolated pos
+        s!"'BagToSet' has type {repr τ}, which type checking should already have rejected")
+  | "Bags", "SetToBag", [s] => return tlaplusCall "SetToBag" [s]
+  | "Bags", "BagIn", [x, b] =>
+    match τ with
+    | .operator [ρ, _] _ => return tlaBool (tlaplusCall "BagIn" [← ordDict ρ, b, x])
+    | _ =>
+      throw (.internalInvariantViolated pos
+        s!"'BagIn' has type {repr τ}, which type checking should already have rejected")
+  | "Bags", "(+)", [b1, b2] =>
+    match τ with
+    | .operator [.bag ρ, _] _ => return tlaplusCall "BagSum" [← ordDict ρ, b1, b2]
+    | _ =>
+      throw (.internalInvariantViolated pos
+        s!"'(+)' has type {repr τ}, which type checking should already have rejected")
+  | "Bags", "(-)", [b1, b2] =>
+    match τ with
+    | .operator [.bag ρ, _] _ => return tlaplusCall "BagDiff" [← ordDict ρ, b1, b2]
+    | _ =>
+      throw (.internalInvariantViolated pos
+        s!"'(-)' has type {repr τ}, which type checking should already have rejected")
+  | "Bags", "BagUnion", [s] =>
+    match τ with
+    | .operator [.set (.bag ρ)] _ => return tlaplusCall "BagUnion" [← ordDict ρ, s]
+    | _ =>
+      throw (.internalInvariantViolated pos
+        s!"'BagUnion' has type {repr τ}, which type checking should already have rejected")
+  | "Bags", "\\sqsubseteq", [b1, b2] =>
+    match τ with
+    | .operator [.bag ρ, _] _ => return tlaBool (tlaplusCall "BagSqsubseteq" [← ordDict ρ, b1, b2])
+    | _ =>
+      throw (.internalInvariantViolated pos
+        s!"'\\sqsubseteq' has type {repr τ}, which type checking should already have rejected")
+  | "Bags", "SubBag", [b] =>
+    match τ with
+    | .operator [.bag ρ] _ => return tlaplusCall "SubBag" [← ordDict ρ, b]
+    | _ =>
+      throw (.internalInvariantViolated pos
+        s!"'SubBag' has type {repr τ}, which type checking should already have rejected")
+  | "Bags", "CopiesIn", [x, b] =>
+    match τ with
+    | .operator [ρ, _] _ => return tlaplusCall "CopiesIn" [← ordDict ρ, b, x]
+    | _ =>
+      throw (.internalInvariantViolated pos
+        s!"'CopiesIn' has type {repr τ}, which type checking should already have rejected")
+  -- `BagOfAll`/`BagCardinality` are `Sum`-based (`BagOfAll` a `SetMap`-style renormalizing fold
+  -- over an arbitrary function argument) and stay unsupported — nothing in scope calls them.
   | "Bags", _, _ =>
     throw (.unsupported pos s!"Bags!{name}" "the Bags module has no runtime representation")
   -- The whole point of `Fugue`'s `\prec` (`Driver/Builtins.lean`): the order on `Address` that the

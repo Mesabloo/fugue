@@ -19,6 +19,7 @@ partial def Typ.pretty : Typ → Std.Format
   | .function dom rng => dom.pretty ++ " → " ++ rng.pretty
   | .set τ => "Set" ++ .paren τ.pretty
   | .seq τ => "Seq" ++ .paren τ.pretty
+  | .bag τ => "Bag" ++ .paren τ.pretty
   | .tuple τs => .bracket "<<" (.joinSep (τs.map Typ.pretty) ", ") ">>"
   | .operator dom rng => .paren (.joinSep (dom.map Typ.pretty) ", ") ++ " ⇒ " ++ rng.pretty
   | .var v => v

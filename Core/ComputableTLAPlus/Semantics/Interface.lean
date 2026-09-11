@@ -82,6 +82,7 @@ def _root_.TypedTLAPlus.Coercion.FreshFor : TypedTLAPlus.Coercion → Finset Str
   | .id, _ => True
   | .strToSeq, _ => True
   | .seqToFun _ i, S => i ∉ S
+  | .bagToFun _ i, S => i ∉ S
   | .tupleToSeq _ _ _, _ => True
   | .set x _ _ c, _ => c.FreshFor {x}
   | .tuple coes _ _, S => ∀ c ∈ coes, c.FreshFor S
@@ -107,6 +108,8 @@ theorem _root_.TypedTLAPlus.Coercion.FreshFor.mono :
   | .strToSeq, _, _, _, _ => by simp [TypedTLAPlus.Coercion.FreshFor]
   | .tupleToSeq _ _ _, _, _, _, _ => by simp [TypedTLAPlus.Coercion.FreshFor]
   | .seqToFun _ _, _, _, h, hsub => by
+      simp only [TypedTLAPlus.Coercion.FreshFor] at h ⊢; exact λ hi ↦ h (hsub hi)
+  | .bagToFun _ _, _, _, h, hsub => by
       simp only [TypedTLAPlus.Coercion.FreshFor] at h ⊢; exact λ hi ↦ h (hsub hi)
   | .set _ _ _ _, _, _, h, _ => by simpa only [TypedTLAPlus.Coercion.FreshFor] using h
   | .tuple coes _ _, _, _, h, hsub => by

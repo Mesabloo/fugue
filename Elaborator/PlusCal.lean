@@ -54,7 +54,7 @@ genuinely unresolved metavariable, not one already pinned to something showable.
 partial def showable : Typ → Bool
   | .bool | .int | .str | .address => true
   | .function dom rng => showable dom && showable rng
-  | .set τ | .seq τ => showable τ
+  | .set τ | .seq τ | .bag τ => showable τ
   | .tuple τs => τs.all showable
   | .record fs => fs.all (showable ∘ Prod.snd)
   | .operator .. | .channel .. | .var _ | .const _ | .mvar _ => false
@@ -68,7 +68,7 @@ Same non-monadic, resolve-first contract as `showable`. -/
 partial def sendable : Typ → Bool
   | .bool | .int | .str | .address => true
   | .function dom rng => sendable dom && sendable rng
-  | .set τ | .seq τ => sendable τ
+  | .set τ | .seq τ | .bag τ => sendable τ
   | .tuple τs => τs.all sendable
   | .record fs => fs.all (sendable ∘ Prod.snd)
   | .operator .. | .channel .. | .var _ | .const _ | .mvar _ => false

@@ -237,13 +237,16 @@ partial def Statement.pretty {α} [Std.ToFormat α] : Statement α → Std.Forma
       ++ (ok.elim .nil (λ r ↦ ", " ++ Ref.pretty (Expression.pretty · 0) r))
       ++ " = <-" ++ Expression.pretty c 0
   | .go body => "go func() " ++ formatBlock Statement.pretty body ++ "()"
+  -- Parenthesized unconditionally, not only when the condition happens to start with a composite
+  -- literal (`τ{…}`) — Go requires it there (the `{` would otherwise read as the block's own),
+  -- and a blanket rule is simpler and no less correct than detecting the one shape that needs it.
   | .if cond thenBranch elseBranch =>
-    "if " ++ Expression.pretty cond 0 ++ " " ++ formatBlock Statement.pretty thenBranch
+    "if " ++ .paren (Expression.pretty cond 0) ++ " " ++ formatBlock Statement.pretty thenBranch
       ++ if elseBranch.isEmpty then .nil else " else " ++ formatBlock Statement.pretty elseBranch
   | .for cond body =>
-    "for " ++ Expression.pretty cond 0 ++ " " ++ formatBlock Statement.pretty body
+    "for " ++ .paren (Expression.pretty cond 0) ++ " " ++ formatBlock Statement.pretty body
   | .switch e cases «default» =>
-    "switch " ++ Expression.pretty e 0 ++ " " ++ cblock (.joinSep
+    "switch " ++ .paren (Expression.pretty e 0) ++ " " ++ cblock (.joinSep
       ((cases.map λ c ↦
         "case " ++ Expression.pretty c.head 0 ++ ":" ++ formatCase Statement.pretty c.body)
         ++ [f!"default:" ++ formatCase Statement.pretty «default»]) .line)

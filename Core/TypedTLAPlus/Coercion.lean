@@ -50,6 +50,9 @@ inductive Coercion : Type
   | strToSeq
   /-- `Seq(τ) <: Int → τ` — `[i ∈ 1..Len(e) ↦ e[i]]`. `i` a fresh name chosen at construction. -/
   | seqToFun (τ : Typ) (i : String)
+  /-- `Bag(τ) <: τ → Int` — `[i ∈ Bags!BagToSet(e) ↦ Bags!CopiesIn(i, e)]`. `i` a fresh name
+  chosen at construction. -/
+  | bagToFun (τ : Typ) (i : String)
   /-- `⟨τ,...,τ⟩ <: Seq(τ)` (uniform tuple only) — a tuple's arity `n` is static, so discharge is
   just a literal `.seq` of the `n` projected components. `hn` — a tuple is non-empty, so the
   discharged `.seq` evaluates its source at least once (needed for `evalCoerce`, whose right-hand
@@ -98,6 +101,12 @@ partial def Coercion.apply (c : Coercion) (e : Expr) : Expr :=
          .opCall (.var (.operator [.seq τ₀] .int) (.module "Sequences" "Len") @@ pos) [e] @@ pos] @@ pos
     .fn i .int τ₀ range
       (.fnCall (Expression.liftBound 1 e) (.seq τ₀) (.var .int (.bound 0) @@ pos) @@ pos) @@ pos
+  | .bagToFun τ₀ i =>
+    let domain : Expr :=
+      .opCall (.var (.operator [.bag τ₀] (.set τ₀)) (.module "Bags" "BagToSet") @@ pos) [e] @@ pos
+    .fn i τ₀ .int domain
+      (.opCall (.var (.operator [τ₀, .bag τ₀] .int) (.module "Bags" "CopiesIn") @@ pos)
+        [.var τ₀ (.bound 0) @@ pos, Expression.liftBound 1 e] @@ pos) @@ pos
   | .tupleToSeq n τ _ =>
     .seq ((List.range n).map λ i ↦
       .fnCall e (.tuple (List.replicate n τ)) (.nat (toString (i + 1)) @@ pos) @@ pos) τ @@ pos

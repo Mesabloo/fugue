@@ -106,6 +106,7 @@ section
         .str <$ (chars "Str" <* ws),
         .set <$> (chars "Set" *> ws *> parens expr),
         .seq <$> (chars "Seq" *> ws *> parens expr),
+        .bag <$> (chars "Bag" *> ws *> parens expr),
         .channel <$> (chars "Channel" *> ws *> parens expr),
         .tuple <$> between (chars "<<") (chars ">>") (Array.toList <$> sepBy1 (char ',' <* ws) expr),
         .record <$> between (char '{') (char '}') (Array.toList <$> sepBy1 (char ',' <* ws) do

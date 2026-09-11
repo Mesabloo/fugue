@@ -568,6 +568,10 @@ def coerce : Coercion → Value → Value → Prop
   | .id, v, v' => v' = v
   | .strToSeq, v, v' => v' = v
   | .seqToFun _ _, v, v' => (∃ vs, IsSeq v vs) ∧ v' = v
+  -- `Bags!BagToSet`/`Bags!CopiesIn` have no `EvalBuiltin` rule (see `EvalBuiltin`'s own doc), so
+  -- `bagToFun.applyComputable e` never evaluates to anything (`evalCoerce'`'s `.bagToFun` case) —
+  -- `False` is the only choice that keeps that iff provable.
+  | .bagToFun _ _, _, _ => False
   | .tupleToSeq n _ _, v, v' =>
     (∃ A B, v.IsPFunc A B) ∧
     ∃ ws : List Value, ws.length = n ∧
@@ -1040,6 +1044,7 @@ theorem coerceUnique : ∀ {c : Coercion} {v v₁' v₂' : Value},
   | .id, _, _, _, h₁, h₂ => by simp only [coerce] at h₁ h₂; exact h₁.trans h₂.symm
   | .strToSeq, _, _, _, h₁, h₂ => by simp only [coerce] at h₁ h₂; exact h₁.trans h₂.symm
   | .seqToFun _ _, _, _, _, h₁, h₂ => by simp only [coerce] at h₁ h₂; exact h₁.2.trans h₂.2.symm
+  | .bagToFun _ _, _, _, _, h₁, _ => by simp only [coerce] at h₁
   | .tupleToSeq _ _ _, _, _, _, h₁, h₂ => by
     simp only [coerce] at h₁ h₂
     obtain ⟨⟨A, B, hpf⟩, ws₁, hlen₁, hmem₁, rfl⟩ := h₁
@@ -1760,6 +1765,22 @@ theorem evalCoerce' {Ξ : OperatorEnv} {Ω : Model Value} (hΞ : Ξ.WellScoped) 
         | cons he hnil => cases hb with | strToSeq => exact ⟨_, he, rfl⟩
     · exact .opCall_builtin (op := .strToSeq) rfl (.cons hv .nil) .strToSeq
   | .seqToFun τ i, M, e, v' => evalCoerce'_seqToFun (i := i) hΞ
+  | .bagToFun τ i, M, e, v' => by
+    -- LHS is uninhabited: `bagToFun.applyComputable c e` is `.fn i τ .int (BagToSet(e)) _`,
+    -- `Eval.fn` demands `Eval _ _ _ (BagToSet(e)) _`, and `Bags!BagToSet` has no `EvalBuiltin`
+    -- rule for `Eval.opCall_builtin` to discharge — so no derivation reaches `.fn` at all. `coerce`
+    -- is `False` here for the matching reason, so the RHS is uninhabited too.
+    simp only [TypedTLAPlus.Coercion.applyComputable, coerce, and_false, exists_false, iff_false]
+    intro hev
+    cases hev with
+    | fn _ _ hdom _ _ _ =>
+      cases hdom with
+      | opCall_builtin hop _ hb =>
+        simp only [TypedTLAPlus.builtinOpOf?] at hop
+        cases hop
+        cases hb
+      | opCall_op _ hnb _ _ _ =>
+        simp [TypedTLAPlus.builtinOpOf?] at hnb
   | .tupleToSeq n τ hn, M, e, v' => by
     simp only [TypedTLAPlus.Coercion.applyComputable, coerce, registerSource]
     have hne : List.range n ≠ [] := by

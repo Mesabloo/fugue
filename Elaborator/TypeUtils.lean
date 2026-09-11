@@ -12,7 +12,7 @@ private partial def typeFreeVars : Typ → List String
   | .var a => [a]
   | .bool | .int | .str | .address | .const _ | .mvar _ => []
   | .function dom rng => typeFreeVars dom ++ typeFreeVars rng
-  | .set τ | .seq τ | .channel τ => typeFreeVars τ
+  | .set τ | .seq τ | .channel τ | .bag τ => typeFreeVars τ
   | .tuple τs => τs.flatMap typeFreeVars
   | .operator τs τ => τs.flatMap typeFreeVars ++ typeFreeVars τ
   | .record fs => fs.flatMap (typeFreeVars ∘ Prod.snd)
@@ -33,6 +33,7 @@ private partial def substTypeVars (σ : List (String × MVarId)) : Typ → Typ
   | .set τ => .set (substTypeVars σ τ)
   | .seq τ => .seq (substTypeVars σ τ)
   | .channel τ => .channel (substTypeVars σ τ)
+  | .bag τ => .bag (substTypeVars σ τ)
   | .tuple τs => .tuple (τs.map (substTypeVars σ))
   | .operator τs τ => .operator (τs.map (substTypeVars σ)) (substTypeVars σ τ)
   | .record fs => .record (fs.map λ (x, τ) ↦ (x, substTypeVars σ τ))

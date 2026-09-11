@@ -104,6 +104,7 @@ private partial def resolveTypeMVarsWith (onUnassigned : MVarId → m Typ) : Typ
   | .set τ => return .set (← resolveTypeMVarsWith onUnassigned τ)
   | .seq τ => return .seq (← resolveTypeMVarsWith onUnassigned τ)
   | .channel τ => return .channel (← resolveTypeMVarsWith onUnassigned τ)
+  | .bag τ => return .bag (← resolveTypeMVarsWith onUnassigned τ)
   | .tuple τs => return .tuple (← τs.mapM (resolveTypeMVarsWith onUnassigned))
   | .operator τs τ =>
     return .operator (← τs.mapM (resolveTypeMVarsWith onUnassigned)) (← resolveTypeMVarsWith onUnassigned τ)

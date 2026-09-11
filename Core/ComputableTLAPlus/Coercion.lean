@@ -43,6 +43,12 @@ expression's own span, for the reason spelled out on `Coercion.apply`. -/
          .opCall (.var (.operator [.seq τ₀] .int) (.module "Sequences" "Len") @@ pos) [e] @@ pos] @@ pos
     .fn i .int τ₀ range
       (.fnCall (ComputableTLAPlus.Expression.liftBound 1 e) (.seq τ₀) (.var .int (.bound 0) @@ pos) @@ pos) @@ pos
+  | .bagToFun τ₀ i =>
+    let domain : CExpr :=
+      .opCall (.var (.operator [.bag τ₀] (.set τ₀)) (.module "Bags" "BagToSet") @@ pos) [e] @@ pos
+    .fn i τ₀ .int domain
+      (.opCall (.var (.operator [τ₀, .bag τ₀] .int) (.module "Bags" "CopiesIn") @@ pos)
+        [.var τ₀ (.bound 0) @@ pos, ComputableTLAPlus.Expression.liftBound 1 e] @@ pos) @@ pos
   | .tupleToSeq n τ _ =>
     .seq ((List.range n).map λ i ↦
       .fnCall e (.tuple (List.replicate n τ)) (.nat (toString (i + 1)) @@ pos) @@ pos) τ @@ pos
@@ -159,18 +165,24 @@ theorem freeVars_applyComputable_subset {c : TypedTLAPlus.Coercion} {e : Express
       List.mem_cons, List.not_mem_nil] at hz
     grind [Expression.freeVars_liftBound_subset, freeVars_nat, Expression.mem_freeVars_opCall,
       freeVars_var_module]
-  | case4 => next e' pos n τ hn =>
+  | case4 => next e' pos τ₀ i domain =>
+    intro hz
+    simp only [domain, mem_freeVars_fn, Expression.mem_freeVars_opCall, freeVars_var_module,
+      Finset.notMem_empty, false_or, exists_eq_left, List.mem_cons, List.not_mem_nil,
+      or_false] at hz
+    grind [Expression.freeVars_liftBound_subset, freeVars_var_bound]
+  | case5 => next e' pos n τ hn =>
     intro hz
     simp only [Expression.mem_freeVars_seq, List.mem_map] at hz
     grind [freeVars_fnCall_nat]
-  | case5 => next e' pos x τ τ' cc ih =>
+  | case6 => next e' pos x τ τ' cc ih =>
     intro hz
     rw [mem_freeVars_map'] at hz
     rcases hz with h | h
     · exact h
     · absurd ih h
       simp
-  | case6 => next e' pos coes τs τs' ih1 =>
+  | case7 => next e' pos coes τs τs' ih1 =>
     intro hz
     rw [Expression.mem_freeVars_tuple] at hz
     obtain ⟨p, hp, h⟩ := hz
@@ -179,7 +191,7 @@ theorem freeVars_applyComputable_subset {c : TypedTLAPlus.Coercion} {e : Express
     simp only at h
     have hf := ih1 j hj h
     rwa [freeVars_fnCall_nat] at hf
-  | case7 => next e' pos fields ih1 =>
+  | case8 => next e' pos fields ih1 =>
     intro hz
     rw [Expression.mem_freeVars_record] at hz
     obtain ⟨p, hp, h⟩ := hz
@@ -188,7 +200,7 @@ theorem freeVars_applyComputable_subset {c : TypedTLAPlus.Coercion} {e : Express
     simp only at h
     have hr := ih1 name cc τ'ᵢ hf h
     rwa [freeVars_recordAccess] at hr
-  | case8 => next e' pos x y dom rng dom' rng' cDom cRng eLift domE newD eqTy domEL rArg ih3 ih2 ih1 =>
+  | case9 => next e' pos x y dom rng dom' rng' cDom cRng eLift domE newD eqTy domEL rArg ih3 ih2 ih1 =>
     intro hz
     rw [mem_freeVars_fn] at hz
     rcases hz with h | h
@@ -212,7 +224,7 @@ theorem freeVars_applyComputable_subset {c : TypedTLAPlus.Coercion} {e : Express
           simp
         · absurd ha
           simp
-  | case9 => next e' c₁ c₂ ih₁ ih₂ => exact λ hz ↦ ih₁ (ih₂ hz)
+  | case10 => next e' c₁ c₂ ih₁ ih₂ => exact λ hz ↦ ih₁ (ih₂ hz)
 
 /-- The `⊆` reading of `freeVars_applyComputable_subset`. -/
 theorem freeVars_applyComputable_subset' {c : TypedTLAPlus.Coercion} {e : Expression Typ} :
@@ -247,17 +259,23 @@ theorem openVar_applyComputable_aux (c : TypedTLAPlus.Coercion) (x : String) :
       Expression.openVar_liftBound_one_comm, Expression.openVarLam, List.map_cons, List.map_nil,
       List.attach_map_val]
     rw [if_neg (by omega), if_neg (by omega)]
-  | case4 => next e' pos n τ hn =>
+  | case4 => next e' pos τ₀ i domain =>
+    intro k
+    simp only [TypedTLAPlus.Coercion.applyComputable, Expression.mapVars, registerSource, domain,
+      Expression.openVar_liftBound_one_comm, Expression.openVarLam, List.map_cons, List.map_nil,
+      List.attach_map_val]
+    rw [if_neg (by omega), if_neg (by omega)]
+  | case5 => next e' pos n τ hn =>
     simp_intro k [TypedTLAPlus.Coercion.applyComputable, Expression.mapVars, registerSource,
       List.attach_map_val, List.map_map, Function.comp_def]
-  | case5 => next e' pos x' τ τ' cc ih =>
+  | case6 => next e' pos x' τ τ' cc ih =>
     intro k
     simp only [TypedTLAPlus.Coercion.applyComputable, Expression.mapVars, registerSource] at ih ⊢
     congr 1
     rewrite [ih (k + 1)]
     simp only [Expression.openVarLam, registerSource]
     rw [if_neg (by omega), if_neg (by omega)]
-  | case6 => next e' pos coes τs τs' ih1 =>
+  | case7 => next e' pos coes τs τs' ih1 =>
     intro k
     simp only [TypedTLAPlus.Coercion.applyComputable, Expression.mapVars, registerSource] at ih1 ⊢
     congr 1
@@ -266,7 +284,7 @@ theorem openVar_applyComputable_aux (c : TypedTLAPlus.Coercion) (x : String) :
     refine Prod.ext rfl ?_
     dsimp only
     rw [ih1 i hi k]
-  | case7 => next e' pos fields ih1 =>
+  | case8 => next e' pos fields ih1 =>
     intro k
     simp only [TypedTLAPlus.Coercion.applyComputable, Expression.mapVars, registerSource] at ih1 ⊢
     congr 1
@@ -275,7 +293,7 @@ theorem openVar_applyComputable_aux (c : TypedTLAPlus.Coercion) (x : String) :
     refine Prod.ext rfl (Prod.ext rfl ?_)
     dsimp only
     rw [ih1 nm cc τ'ᵢ hf k]
-  | case8 =>
+  | case9 =>
     next e' pos x' y dom rng dom' rng' cDom cRng eLift domE newD eqTy domEL rArg ih3 _ih2 ih1 =>
     intro k
     simp only [TypedTLAPlus.Coercion.applyComputable, Expression.mapVars, registerSource,
@@ -285,7 +303,7 @@ theorem openVar_applyComputable_aux (c : TypedTLAPlus.Coercion) (x : String) :
     simp only [ih3, Expression.openVar_liftBound_one_comm, Expression.openVarLam, registerSource]
     rw [if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
       if_neg (by omega), if_neg (by omega)]
-  | case9 => next e' c₁ c₂ ih₁ ih₂ =>
+  | case10 => next e' c₁ c₂ ih₁ ih₂ =>
     intro k
     simp only [TypedTLAPlus.Coercion.applyComputable]
     rw [ih₂ k, ih₁ k]

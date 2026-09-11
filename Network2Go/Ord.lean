@@ -58,6 +58,7 @@ partial def ordDict : Typ → m ComputableGo.Expression
   | .str => return tlaplusVar "StrOrd"
   | .set τ => return tlaplusCall "SetOrd" [← ordDict τ]
   | .seq τ => return tlaplusCall "SeqOrd" [← ordDict τ]
+  | .bag τ => return tlaplusCall "BagOrd" [← ordDict τ]
   -- A placeholder in the runtime: ordering two lazy maps means forcing both domains and comparing
   -- pointwise, which is well defined and which nothing exercises yet. Emitting the call is still
   -- right — the panic belongs at the point a specification actually orders two functions.
@@ -133,7 +134,7 @@ hence the dictionary parameters, a definition of that type has to bind; a type v
 propagated to the nearest enclosing function definition. -/
 partial def Typ.typeVars : Typ → List String
   | .var a => [a]
-  | .set τ | .seq τ | .channel τ => Typ.typeVars τ
+  | .set τ | .seq τ | .channel τ | .bag τ => Typ.typeVars τ
   | .function τ₁ τ₂ => dedup (Typ.typeVars τ₁ ++ Typ.typeVars τ₂)
   | .tuple τs => dedup (τs.flatMap Typ.typeVars)
   | .record fs => dedup (fs.flatMap λ (_, τ) ↦ Typ.typeVars τ)

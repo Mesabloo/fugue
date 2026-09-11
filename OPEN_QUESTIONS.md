@@ -453,3 +453,22 @@ re-triggers the clash. Blocks further development on top of the correctness theo
 `zflean` makes the `ε` notation scoped in its `v4.33.0` release. The lockfile pins
 `zflean @ v{Lean.versionString}`, so this arrives with the toolchain bump to Lean 4.33. Revisit
 then: `public import Guarded2Network.CorrectInstance` and drop the workaround.
+
+### 9.35 `EvalBuiltin` has no rule for `Bags`/`Cardinality`/`IsFiniteSet`/`MkSeq`/`SetAsFun`/`Address` order
+`Core/ComputableTLAPlus/Semantics/Operational.lean:234-236` doc comment: these denote nothing in
+the reference operational semantics — no `EvalBuiltin` arm, deliberate per the comment. Same for
+`funAsSeq`'s partiality (only `IsSeqVal` domain covered, line 307-311).
+
+Surfaced 2026-09-11 scoping Go codegen for `Bags` (Paxos example needs `SetToBag`/`(+)`/`CopiesIn`/
+`EmptyBag`; `Network2Go` currently rejects every `Bags!*` call outright, `E0061`). Expectation going
+in was these already had rules. `git log -S` on the doc comment's wording turned up no history —
+looks original to the semantics file (`e81fb7b`), not a regression, but not confirmed.
+
+Cost: any Go codegen added for these operators runs ahead of the Lean reference semantics — nothing
+proves compiled behavior matches spec for them. Already true today for `Cardinality`/`IsFiniteSet`
+(`Network2Go` compiles them anyway, no proof backing) and for the `Address` order operators; `Bags`
+and `MkSeq`/`SetAsFun` are currently rejected instead, which is the more conservative choice.
+
+To resolve: per operator, decide (a) add an `EvalBuiltin` rule and prove `Network2Go` sound against
+it, or (b) accept permanently proof-free codegen, same status `Cardinality`/`IsFiniteSet` already
+have, and record that choice here rather than leaving it implicit in the doc comment.

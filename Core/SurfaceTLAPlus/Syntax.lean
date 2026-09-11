@@ -242,6 +242,8 @@ inductive Typ : Type
   | set (_ : Typ)
   /-- `Seq(τ)` -/
   | seq (_ : Typ)
+  /-- `Bag(τ)` -/
+  | bag (_ : Typ)
   /-- `<<τ₁, …, τₙ>>` -/
   | tuple (_ : List Typ)
   /-- `(τ₁, …, τₙ) => τₙ₊₁` -/
@@ -277,7 +279,7 @@ partial instance : DecidableEq Typ :=
       match go dom dom', go rng rng' with
       | .isTrue h₁, .isTrue h₂ => isTrue (by rw [h₁, h₂])
       | .isFalse h, _ | _, .isFalse h => isFalse λ h' ↦ by injections; contradiction
-    | .set τ, .set τ' | .seq τ, .seq τ' | .channel τ, .channel τ' =>
+    | .set τ, .set τ' | .seq τ, .seq τ' | .channel τ, .channel τ' | .bag τ, .bag τ' =>
       match go τ τ' with
       | isTrue h => isTrue (by rw [h])
       | isFalse h => isFalse λ h' ↦ by injections; contradiction
@@ -298,44 +300,47 @@ partial instance : DecidableEq Typ :=
     | .mvar n, .mvar n' =>
       if h : n = n' then isTrue (by rw [h]) else isFalse λ h' ↦ by injections; contradiction
     | .bool, .int | .bool, .str | .bool, .function .. | .bool, .set .. | .bool, .seq .. | .bool, .channel ..
-    | .bool, .tuple .. | .bool, .operator .. | .bool, .var .. | .bool, .const .. | .bool, .record .. | .bool, .address | .bool, .mvar ..
+    | .bool, .tuple .. | .bool, .operator .. | .bool, .var .. | .bool, .const .. | .bool, .record .. | .bool, .address | .bool, .mvar .. | .bool, .bag ..
     | .int, .bool | .int, .str | .int, .function .. | .int, .set .. | .int, .seq .. | .int, .channel ..
-    | .int, .tuple .. | .int, .operator .. | .int, .var .. | .int, .const .. | .int, .record .. | .int, .address | .int, .mvar ..
+    | .int, .tuple .. | .int, .operator .. | .int, .var .. | .int, .const .. | .int, .record .. | .int, .address | .int, .mvar .. | .int, .bag ..
     | .str, .bool | .str, .int | .str, .function .. | .str, .set .. | .str, .seq .. | .str, .channel ..
-    | .str, .tuple .. | .str, .operator .. | .str, .var .. | .str, .const .. | .str, .record .. | .str, .address | .str, .mvar ..
+    | .str, .tuple .. | .str, .operator .. | .str, .var .. | .str, .const .. | .str, .record .. | .str, .address | .str, .mvar .. | .str, .bag ..
     | .function .., .bool | .function .., .int | .function .., .str | .function .., .set .. | .function .., .seq ..
     | .function .., .channel .. | .function .., .tuple .. | .function .., .operator .. | .function .., .var ..
-    | .function .., .const .. | .function .., .record .. | .function .., .address | .function .., .mvar ..
+    | .function .., .const .. | .function .., .record .. | .function .., .address | .function .., .mvar .. | .function .., .bag ..
     | .set .., .bool | .set .., .int | .set .., .str | .set .., .function .. | .set .., .seq ..
     | .set .., .channel .. | .set .., .tuple .. | .set .., .operator .. | .set .., .var ..
-    | .set .., .const .. | .set .., .record .. | .set .., .address | .set .., .mvar ..
+    | .set .., .const .. | .set .., .record .. | .set .., .address | .set .., .mvar .. | .set .., .bag ..
     | .seq .., .bool | .seq .., .int | .seq .., .str | .seq .., .function .. | .seq .., .set ..
     | .seq .., .channel .. | .seq .., .tuple .. | .seq .., .operator .. | .seq .., .var ..
-    | .seq .., .const .. | .seq .., .record .. | .seq .., .address | .seq .., .mvar ..
+    | .seq .., .const .. | .seq .., .record .. | .seq .., .address | .seq .., .mvar .. | .seq .., .bag ..
     | .channel .., .bool | .channel .., .int | .channel .., .str | .channel .., .function .. | .channel .., .set ..
     | .channel .., .seq .. | .channel .., .tuple .. | .channel .., .operator .. | .channel .., .var ..
-    | .channel .., .const .. | .channel .., .record .. | .channel .., .address | .channel .., .mvar ..
+    | .channel .., .const .. | .channel .., .record .. | .channel .., .address | .channel .., .mvar .. | .channel .., .bag ..
     | .tuple .., .bool | .tuple .., .int | .tuple .., .str | .tuple .., .function .. | .tuple .., .set ..
     | .tuple .., .seq .. | .tuple .., .channel .. | .tuple .., .operator .. | .tuple .., .var ..
-    | .tuple .., .const .. | .tuple .., .record .. | .tuple .., .address | .tuple .., .mvar ..
+    | .tuple .., .const .. | .tuple .., .record .. | .tuple .., .address | .tuple .., .mvar .. | .tuple .., .bag ..
     | .operator .., .bool | .operator .., .int | .operator .., .str | .operator .., .function .. | .operator .., .set ..
     | .operator .., .seq .. | .operator .., .channel .. | .operator .., .tuple .. | .operator .., .var ..
-    | .operator .., .const .. | .operator .., .record .. | .operator .., .address | .operator .., .mvar ..
+    | .operator .., .const .. | .operator .., .record .. | .operator .., .address | .operator .., .mvar .. | .operator .., .bag ..
     | .var .., .bool | .var .., .int | .var .., .str | .var .., .function .. | .var .., .set ..
     | .var .., .seq .. | .var .., .channel .. | .var .., .tuple .. | .var .., .operator ..
-    | .var .., .const .. | .var .., .record .. | .var .., .address | .var .., .mvar ..
+    | .var .., .const .. | .var .., .record .. | .var .., .address | .var .., .mvar .. | .var .., .bag ..
     | .const .., .bool | .const .., .int | .const .., .str | .const .., .function .. | .const .., .set ..
     | .const .., .seq .. | .const .., .channel .. | .const .., .tuple .. | .const .., .operator ..
-    | .const .., .var .. | .const .., .record .. | .const .., .address | .const .., .mvar ..
+    | .const .., .var .. | .const .., .record .. | .const .., .address | .const .., .mvar .. | .const .., .bag ..
     | .record .., .bool | .record .., .int | .record .., .str | .record .., .function .. | .record .., .set ..
     | .record .., .seq .. | .record .., .channel .. | .record .., .tuple .. | .record .., .operator ..
-    | .record .., .var .. | .record .., .const .. | .record .., .address | .record .., .mvar ..
+    | .record .., .var .. | .record .., .const .. | .record .., .address | .record .., .mvar .. | .record .., .bag ..
     | .address, .bool | .address, .int | .address, .str | .address, .function .. | .address, .set ..
     | .address, .seq .. | .address, .channel .. | .address, .tuple .. | .address, .operator ..
-    | .address, .var .. | .address, .const .. | .address, .record .. | .address, .mvar ..
+    | .address, .var .. | .address, .const .. | .address, .record .. | .address, .mvar .. | .address, .bag ..
     | .mvar .., .bool | .mvar .., .int | .mvar .., .str | .mvar .., .function .. | .mvar .., .set ..
     | .mvar .., .seq .. | .mvar .., .channel .. | .mvar .., .tuple .. | .mvar .., .operator ..
-    | .mvar .., .var .. | .mvar .., .const .. | .mvar .., .record .. | .mvar .., .address => isFalse nofun
+    | .mvar .., .var .. | .mvar .., .const .. | .mvar .., .record .. | .mvar .., .address | .mvar .., .bag ..
+    | .bag .., .bool | .bag .., .int | .bag .., .str | .bag .., .function .. | .bag .., .set ..
+    | .bag .., .seq .. | .bag .., .channel .. | .bag .., .tuple .. | .bag .., .operator ..
+    | .bag .., .var .. | .bag .., .const .. | .bag .., .record .. | .bag .., .address | .bag .., .mvar .. => isFalse nofun
   go
 
 partial instance : ToString Typ where
@@ -350,6 +355,7 @@ partial instance : ToString Typ where
       | .function τ₁ τ₂ => s!"{go τ₁} -> {go τ₂}"
       | .set τ => s!"Set({go τ})"
       | .seq τ => s!"Seq({go τ})"
+      | .bag τ => s!"Bag({go τ})"
       | .tuple τs => s!"<<{String.intercalate ", " (τs.map go)}>>"
       | .operator τs τ => s!"({String.intercalate ", " (τs.map go)}) => {go τ}"
       | .var v => v

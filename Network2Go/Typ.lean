@@ -49,6 +49,7 @@ partial def compileTyp : Typ → m Go.Typ
   | .str => return tlaplusTyp "Str"
   | .set τ => return tlaplusTyp "Set" [← compileTyp τ]
   | .seq τ => return tlaplusTyp "Seq" [← compileTyp τ]
+  | .bag τ => return tlaplusTyp "Bag" [← compileTyp τ]
   -- A function is a lazy map rather than a Go `func`: its domain is a value the generated code
   -- inspects (`DOMAIN f`, and the domain check every application performs), which a `func` has
   -- no way to expose.

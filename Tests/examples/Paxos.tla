@@ -15,14 +15,19 @@ CONSTANTS
     \* @type: Set(Str);
     Values,      
     \* @type: Set(Address);
-    Nodes
+    Nodes,
+    \* upper bound on ballot round numbers, so Ballots is finite and can compile to Go
+    \* @type: Int;
+    MaxRound
 
 ASSUME IsFiniteSet(Nodes)
 ASSUME Cardinality(Nodes) = N
+ASSUME MaxRound > 0
 
 \* Nodes == 1 .. N
 \* @type: Int;
 quorum == N \div 2
+
 \* @type: Str;
 None == "" \* CHOOSE none : none \notin Values
 
@@ -33,18 +38,23 @@ None == "" \* CHOOSE none : none \notin Values
 (* initiated by different nodes can be differentiated. Ballot IDs are       *)
 (* ordered lexicographically.                                               *)
 (****************************************************************************)
+\* Bounded so ballot rounds are finite (needed to compile to Go at all -- MaxRound
+\* below). Not referenced by the algorithm, which quantifies over 0..MaxRound-1 and
+\* Nodes directly wherever it needs a ballot's round/node parts (see "learn a value"
+\* below); kept here as the type this file's comments and any future TLC-only
+\* invariant should describe a ballot by.
 \* @type: Set(<<Int, Address>>);
-Ballots == Nat \X Nodes  \* override definition for finite-state model checking
+Ballots == (0..MaxRound-1) \X Nodes
+
 \* @type: (<<Int, Address>>, <<Int, Address>>) => Bool;
 less(b1, b2) ==
    \/ b1[1] < b2[1]
    \/ b1[1] = b2[1] /\ b1[2] \prec b2[2]
 
-(* PlusCal options (-label -distpcal) *)
-
+(* PlusCal options (-distpcal) *)
 (*--algorithm Paxos {
     fifos
-        \* @type: Address -> Channel({type: Str, leader: Address, bal: <<Int, Address>>, val: Str});
+        \* @type: Address -> Channel({type: Str, leader: Address, bal: <<Int, Address>>, val: Str, maxVBal: <<Int, Address>>, maxVal: Str});
         ch[Nodes];
 
     \* @mailbox: ch[self];
@@ -57,8 +67,8 @@ less(b1, b2) ==
             \* the value the node voted for in that ballot
             maxVal = None,
             \* last message received (None unless handling a message)
-            \* @type: {type: Str, leader: Address, bal: <<Int, Address>>, val: Str};
-            msg = [type |-> "", leader |-> self, bal |-> <<0, self>>, val |-> ""],
+            \* @type: {type: Str, leader: Address, bal: <<Int, Address>>, val: Str, maxVBal: <<Int, Address>>, maxVal: Str};
+            msg = [type |-> "", leader |-> self, bal |-> <<0, self>>, val |-> "", maxVBal |-> <<0,self>>, maxVal |-> ""],
             \* ballot number used in latest "1a" message
             ballot1a = <<0,self>>,
             \* number of replies received by a leader to its "1a" message
@@ -68,7 +78,7 @@ less(b1, b2) ==
             \* the corresponding value
             maxValRcvd = None,
             \* bag of votes received by the node
-            \* @type: {bal: <<Int, Address>>, val: Str} -> Int;
+            \* @type: Bag({bal: <<Int, Address>>, val: Str});
             votesRcvd = EmptyBag,
             \* value chosen by the node
             chosen = None;
@@ -80,7 +90,8 @@ n0:
                 with (newBallot = << maxBal[1]+1, self >>) {
                     multicast(ch, [n \in Nodes \ {self} |->
                                     [type |-> "1a", leader |-> self,
-                                    bal |-> newBallot, val |-> None] ] );
+                                    bal |-> newBallot, val |-> None,
+                                    maxVBal |-> <<0,self>>, maxVal |-> None] ] );
                     maxBal := newBallot;
                     ballot1a := newBallot;
                     replies1a := 1; \* leader implicitly replies to its own message
@@ -92,10 +103,14 @@ n0:
                 when (replies1a > quorum);
                 \* if some reply contained a value, take the one in the reply for
                 \* the highest ballot, otherwise choose any value
-                with (v \in {v \in Values : maxValRcvd = None \/ v = maxValRcvd}) {
+                \* (`with x \in S` is a search over S and Fugue only compiles a search
+                \* into a deterministic pick, not a nondeterministic one, so this is
+                \* written as a plain `=` binding to a CHOOSE instead)
+                with (v = IF maxValRcvd # None THEN maxValRcvd ELSE CHOOSE x \in Values : TRUE) {
                     multicast(ch, [n \in Nodes \ {self} |->
                                     [type |-> "2a", leader |-> self,
-                                    bal |-> ballot1a, val |-> v]]);
+                                    bal |-> ballot1a, val |-> v,
+                                    maxVBal |-> <<0,self>>, maxVal |-> None]]);
                 };
                 \* stop handling "1b" messages and reset corresponding variables
                 replies1a := 0;
@@ -104,9 +119,12 @@ n0:
                 maxValRcvd := None;
             } or {
                 \* learn a value when a quorum of nodes voted for it
-                with (v \in {v \in Values : \E b \in Ballots :
-                                CopiesIn([bal |-> b, val |-> v], votesRcvd)
-                                > quorum}) {
+                \* (Consistency guarantees at most one such value ever exists, so the
+                \* CHOOSE below is exact, not an approximation)
+                when (\E v \in Values : \E m \in BagToSet(votesRcvd) :
+                                m.val = v /\ CopiesIn(m, votesRcvd) > quorum);
+                with (v = CHOOSE v \in Values : \E m \in BagToSet(votesRcvd) :
+                                m.val = v /\ CopiesIn(m, votesRcvd) > quorum) {
                     chosen := v;
                 }
             }
@@ -120,9 +138,10 @@ r0:
                 \* node participates in new ballot
                 maxBal := msg.bal;
 r0_1:           send(ch[msg.leader],
-                            [type |-> "1b", bal |-> msg.bal,
+                            [type |-> "1b", leader |-> self,
+                            bal |-> msg.bal, val |-> None,
                             maxVBal |-> maxVBal, maxVal |-> maxVal]);
-                msg := None;  \* reset to default value (reduce state space)
+                msg := [type |-> "", leader |-> self, bal |-> <<0,self>>, val |-> "", maxVBal |-> <<0,self>>, maxVal |-> ""];  \* reset to default value (reduce state space)
             } else if (msg.type = "1b" /\ msg.bal = ballot1a /\ replies1a > 0) {
                 \* leader receives a reply to its previous "1a" message
                 \* NB: replies1a = 0 means that the leader is no longer interested in "1b"
@@ -132,26 +151,27 @@ r0_1:           send(ch[msg.leader],
                 if (msg.maxVBal[1] # 0 /\ less(maxVBalRcvd, msg.maxVBal)) {
                     maxVBalRcvd := msg.maxVBal; maxValRcvd := msg.maxVal;
                 };
-r0_2:           msg := None;
+r0_2:           msg := [type |-> "", leader |-> self, bal |-> <<0,self>>, val |-> "", maxVBal |-> <<0,self>>, maxVal |-> ""];
             } else if (msg.type = "2a" /\ (less(maxBal, msg.bal) \/ maxBal = msg.bal) /\ maxVBal # msg.bal) {
                 maxBal := msg.bal;
                 maxVBal := msg.bal;
                 maxVal := msg.val;
                 \* vote for value contained in "2a" message
 r0_3:           multicast(ch, [n \in Nodes \ {self} |->
-                                    [type |-> "2b",
-                                    bal |-> msg.bal, val |-> msg.val]]);
+                                    [type |-> "2b", leader |-> self,
+                                    bal |-> msg.bal, val |-> msg.val,
+                                    maxVBal |-> <<0,self>>, maxVal |-> None]]);
                 \* record the node's vote
                 votesRcvd := votesRcvd (+)
                                 SetToBag({[bal |-> msg.bal, val |-> msg.val]});
-                msg := None;
+                msg := [type |-> "", leader |-> self, bal |-> <<0,self>>, val |-> "", maxVBal |-> <<0,self>>, maxVal |-> ""];
             } else if (msg.type = "2b") {
                 \* record vote
                 votesRcvd := votesRcvd (+)
                                 SetToBag({[bal |-> msg.bal, val |-> msg.val]});
-r0_4:           msg := None;
+r0_4:           msg := [type |-> "", leader |-> self, bal |-> <<0,self>>, val |-> "", maxVBal |-> <<0,self>>, maxVal |-> ""];
             } else {
-r0_5:           msg := None;
+r0_5:           msg := [type |-> "", leader |-> self, bal |-> <<0,self>>, val |-> "", maxVBal |-> <<0,self>>, maxVal |-> ""];
             }
         }  \* end helper thread
     }
@@ -160,15 +180,24 @@ r0_5:           msg := None;
 \* BEGIN TRANSLATION (chksum(pcal) = "75c82728" /\ chksum(tla) = "cc812100")
 
 
-\* END TRANSLATION 
+\* END TRANSLATION
 
+(****************************************************************************)
+(* Fugue has no shared module-level VARIABLE across processes (Core/       *)
+(* GuardedPlusCal/Semantics/Process.lean bans a process from referencing    *)
+(* any module-level VARIABLE) and never materializes the pcal-style         *)
+(* `VARIABLES ch, maxBal, ...` a real translation would generate, so `ch`,  *)
+(* `maxBal`, etc. below are not in scope for `fugue compile` -- these       *)
+(* TLC-only invariants are kept as documentation and are not checked/      *)
+(* compiled by Fugue.                                                      *)
+(*
 Messages ==
     [type: {"1a"}, leader: Nodes, bal: Ballots]
-    \union 
+    \union
     [type: {"1b"}, bal: Ballots, maxVBal: Ballots, maxVal: Values \union {None}]
-    \union 
+    \union
     [type: {"2a"}, leader: Nodes, bal: Ballots, val: Values]
-    \union 
+    \union
     [type: {"2b"}, bal: Ballots, val: Values]
 
 TypeOK ==
@@ -182,13 +211,12 @@ TypeOK ==
     /\ maxVBalRcvd \in [Nodes -> Ballots]
     /\ maxValRcvd \in [Nodes -> Values \union {None}]
     /\ \A n \in Nodes : IsABag(votesRcvd[n])
-    /\ \A n \in Nodes : \A v \in DOMAIN votesRcvd[n] : v \in [bal : Ballots, val : Values]
+    /\ \A n \in Nodes : \A v \in BagToSet(votesRcvd[n]) : v \in [bal : Ballots, val : Values]
     /\ chosen \in [Nodes -> Values \union {None}]
 
-(****************************************************************************)
-(* Any two nodes that have chosen some value must agree.                    *)
-(****************************************************************************)
+(* Any two nodes that have chosen some value must agree. *)
 Consistency ==
-    /\ \A m,n \in Nodes : chosen[m] # None /\ chosen[n] # None 
+    /\ \A m,n \in Nodes : chosen[m] # None /\ chosen[n] # None
                           => chosen[m] = chosen[n]
+*)
 ===============================================================================
