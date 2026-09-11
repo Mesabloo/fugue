@@ -127,6 +127,9 @@ Generic data-structure lemmas and instances.
 - `Semantics/Interface.lean` — `ExprSemantics`, the abstract expression layer.
 - `Semantics/Value.lean` — the concrete value domain `Value := ZFSet` and its literal encodings.
 - `Semantics/Operational.lean` — the concrete `ExprSemantics Value` instance: `Eval` as an inductive relation.
+- `Semantics/ZFSet.lean` — re-exports `ZFLean.Functions`/`ZFLean.Naturals` declarations not
+  otherwise public (`ZFSet.IsFinite`'s witnesses, `ZFNat`), body-exposed via `import all`, scoped
+  to this one file.
 
 ## `Core/GuardedPlusCal/`
 - `Syntax.lean` — the flat statement AST and `Block`'s list-like interface.
@@ -252,9 +255,11 @@ Go, not Lean — the library generated code links against. Every package is a su
 - `sets.go` — `Set[T]` and the set operations.
 - `functions.go` — `LazyFunction[T, U]` and function construction.
 - `naturals.go` — `IntRange`.
+- `bags.go` — `Bag[T]`, a sorted-with-duplicates slice, and the `Bags` module's operations.
 - `print.go` — what PlusCal's `print` compiles to.
 - `helpers_test.go`, `int_test.go`, `int_big_test.go`, `functions_test.go`, `naturals_test.go`,
-  `records_test.go`, `sequences_test.go`, `sets_test.go`, `str_test.go`, `downcasts_test.go` — their tests.
+  `bags_test.go`, `records_test.go`, `sequences_test.go`, `sets_test.go`, `str_test.go`,
+  `downcasts_test.go` — their tests.
 
 ## `persistent/`
 Go, not Lean — data structures the runtime needs. Root `go.mod` covers this directory and

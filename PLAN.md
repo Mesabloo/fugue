@@ -797,11 +797,45 @@ instantiation, below):
     and raise `W0008` (`-Wunsafe`) at the reference (`Elaborator/Expressions.lean`
     `inferExpr` `.var` case); `MkSeq` is total, raises nothing. `FunAsSeq`'s `EvalBuiltin`
     rule is `funAsSeq (hf : IsSeqVal f) : EvalBuiltin .funAsSeq [f] f` (identity on a value
-    already a sequence); `MkSeq`/`SetAsFun` get no rule (like the `Bags` family).
+    already a sequence); `MkSeq`/`SetAsFun` get no rule (like `Bags!BagOfAll`, below —
+    all three take an operator-typed argument `EvalBuiltin`'s `List Value` shape can't accept).
     `Network2Go` compiles `FunAsSeq`/`SetAsFun` to `tlaplus.FunAsSeq`/`SetAsFun` (the latter
     handed both tuple projections as callbacks); `MkSeq` is `E0061` at `go` until operator
     arguments exist (§9.10). Not a cast: `StrToSeq` stays coercion-only, `"abc"[2]`
     synthesis-position failures stay a known limitation (needs `LET`/`IN`, §9.2).
+  - **`Bags`'s representation and reference semantics.** `Bag(τ)` is `Typ.bag τ`, a dedicated
+    type, but at the runtime `Value` level a bag *is* the same `ZFSet` shape a `τ → Int` function
+    is — a graph, `IsPFunc`/`IsFunc`-recognized, no separate `Value` constructor. The one-direction
+    axiom `Bag(τ) <: τ → Int` (`Elaborator/Subtyping.lean`'s `tryAxioms`, `.bag` case) discharges
+    through `Core/TypedTLAPlus/Coercion.lean`'s `bagToFun` as a real eta-expansion,
+    `[i ∈ BagToSet(e) ↦ CopiesIn(i,e)]`, through the real module's own operators — not a bare
+    identity, even though the underlying representation already agrees.
+
+    12 of `Bags`' 13 operators have `EvalBuiltin` rules (`Core/ComputableTLAPlus/Semantics/
+    Operational.lean`), built on `Value.lean`'s `rawDom`/`copiesInRaw` — witness-free, total on any
+    `Value` — rather than `Dom`/`fnApply`'s `IsPFunc`-witness style, which stays reserved for the
+    three operators asserting something meaningfully *about* `B` being a bag: `IsABag`,
+    `BagToSet`, `BagIn` gate on `Value.IsBagVal B` (mirrors `domain`'s own gate); `EmptyBag`,
+    `SetToBag`, `(+)`, `(-)`, `SubBag`, `CopiesIn` are total, no witness to fire; `\sqsubseteq` is
+    total too, a direct `copiesInRaw` comparison (mirrors `subseteq_pos`/`_neg`'s witness-free
+    style). `BagUnion`/`BagCardinality` need `S.IsFinite`/`(rawDom B).IsFinite` — zflean's own
+    `ZFSet.IsFinite`, not Mathlib's `Set.Finite` — to sum over; `ZFSet.sumUpTo`/`IsFinite.sum`
+    (`Core/ComputableTLAPlus/Semantics/ZFSet.lean`) compute it by recursion on the finiteness
+    witness's own ordinal, `Bags.tla`'s `DSum` algorithm adapted to sweep the codomain rather than
+    shrink the domain (needs no "remove one element, codomain shrinks by one" lemma), proven
+    correct (`sumUpTo_insert`/`sumUpTo_insert_aux`) rather than merely well-typed. `BagOfAll` stays
+    ruleless — takes an operator-typed argument, which `EvalBuiltin`'s uniform `List Value` shape
+    cannot accept, same gap `Fugue!MkSeq` has (§9.37).
+
+    `ZFSet.lean` re-exports `ZFLean.Functions`/`ZFLean.Naturals` declarations not otherwise public
+    (`ZFSet.IsFinite`'s witnesses, `ZFNat`), body-exposed via `import all` scoped to that one file
+    — everything downstream consumes only the ordinary, already-exposed wrappers it provides.
+
+    `bagToFun`'s coercion correctness (`coerce`/`evalCoerce'` in `Operational.lean`) is real, not
+    vacuous: `coerce (.bagToFun ..) v v' := Value.IsBagVal v ∧ v' = v`, the same shape `.seqToFun`'s
+    case has, proven via `Value.IsBagVal.mem_iff` — a bag's own graph already *is*
+    `{pair w (ofNat (copiesInRaw w v)) | w ∈ rawDom v}`, so the eta-expansion reconstructs it
+    exactly.
 
   Each declaration only needs a name/type binding (`Decl.bindings`) — bodies never
   re-examined (standard-library operators replaced by backend-native implementations at

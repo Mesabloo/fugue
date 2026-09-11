@@ -2,6 +2,7 @@ module
 
 meta import CustomPrelude
 public import ZFLean
+public import Core.ComputableTLAPlus.Semantics.ZFSet
 
 @[expose] public section
 
@@ -302,6 +303,238 @@ theorem mem_recordGraph {z : Value} {fs : List (String × Value)} :
       · obtain ⟨rfl, rfl⟩ := Prod.mk.injEq .. |>.mp heq
         exact Or.inl rfl
       · exact Or.inr ⟨k', v', hmem, rfl⟩
+
+/-- TLA⁺'s `{n ∈ Nat : n > 0}` — the strictly positive integers, `Bags`' codomain
+(`Bags!IsABag`'s `[DOMAIN B -> {n ∈ Nat : n > 0}]`). -/
+noncomputable def posNatSet : Value :=
+  ZFSet.sep (λ z ↦ ∃ k : ℤ, 0 < k ∧ z = ofInt k) ZFSet.Int
+
+/-- `{n ∈ Nat : n > 0}` holds exactly the strictly positive integer encodings. -/
+@[simp] theorem mem_posNatSet {z : Value} : z ∈ posNatSet ↔ ∃ k : ℤ, 0 < k ∧ z = ofInt k := by
+  rw [posNatSet, ZFSet.mem_sep, and_iff_right_iff_imp]
+  rintro ⟨k, -, rfl⟩
+  exact ofInt_mem_int
+
+/-- `B` is a bag value: a total function from some carrier set into the strictly positive
+integers — `Bags!IsABag`'s own defining condition, `B ∈ [DOMAIN B -> {n ∈ Nat : n > 0}]`. -/
+def IsBagVal (B : Value) : Prop := ∃ A : Value, ZFSet.IsFunc A posNatSet B
+
+/-- `Bags!SetToBag(S)`: the bag containing exactly one copy of every element of `S`,
+`[e ∈ S ↦ 1]`. Its graph is the product of `S` with the singleton `{1}` directly —
+`ZFSet.prod`'s own membership characterisation already is the graph, no `sep` needed. -/
+noncomputable def setToBag (S : Value) : Value := S.prod ({ofNat 1} : Value)
+
+/-- `SetToBag S` holds exactly the pairs `⟨w, 1⟩` with `w ∈ S`. -/
+@[simp] theorem mem_setToBag {z S : Value} :
+    z ∈ setToBag S ↔ ∃ w ∈ S, z = ZFSet.pair w (ofNat 1) := by
+  simp only [setToBag, ZFSet.mem_prod, ZFSet.mem_singleton]
+  grind
+
+/-- The first coordinate of any pair of `f` is reachable through `⋃₀ ⋃₀ f` — symmetric to
+`Operational.lean`'s (private) `snd_mem_sUsU` for the second. -/
+private theorem fst_mem_sUsU {f k w : Value} (h : ZFSet.pair k w ∈ f) :
+    k ∈ ZFSet.sUnion (ZFSet.sUnion f) := by
+  have h1 : ({k} : ZFSet) ∈ ZFSet.pair k w := by
+    rw [ZFSet.pair, ZFSet.mem_insert_iff]; left; rfl
+  exact ZFSet.mem_sUnion.mpr ⟨{k}, ZFSet.mem_sUnion.mpr ⟨_, h, h1⟩, ZFSet.mem_singleton.mpr rfl⟩
+
+/-- The set of first coordinates among `f`'s pairs — `DOMAIN f` without needing an `IsPFunc`
+witness first. Bounded the same way `fnRead` is (`⋃₀ ⋃₀ f` reaches every coordinate of every pair
+of `f`), so it is total on any `Value`, not just a genuine function graph. `bagAdd`/`bagSub` build
+on this rather than `Value.Dom` so they need no well-formedness proof to construct. -/
+noncomputable def rawDom (f : Value) : Value :=
+  ZFSet.sep (λ e ↦ ∃ c, ZFSet.pair e c ∈ f) (ZFSet.sUnion (ZFSet.sUnion f))
+
+/-- `rawDom f` holds exactly the keys `f` pairs something with. -/
+@[simp] theorem mem_rawDom {e f : Value} : e ∈ rawDom f ↔ ∃ c, ZFSet.pair e c ∈ f := by
+  rw [rawDom, ZFSet.mem_sep, and_iff_right_iff_imp]
+  rintro ⟨c, hc⟩
+  exact fst_mem_sUsU hc
+
+/-- The multiplicity `f` assigns `e`, or `0` when `f` has no pair at `e` — `CopiesIn`'s own
+"else 0" branch, as a value-level function so a `sep` predicate can use it directly instead of an
+existential disjunction. Junk (an unspecified count) only if `f` pairs `e` with something other
+than a single `ofNat`-shaped value; every genuine bag graph does not, so this only matters off
+`IsBagVal`, same convention as `lenOf`. -/
+noncomputable def copiesInRaw (e f : Value) : ℕ :=
+  Classical.epsilon (λ n ↦ ZFSet.pair e (ofNat n) ∈ f ∨ (n = 0 ∧ e ∉ rawDom f))
+
+/-- Off `rawDom f`, `copiesInRaw` is exactly `0` — the only `n` satisfying its defining
+disjunction's second arm, and the first is unreachable. -/
+theorem copiesInRaw_eq_zero {e f : Value} (he : e ∉ rawDom f) : copiesInRaw e f = 0 := by
+  have hp : ∃ n, ZFSet.pair e (ofNat n) ∈ f ∨ (n = 0 ∧ e ∉ rawDom f) := ⟨0, Or.inr ⟨rfl, he⟩⟩
+  rcases Classical.epsilon_spec hp with h | ⟨h, -⟩
+  · absurd (mem_rawDom.mpr ⟨_, h⟩); exact he
+  · exact h
+
+/-- A genuine bag's own stored count at `e` is exactly what `copiesInRaw` computes — the
+`IsFunc`-uniqueness half of the graph-reconstruction fact `bagToFun`'s coercion proof needs
+(`Bag(τ) <: τ → Int` is discharged as an eta-expansion through `BagToSet`/`CopiesIn`, so proving
+it correct means showing the eta-expanded graph reproduces the bag exactly). -/
+theorem IsBagVal.eq_ofNat_copiesInRaw {f : Value} (hf : IsBagVal f) {e c : Value}
+    (h : ZFSet.pair e c ∈ f) : c = ofNat (copiesInRaw e f) := by
+  obtain ⟨A, hA⟩ := hf
+  have he : e ∈ rawDom f := mem_rawDom.mpr ⟨c, h⟩
+  obtain ⟨heA, hcPos⟩ := ZFSet.pair_mem_prod.mp (hA.1 h)
+  obtain ⟨k, hk, hck⟩ := mem_posNatSet.mp hcPos
+  have hc0 : c = ofNat k.toNat := by rw [hck, ofNat]; congr 1; omega
+  have hp : ∃ n, ZFSet.pair e (ofNat n) ∈ f ∨ (n = 0 ∧ e ∉ rawDom f) :=
+    ⟨k.toNat, Or.inl (hc0 ▸ h)⟩
+  rcases Classical.epsilon_spec hp with hev | ⟨-, hne⟩
+  · exact (hA.2 e heA).unique h hev
+  · absurd he; exact hne
+
+/-- The other half: a genuine bag actually *has* a stored pair at every key of its domain, at
+exactly the count `copiesInRaw` computes. -/
+theorem IsBagVal.mem_copiesInRaw {f : Value} (hf : IsBagVal f) {w : Value} (hw : w ∈ rawDom f) :
+    ZFSet.pair w (ofNat (copiesInRaw w f)) ∈ f := by
+  obtain ⟨c, hc⟩ := mem_rawDom.mp hw
+  rwa [hf.eq_ofNat_copiesInRaw hc] at hc
+
+/-- A genuine bag's graph is exactly the graph `copiesInRaw` characterises — the
+self-reconstruction fact underlying `bagToFun`'s coercion correctness (`evalCoerce'`'s
+`.bagToFun` case): the `.fn` the coercion eta-expands to reproduces `f` exactly because `f`
+already *is* this graph. -/
+theorem IsBagVal.mem_iff {f : Value} (hf : IsBagVal f) {z : Value} :
+    z ∈ f ↔ ∃ w ∈ rawDom f, z = ZFSet.pair w (ofNat (copiesInRaw w f)) := by
+  obtain ⟨A, hA⟩ := hf
+  constructor
+  · intro hz
+    obtain ⟨w, -, c, -, rfl⟩ := ZFSet.mem_prod.mp (hA.1 hz)
+    exact ⟨w, mem_rawDom.mpr ⟨c, hz⟩,
+      congrArg (ZFSet.pair w) (IsBagVal.eq_ofNat_copiesInRaw ⟨A, hA⟩ hz)⟩
+  · rintro ⟨w, hw, rfl⟩
+    exact IsBagVal.mem_copiesInRaw ⟨A, hA⟩ hw
+
+/-- `Bags!(+)`: multiset sum, `[e ∈ (DOMAIN B1) ∪ (DOMAIN B2) ↦ CopiesIn(e,B1) + CopiesIn(e,B2)]`.
+Total on any two `Value`s — `rawDom`/`copiesInRaw`, not `Value.Dom`, so no well-formedness proof
+is needed to build it. `e ∈ rawDom B1 ∪ rawDom B2` sits inside the existential (not just the
+bound) so the predicate can't be satisfied by an `e` outside both domains with count `0` — that
+`z` genuinely is not a member, and a membership lemma stating otherwise would be false. -/
+noncomputable def bagAdd (B1 B2 : Value) : Value :=
+  ZFSet.sep
+    (λ z ↦ ∃ e ∈ rawDom B1 ∪ rawDom B2,
+      z = ZFSet.pair e (ofNat (copiesInRaw e B1 + copiesInRaw e B2)))
+    ((rawDom B1 ∪ rawDom B2).prod posNatSet)
+
+/-- `bagAdd B1 B2` holds exactly the pairs `⟨e, c1 + c2⟩` where `c1`/`c2` are `e`'s count in
+`B1`/`B2`, `e` in at least one of the two domains and the sum strictly positive (`sep`'s bound —
+matters only for garbage input where a stored count is itself `0`; a genuine `IsBagVal` bag never
+stores one). -/
+theorem mem_bagAdd {z B1 B2 : Value} :
+    z ∈ bagAdd B1 B2 ↔ ∃ e ∈ rawDom B1 ∪ rawDom B2,
+      0 < copiesInRaw e B1 + copiesInRaw e B2 ∧
+      z = ZFSet.pair e (ofNat (copiesInRaw e B1 + copiesInRaw e B2)) := by
+  rw [bagAdd, ZFSet.mem_sep]
+  constructor
+  · rintro ⟨hbound, e, he, rfl⟩
+    obtain ⟨-, hc⟩ := ZFSet.pair_mem_prod.mp hbound
+    obtain ⟨k, hk, hke⟩ := mem_posNatSet.mp hc
+    rw [ofNat] at hke
+    have hnk : (copiesInRaw e B1 + copiesInRaw e B2 : ℤ) = k := ofInt_inj.mp hke
+    exact ⟨e, he, by omega, rfl⟩
+  · rintro ⟨e, he, hpos, rfl⟩
+    refine ⟨ZFSet.pair_mem_prod.mpr ⟨he, mem_posNatSet.mpr
+      ⟨(copiesInRaw e B1 + copiesInRaw e B2 : ℕ), ?_, ?_⟩⟩, e, he, rfl⟩
+    · exact_mod_cast hpos
+    · rw [ofNat, Nat.cast_add]
+
+/-- `Bags!(-)`: multiset difference, domain restricted to `B1`'s, each count clamped to `0` and
+dropped there (ℕ's `-` is already truncated, so `copiesInRaw e B1 - copiesInRaw e B2` *is*
+`max(c1 - c2, 0)`; `sep`'s codomain bound then drops the zero-count keys). Total on any two
+`Value`s, same reason `bagAdd` is. -/
+noncomputable def bagSub (B1 B2 : Value) : Value :=
+  ZFSet.sep
+    (λ z ↦ ∃ e ∈ rawDom B1, z = ZFSet.pair e (ofNat (copiesInRaw e B1 - copiesInRaw e B2)))
+    ((rawDom B1).prod posNatSet)
+
+/-- `bagSub B1 B2` holds exactly the pairs `⟨e, c1 - c2⟩` (ℕ-truncated) with `e ∈ rawDom B1` and
+the difference strictly positive. -/
+theorem mem_bagSub {z B1 B2 : Value} :
+    z ∈ bagSub B1 B2 ↔ ∃ e ∈ rawDom B1,
+      0 < copiesInRaw e B1 - copiesInRaw e B2 ∧
+      z = ZFSet.pair e (ofNat (copiesInRaw e B1 - copiesInRaw e B2)) := by
+  rw [bagSub, ZFSet.mem_sep]
+  constructor
+  · rintro ⟨hbound, e, he, rfl⟩
+    obtain ⟨-, hc⟩ := ZFSet.pair_mem_prod.mp hbound
+    obtain ⟨k, hk, hke⟩ := mem_posNatSet.mp hc
+    rw [ofNat] at hke
+    have hnk : ((copiesInRaw e B1 - copiesInRaw e B2 : ℕ) : ℤ) = k := ofInt_inj.mp hke
+    exact ⟨e, he, by omega, rfl⟩
+  · rintro ⟨e, he, hpos, rfl⟩
+    refine ⟨ZFSet.pair_mem_prod.mpr ⟨he, mem_posNatSet.mpr
+      ⟨(copiesInRaw e B1 - copiesInRaw e B2 : ℕ), ?_, ?_⟩⟩, e, he, rfl⟩
+    · exact_mod_cast hpos
+    · rw [ofNat]
+
+/-- `Bags!SubBag(B)`'s `AllBagsOfSubset` (TLA⁺ book definition, not `Bags.tla`'s own recursive
+one): every bag graph whose carrier is some subset of `B`'s domain — `UNION {[SB -> {n ∈ Nat : n >
+0}] : SB ∈ SUBSET BagToSet(B)}`. One `powerset` layer bounds it, since each element is itself a
+graph (`⊆ T.prod posNatSet ⊆ (rawDom B).prod posNatSet` for its own carrier `T ⊆ rawDom B`). -/
+noncomputable def allBagsOfSubset (B : Value) : Value :=
+  ZFSet.sep (λ z ↦ ∃ T ⊆ rawDom B, ZFSet.IsFunc T posNatSet z)
+    (ZFSet.powerset ((rawDom B).prod posNatSet))
+
+/-- `AllBagsOfSubset B` holds exactly the total functions from some subset of `rawDom B` into the
+strictly positive integers. -/
+theorem mem_allBagsOfSubset {z B : Value} :
+    z ∈ allBagsOfSubset B ↔ ∃ T ⊆ rawDom B, ZFSet.IsFunc T posNatSet z := by
+  rw [allBagsOfSubset, ZFSet.mem_sep, and_iff_right_iff_imp]
+  rintro ⟨T, hT, hf⟩
+  rw [ZFSet.mem_powerset]
+  intro w hw
+  obtain ⟨a, ha, b, hb, rfl⟩ := ZFSet.mem_prod.mp ((ZFSet.is_func_is_pfunc hf).1 hw)
+  exact ZFSet.mem_prod.mpr ⟨a, hT ha, b, hb, rfl⟩
+
+/-- `Bags!SubBag(B)`: every sub-bag of `B` — `AllBagsOfSubset B` filtered to the graphs whose
+count at each of its own keys is at most `B`'s. `copiesInRaw`, not `Value.Dom`/`fnApply`, so no
+well-formedness proof is needed for `B` either. -/
+noncomputable def subBag (B : Value) : Value :=
+  ZFSet.sep (λ SB ↦ ∀ e ∈ rawDom SB, copiesInRaw e SB ≤ copiesInRaw e B) (allBagsOfSubset B)
+
+/-- `SubBag B` holds exactly the bag graphs in `AllBagsOfSubset B` whose count nowhere exceeds
+`B`'s own. -/
+theorem mem_subBag {SB B : Value} :
+    SB ∈ subBag B ↔ (∃ T ⊆ rawDom B, ZFSet.IsFunc T posNatSet SB) ∧
+      ∀ e ∈ rawDom SB, copiesInRaw e SB ≤ copiesInRaw e B := by
+  rw [subBag, ZFSet.mem_sep, mem_allBagsOfSubset]
+
+open Classical in
+/-- `Bags!BagUnion(S)`: multiset sum across every bag of `S`, `[e ∈ ⋃{BagToSet(B) : B ∈ S} ↦
+Sum({CopiesIn(e,B) : B ∈ S})]`. `⋃₀ S` is already exactly "every pair from every bag of `S`", so
+its `rawDom` is `S`'s combined domain directly — no separate bound construction needed. The count
+needs `S` itself finite (`hS`, `ZFSet.IsFinite` — proven correct via `ZFSet.sumUpTo_insert`, not
+a bespoke fold) to sum over; every other `Bags` builder is total precisely because none of the
+rest needs to sum across a *set* of bags. -/
+noncomputable def bagUnion (S : Value) (hS : S.IsFinite) : Value :=
+  ZFSet.sep
+    (λ z ↦ ∃ e ∈ rawDom (ZFSet.sUnion S), z = ZFSet.pair e (ofNat (hS.sum (copiesInRaw e))))
+    ((rawDom (ZFSet.sUnion S)).prod posNatSet)
+
+/-- `bagUnion S hS` holds exactly the pairs `⟨e, Σ⟩` where `Σ` sums `e`'s count across every bag
+of `S`, `e` a key of some bag of `S` and the sum strictly positive. -/
+theorem mem_bagUnion {z S : Value} {hS : S.IsFinite} :
+    z ∈ bagUnion S hS ↔ ∃ e ∈ rawDom (ZFSet.sUnion S),
+      0 < hS.sum (copiesInRaw e) ∧ z = ZFSet.pair e (ofNat (hS.sum (copiesInRaw e))) := by
+  rw [bagUnion, ZFSet.mem_sep]
+  constructor
+  · rintro ⟨hbound, e, he, rfl⟩
+    obtain ⟨-, hc⟩ := ZFSet.pair_mem_prod.mp hbound
+    obtain ⟨k, hk, hke⟩ := mem_posNatSet.mp hc
+    rw [ofNat] at hke
+    have hnk : ((hS.sum (copiesInRaw e) : ℕ) : ℤ) = k := ofInt_inj.mp hke
+    exact ⟨e, he, by omega, rfl⟩
+  · rintro ⟨e, he, hpos, rfl⟩
+    refine ⟨ZFSet.pair_mem_prod.mpr ⟨he, mem_posNatSet.mpr
+      ⟨hS.sum (copiesInRaw e), ?_, ?_⟩⟩, e, he, rfl⟩
+    · exact_mod_cast hpos
+    · rw [ofNat]
+
+/-- `Bags!BagCardinality(B) == Sum(B)`: the sum of `B`'s own multiplicities. Same
+`ZFSet.IsFinite.sum` `bagUnion`'s count uses, applied to one bag instead of a set of them. -/
+noncomputable def bagCardinality (B : Value) (hB : (rawDom B).IsFinite) : ℕ :=
+  hB.sum (copiesInRaw · B)
 
 /-- `ZFSet` carries no canonical structural pretty-printer; a value prints as an opaque
 placeholder. Present only so that a structure carrying a `Value` can still derive `Repr`. -/

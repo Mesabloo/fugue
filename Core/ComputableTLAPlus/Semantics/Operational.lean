@@ -231,7 +231,8 @@ theorem isSeq_ofSeq (vs : List Value) : IsSeq (Value.ofSeq vs) vs := isSeq_iff_o
 
 /-- `EvalBuiltin op args v` — the builtin `op`, applied to already-evaluated arguments `args`,
 denotes `v`. Strict in argument kinds: an arm exists only for the shapes the operator is defined
-on. Covers the operators reachable from a computable algorithm. The `Bags` family,
+on. Covers the operators reachable from a computable algorithm. `BagOfAll` (takes an
+operator-typed argument `EvalBuiltin`'s uniform `List Value` shape cannot accept),
 `Cardinality`/`IsFiniteSet`, the `Address` order (`\prec`/`\preceq`/`\succ`/`\succeq`), `MkSeq` and
 `SetAsFun` have no arm — a call to one of them denotes nothing.
 
@@ -307,8 +308,39 @@ inductive EvalBuiltin : BuiltinOp → List Value → Value → Prop
   -- `FunAsSeq(f)` reads a function back as a sequence. A sequence value *is* a function over an
   -- index interval `1 .. n`, so when `f` already has that shape the cast is the identity; there is
   -- no rule for any other `f`, which is the partiality Apalache leaves to the user. `MkSeq` and
-  -- `SetAsFun` have no rule at all — like the `Bags` family, a call to either denotes nothing.
+  -- `SetAsFun` have no rule at all — like `BagOfAll` below, a call to either denotes nothing.
   | funAsSeq {f : Value} (hf : Value.IsSeqVal f) : EvalBuiltin .funAsSeq [f] f
+  -- `Bags`. Every arm here builds on `Value.rawDom`/`Value.copiesInRaw`, not `Value.Dom`/
+  -- `fnApply`'s `IsPFunc`-witness style `domain`/`fnCall` use — those two are already total
+  -- (0 off-domain, no witness needed to construct), so every closed-form builder in this family
+  -- reuses them directly rather than introducing a second, witness-carrying representation that
+  -- would need its own bridging lemma back to `Value.bagAdd`/`Value.bagUnion`/etc., which are
+  -- themselves built the witness-free way (see `Value.lean`). `IsBagVal` still gates the arms
+  -- that assert something meaningfully *about* `B` being a bag (`IsABag`, `BagToSet`, `BagIn`) —
+  -- mirrors `domain`'s own `IsPFunc` gate. `CopiesIn`/`\sqsubseteq` need no such gate: both are
+  -- already total off-domain in the real module too (`CopiesIn`'s own `ELSE 0`), so they fire
+  -- unconditionally, matching `subseteq_pos`/`_neg`'s witness-free style above.
+  | emptyBag : EvalBuiltin .emptyBag [] (∅ : Value)
+  | setToBag {S : Value} : EvalBuiltin .setToBag [S] (Value.setToBag S)
+  | bagAdd {B1 B2 : Value} : EvalBuiltin .bagAdd [B1, B2] (Value.bagAdd B1 B2)
+  | bagSub {B1 B2 : Value} : EvalBuiltin .bagSub [B1, B2] (Value.bagSub B1 B2)
+  | subBag {B : Value} : EvalBuiltin .subBag [B] (Value.subBag B)
+  | copiesIn {e B : Value} :
+      EvalBuiltin .copiesIn [e, B] (Value.ofNat (Value.copiesInRaw e B))
+  | bagUnion {S : Value} (hS : S.IsFinite) : EvalBuiltin .bagUnion [S] (Value.bagUnion S hS)
+  | bagCardinality {B : Value} (hB : (Value.rawDom B).IsFinite) :
+      EvalBuiltin .bagCardinality [B] (Value.ofNat (Value.bagCardinality B hB))
+  | isABag {B : Value} (h : Value.IsBagVal B) : EvalBuiltin .isABag [B] Value.tru
+  | bagToSet {B : Value} (h : Value.IsBagVal B) :
+      EvalBuiltin .bagToSet [B] (Value.rawDom B)
+  | bagIn_pos {e B : Value} (he : e ∈ Value.rawDom B) : EvalBuiltin .bagIn [e, B] Value.tru
+  | bagIn_neg {e B : Value} (he : e ∉ Value.rawDom B) : EvalBuiltin .bagIn [e, B] Value.fls
+  | bagLeq_pos {B1 B2 : Value}
+      (h : ∀ e ∈ Value.rawDom B1, Value.copiesInRaw e B1 ≤ Value.copiesInRaw e B2) :
+      EvalBuiltin .bagLeq [B1, B2] Value.tru
+  | bagLeq_neg {B1 B2 : Value}
+      (h : ¬ ∀ e ∈ Value.rawDom B1, Value.copiesInRaw e B1 ≤ Value.copiesInRaw e B2) :
+      EvalBuiltin .bagLeq [B1, B2] Value.fls
 
 /-! ## Expression evaluation -/
 
@@ -568,10 +600,10 @@ def coerce : Coercion → Value → Value → Prop
   | .id, v, v' => v' = v
   | .strToSeq, v, v' => v' = v
   | .seqToFun _ _, v, v' => (∃ vs, IsSeq v vs) ∧ v' = v
-  -- `Bags!BagToSet`/`Bags!CopiesIn` have no `EvalBuiltin` rule (see `EvalBuiltin`'s own doc), so
-  -- `bagToFun.applyComputable e` never evaluates to anything (`evalCoerce'`'s `.bagToFun` case) —
-  -- `False` is the only choice that keeps that iff provable.
-  | .bagToFun _ _, _, _ => False
+  -- Bag(τ) values are already `τ → Int`-shaped graphs (`Value.rawDom`/`Value.copiesInRaw`, same
+  -- representation a real function value has), so the coercion is the identity on a genuine bag —
+  -- same shape `.seqToFun` above.
+  | .bagToFun _ _, v, v' => Value.IsBagVal v ∧ v' = v
   | .tupleToSeq n _ _, v, v' =>
     (∃ A B, v.IsPFunc A B) ∧
     ∃ ws : List Value, ws.length = n ∧
@@ -1044,7 +1076,7 @@ theorem coerceUnique : ∀ {c : Coercion} {v v₁' v₂' : Value},
   | .id, _, _, _, h₁, h₂ => by simp only [coerce] at h₁ h₂; exact h₁.trans h₂.symm
   | .strToSeq, _, _, _, h₁, h₂ => by simp only [coerce] at h₁ h₂; exact h₁.trans h₂.symm
   | .seqToFun _ _, _, _, _, h₁, h₂ => by simp only [coerce] at h₁ h₂; exact h₁.2.trans h₂.2.symm
-  | .bagToFun _ _, _, _, _, h₁, _ => by simp only [coerce] at h₁
+  | .bagToFun _ _, _, _, _, h₁, h₂ => by simp only [coerce] at h₁ h₂; exact h₁.2.trans h₂.2.symm
   | .tupleToSeq _ _ _, _, _, _, h₁, h₂ => by
     simp only [coerce] at h₁ h₂
     obtain ⟨⟨A, B, hpf⟩, ws₁, hlen₁, hmem₁, rfl⟩ := h₁
@@ -1496,6 +1528,92 @@ theorem evalCoerce'_seqToFun {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory V
         fnApply_eq hpfS (hkdomS j hj) (Value.mem_ofSeq.mpr ⟨j, hj, rfl⟩)]
       exact Value.mem_ofSeq.mpr ⟨j, hj, rfl⟩
 
+/-- The `.bagToFun` case of `evalCoerce'`, standalone — same role `evalCoerce'_seqToFun` plays for
+`.seqToFun`. The built `.fn`'s domain is `Bags!BagToSet(e)`, its body `Bags!CopiesIn(i, e)`; both
+now have real `EvalBuiltin` rules (`.bagToSet`, `.copiesIn`), so the eta-expansion genuinely
+evaluates, reconstructing `e`'s own bag graph exactly (`Value.IsBagVal.mem_iff`). -/
+theorem evalCoerce'_bagToFun {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
+    {τ : Typ} {i : String} {e : Expression Typ} {v' : Value}
+    (hΞ : Ξ.WellScoped) :
+    Eval Ξ Ω M (TypedTLAPlus.Coercion.applyComputable (.bagToFun τ i) e) v' ↔
+      ∃ v, Eval Ξ Ω M e v ∧ coerce (.bagToFun τ i) v v' := by
+  have hloc : ∀ {name : String} {w r : Value}, name ∉ e.freeVars →
+      (Eval Ξ Ω (M.insert name w) e r ↔ Eval Ξ Ω M e r) := λ {name w r} hn ↦
+    evalLocal' hΞ λ z hz ↦ Finmap.lookup_insert_of_ne _ λ h ↦ hn (h ▸ hz)
+  have hbagToSetOp : TypedTLAPlus.builtinOpOf? (.module "Bags" "BagToSet") = some .bagToSet := by
+    simp [TypedTLAPlus.builtinOpOf?]
+  have hcopiesInOp : TypedTLAPlus.builtinOpOf? (.module "Bags" "CopiesIn") = some .copiesIn := by
+    simp [TypedTLAPlus.builtinOpOf?]
+  -- The built body opens (at any fresh name) to `CopiesIn(name, e)`: `e` was `liftBound`-ed by
+  -- one when spliced, `openVar` cancels that exactly, same as `evalCoerce'_seqToFun`'s `hob`.
+  have hob : ∀ name : String,
+      (Expression.opCall
+          (Expression.var (.operator [τ, .bag τ] .int) (.module "Bags" "CopiesIn") @@ posOf e)
+          [Expression.var τ (.bound 0) @@ posOf e, Expression.liftBound 1 e] @@ posOf e).openVar
+        name
+        = Expression.opCall
+          (Expression.var (.operator [τ, .bag τ] .int) (.module "Bags" "CopiesIn") @@ posOf e)
+          [Expression.var τ (.free name) @@ posOf e, e] @@ posOf e := by
+    intro name
+    change Expression.mapVars _ 0 _ = _
+    simp only [Expression.mapVars, registerSource, Expression.openVarLam, List.attach_map_val,
+      List.map_cons, List.map_nil, if_pos]
+    exact congrArg (Expression.opCall _ [Expression.var τ (.free name) @@ posOf e, ·] @@ posOf e)
+      (Expression.openVar_liftBound_one name e)
+  simp only [TypedTLAPlus.Coercion.applyComputable, coerce, registerSource]
+  iff_rintro h ⟨v, he, hbag, rfl⟩
+  · cases h with
+    | @fn _ _ _ _ _ _ S G img L hdom himg hto hof =>
+      obtain ⟨v, he, hb⟩ : ∃ v, Eval Ξ Ω M e v ∧ EvalBuiltin .bagToSet [v] S := by
+        cases hdom with
+        | opCall_op _ hnb _ _ => simp [TypedTLAPlus.builtinOpOf?] at hnb
+        | opCall_builtin hop hargs hb =>
+          rw [hbagToSetOp, Option.some.injEq] at hop
+          cases hargs with
+          | cons he hnil => cases hnil; exact ⟨_, he, hop ▸ hb⟩
+      obtain ⟨hbag, rfl⟩ : Value.IsBagVal v ∧ S = Value.rawDom v := by
+        cases hb with | bagToSet hbag => exact ⟨hbag, rfl⟩
+      have himg' : ∀ w ∈ Value.rawDom v, img w = Value.ofNat (Value.copiesInRaw w v) := by
+        intro w hw
+        obtain ⟨z, hz⟩ := exists_fresh (L ∪ e.freeVars)
+        obtain ⟨hzL, hze⟩ := Finset.notMem_union.mp hz
+        have hb := himg z hzL w hw
+        rw [hob z] at hb
+        cases hb with
+        | opCall_op _ hnb _ _ => simp [TypedTLAPlus.builtinOpOf?] at hnb
+        | opCall_builtin hop hargs hb =>
+          rw [hcopiesInOp, Option.some.injEq] at hop
+          cases hargs with
+          | cons hw' hrest =>
+            cases hrest with
+            | cons he' hnil =>
+              cases hnil
+              cases hw' with
+              | var_free hb' =>
+                rw [Finmap.lookup_insert, Option.some.injEq] at hb'
+                subst hb'
+                obtain rfl := evalUnique' ((hloc hze).mp he') he
+                subst hop
+                exact evalBuiltinUnique hb .copiesIn
+      refine ⟨v, he, hbag, ZFSet.ext λ z ↦ ⟨λ hz ↦ ?_, λ hz ↦ ?_⟩⟩
+      · obtain ⟨w, hw, rfl⟩ := hto z hz
+        rw [himg' w hw]
+        exact hbag.mem_iff.mpr ⟨w, hw, rfl⟩
+      · obtain ⟨w, hw, heq⟩ := hbag.mem_iff.mp hz
+        rw [heq, ← himg' w hw]
+        exact hof w hw
+  · refine .fn (λ w ↦ Value.ofNat (Value.copiesInRaw w v')) e.freeVars
+      (.opCall_builtin hbagToSetOp (.cons he .nil) (.bagToSet hbag)) ?_ ?_ ?_
+    · intro z hz w hw
+      rw [hob z]
+      exact .opCall_builtin hcopiesInOp
+        (.cons (.var_free (Finmap.lookup_insert _)) (.cons ((hloc hz).mpr he) .nil)) .copiesIn
+    · intro z hz
+      obtain ⟨w, hw, rfl⟩ := hbag.mem_iff.mp hz
+      exact ⟨w, hw, rfl⟩
+    · intro w hw
+      exact hbag.mem_iff.mpr ⟨w, hw, rfl⟩
+
 /-- The `.function` case of `evalCoerce'`, standalone. `ihD`/`ihR` are `evalCoerce'` at the strictly
 smaller `cDom`/`cRng` — passed in so this lives outside the `evalCoerce'` recursion block while the
 termination checker still sees the calls. -/
@@ -1765,22 +1883,7 @@ theorem evalCoerce' {Ξ : OperatorEnv} {Ω : Model Value} (hΞ : Ξ.WellScoped) 
         | cons he hnil => cases hb with | strToSeq => exact ⟨_, he, rfl⟩
     · exact .opCall_builtin (op := .strToSeq) rfl (.cons hv .nil) .strToSeq
   | .seqToFun τ i, M, e, v' => evalCoerce'_seqToFun (i := i) hΞ
-  | .bagToFun τ i, M, e, v' => by
-    -- LHS is uninhabited: `bagToFun.applyComputable c e` is `.fn i τ .int (BagToSet(e)) _`,
-    -- `Eval.fn` demands `Eval _ _ _ (BagToSet(e)) _`, and `Bags!BagToSet` has no `EvalBuiltin`
-    -- rule for `Eval.opCall_builtin` to discharge — so no derivation reaches `.fn` at all. `coerce`
-    -- is `False` here for the matching reason, so the RHS is uninhabited too.
-    simp only [TypedTLAPlus.Coercion.applyComputable, coerce, and_false, exists_false, iff_false]
-    intro hev
-    cases hev with
-    | fn _ _ hdom _ _ _ =>
-      cases hdom with
-      | opCall_builtin hop _ hb =>
-        simp only [TypedTLAPlus.builtinOpOf?] at hop
-        cases hop
-        cases hb
-      | opCall_op _ hnb _ _ _ =>
-        simp [TypedTLAPlus.builtinOpOf?] at hnb
+  | .bagToFun τ i, M, e, v' => evalCoerce'_bagToFun (i := i) hΞ
   | .tupleToSeq n τ hn, M, e, v' => by
     simp only [TypedTLAPlus.Coercion.applyComputable, coerce, registerSource]
     have hne : List.range n ≠ [] := by
