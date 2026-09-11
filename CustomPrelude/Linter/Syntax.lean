@@ -31,6 +31,7 @@ public meta import CustomPrelude.Linter.Syntax.InductionWith
 public meta import CustomPrelude.Linter.Syntax.FirstParens
 public meta import CustomPrelude.Linter.Syntax.ExactBy
 public meta import CustomPrelude.Linter.Syntax.SelectorParens
+public meta import CustomPrelude.Linter.Syntax.SubscriptSuffix
 
 /-!
 # Syntax linters

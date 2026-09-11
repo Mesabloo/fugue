@@ -336,6 +336,14 @@ Citations illustrate the rule; this file is not a list of things to fix.
   `Guarded2Network/Lemmas/Statement.lean:259` (`fresh_split`, four copies of `hfe`/`hfr`),
   `VerifiedCompiler/Denotational/StrongRefinement.lean:663` — `Aborting.star`, forty lines of
   induction twinned with `Diverging.star`, now derived from it through `Diverging.toAborting`
+- **An index suffix is a Unicode subscript, not a bare digit.** `B₁`/`hf₂`, not `B1`/`hf2` — the
+  suffix reads as an index, and a subscript says so at a glance instead of reading as part of the
+  name. `VerifiedCompiler/Denotational/StrongRefinement.lean:542` (`ref₁`/`ref₂`/`ref₃`, cited
+  again below). `linter.fugue.subscriptSuffix` (Syn) flags an identifier's last name component
+  ending in an ASCII digit; the standard fixed-width numeric type names (`UInt64`, `Float32`, …)
+  are excepted, their trailing digit a bit width, not an index. `default := false` — the backlog
+  is the whole tree (`vc1`…`vc14`, `hself0`, `b1`/`b2`, …); opt in per file with `set_option
+  linter.fugue.subscriptSuffix true`, same reasoning `sigIndent` gives.
 - **Name introduced hypotheses in signature order.** `rintro`/`intro` names should run in the order
   the binders appear, so a reader can match them without counting. Out-of-order naming reads as a
   slip even when deliberate. Naming by role rather than by position is the usual cause:

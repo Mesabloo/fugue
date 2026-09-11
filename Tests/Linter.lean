@@ -44,6 +44,7 @@ import Tests.Linter.ExistsIntro
 import Tests.Linter.BulletSubgoals
 import Tests.Linter.UnfoldForeign
 import Tests.Linter.HypOrder
+import Tests.Linter.SubscriptSuffix
 
 /-!
 # Style-linter tests
