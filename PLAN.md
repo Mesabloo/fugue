@@ -797,11 +797,25 @@ instantiation, below):
     and raise `W0008` (`-Wunsafe`) at the reference (`Elaborator/Expressions.lean`
     `inferExpr` `.var` case); `MkSeq` is total, raises nothing. `FunAsSeq`'s `EvalBuiltin`
     rule is `funAsSeq (hf : IsSeqVal f) : EvalBuiltin .funAsSeq [f] f` (identity on a value
-    already a sequence); `MkSeq`/`SetAsFun` get no rule (like `Bags!BagOfAll`, below —
-    all three take an operator-typed argument `EvalBuiltin`'s `List Value` shape can't accept).
+    already a sequence); `MkSeq` gets no rule for the same reason `Bags!BagOfAll` doesn't
+    (below) — it takes an operator-typed argument, which `EvalBuiltin`'s `List Value` shape
+    can't accept (§9.37). `SetAsFun`'s rule is `setAsFun {S A B} (h : S.IsPFunc A B) :
+    EvalBuiltin .setAsFun [S] S` — identity, same shape as `FunAsSeq`'s: a function value *is*
+    its own graph, a `ZFSet` of pairs, the same representation a set of pairs already has, so
+    once `S` is single-valued (`IsPFunc`'s own second conjunct — same first component forces
+    same second) the cast changes nothing at the `Value` level, only which predicate recognizes
+    the shape. `evalBuiltinUnique`'s generic `cases <;> cases <;> first | rfl | …` combinator
+    (Operational.lean:758) closed the new diagonal case for free, no bespoke proof needed.
     `Network2Go` compiles `FunAsSeq`/`SetAsFun` to `tlaplus.FunAsSeq`/`SetAsFun` (the latter
-    handed both tuple projections as callbacks); `MkSeq` is `E0061` at `go` until operator
-    arguments exist (§9.10). Not a cast: `StrToSeq` stays coercion-only, `"abc"[2]`
+    handed both tuple projections as callbacks). `MkSeq` compiles too, despite having no
+    `EvalBuiltin` rule: `F` reaches `Network2Go` as an ordinary operator reference, which
+    already compiles to a plain Go function value (`Definition.lean`'s parametric-operator
+    form — the same mechanism any user-defined higher-order call already used, since a TLA⁺
+    operator argument is never a runtime value there, only a name `Network2Go` resolves to a
+    Go function), so compiling `MkSeq(N, F)` is just composing `IntRange`/`FnConstructor`/
+    `FunAsSeq` around that reference rather than needing a dedicated runtime function — LAMBDA
+    (§9.10) was never the blocker for a *named* operator argument, only for an anonymous one,
+    and nobody had written the composition. Not a cast: `StrToSeq` stays coercion-only, `"abc"[2]`
     synthesis-position failures stay a known limitation (needs `LET`/`IN`, §9.2).
   - **`Bags`'s representation and reference semantics.** `Bag(τ)` is `Typ.bag τ`, a dedicated
     type, but at the runtime `Value` level a bag *is* the same `ZFSet` shape a `τ → Int` function
@@ -826,6 +840,18 @@ instantiation, below):
     correct (`sumUpTo_insert`/`sumUpTo_insert_aux`) rather than merely well-typed. `BagOfAll` stays
     ruleless — takes an operator-typed argument, which `EvalBuiltin`'s uniform `List Value` shape
     cannot accept, same gap `Fugue!MkSeq` has (§9.37).
+
+    `Network2Go` compiles all 13 `Bags` operators — `BagCardinality`/`BagOfAll` included —
+    despite that pair still having no `EvalBuiltin` rule between them: Go codegen and the
+    reference semantics are separate efforts here, only Guarded→Network under a completeness
+    proof. `BagCardinality(B)` mirrors `FiniteSets!Cardinality`: the representation is
+    sorted-with-duplicates, so total multiplicity is the slice length, `len(b)`. `BagOfAll(F,
+    B)` reuses the same fact `MkSeq` does — `F` compiles to a plain Go function value —
+    mapping it over every *copy* in `B` (not every distinct element scaled by its count, which
+    is what makes a non-injective `F` sum multiplicities correctly), sorting without
+    compacting to keep `Bag`'s invariant, then reading the result back as `Function(b, Int)`
+    through the same `BagToSet`/`CopiesIn`/`FnConstructor` composition `bagToFun`'s own
+    coercion uses (`runtime/tlaplus/bags.go`'s `BagOfAll`).
 
     `ZFSet.lean` re-exports `ZFLean.Functions`/`ZFLean.Naturals` declarations not otherwise public
     (`ZFSet.IsFinite`'s witnesses, `ZFNat`), body-exposed via `import all` scoped to that one file

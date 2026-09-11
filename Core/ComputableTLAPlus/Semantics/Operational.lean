@@ -233,8 +233,8 @@ theorem isSeq_ofSeq (vs : List Value) : IsSeq (Value.ofSeq vs) vs := isSeq_iff_o
 denotes `v`. Strict in argument kinds: an arm exists only for the shapes the operator is defined
 on. Covers the operators reachable from a computable algorithm. `BagOfAll` (takes an
 operator-typed argument `EvalBuiltin`'s uniform `List Value` shape cannot accept),
-`Cardinality`/`IsFiniteSet`, the `Address` order (`\prec`/`\preceq`/`\succ`/`\succeq`), `MkSeq` and
-`SetAsFun` have no arm — a call to one of them denotes nothing.
+`Cardinality`/`IsFiniteSet`, the `Address` order (`\prec`/`\preceq`/`\succ`/`\succeq`), and `MkSeq`
+have no arm — a call to one of them denotes nothing.
 
 Set-valued results are given by a `ZFSet`/`zflean` term wherever one exists (`∪`/`∩`/`\` for the
 set combinators, `f.Dom` for `DOMAIN`), and by a closed-form `Value` builder otherwise
@@ -307,9 +307,16 @@ inductive EvalBuiltin : BuiltinOp → List Value → Value → Prop
   | strToSeq {v : Value} : EvalBuiltin .strToSeq [v] v
   -- `FunAsSeq(f)` reads a function back as a sequence. A sequence value *is* a function over an
   -- index interval `1 .. n`, so when `f` already has that shape the cast is the identity; there is
-  -- no rule for any other `f`, which is the partiality Apalache leaves to the user. `MkSeq` and
-  -- `SetAsFun` have no rule at all — like `BagOfAll` below, a call to either denotes nothing.
+  -- no rule for any other `f`, which is the partiality Apalache leaves to the user. `MkSeq` has no
+  -- rule at all — like `BagOfAll` below, a call to it denotes nothing.
   | funAsSeq {f : Value} (hf : Value.IsSeqVal f) : EvalBuiltin .funAsSeq [f] f
+  -- `SetAsFun(S)` reads a set of pairs back as a function. A function value *is* its own graph — a
+  -- `ZFSet` of pairs, `IsPFunc`-recognized — the same representation a set of pairs already has, so
+  -- when `S` is already single-valued (`IsPFunc`'s second conjunct: same first component forces
+  -- same second) the cast is the identity too, mirroring `funAsSeq` exactly. Undefined — real
+  -- TLA+'s own partiality — when two pairs share a first component but disagree on the second; no
+  -- rule for that shape, same as `FunAsSeq` outside `IsSeqVal`.
+  | setAsFun {S A B : Value} (h : S.IsPFunc A B) : EvalBuiltin .setAsFun [S] S
   -- `Bags`. Every arm here builds on `Value.rawDom`/`Value.copiesInRaw`, not `Value.Dom`/
   -- `fnApply`'s `IsPFunc`-witness style `domain`/`fnCall` use — those two are already total
   -- (0 off-domain, no witness needed to construct), so every closed-form builder in this family

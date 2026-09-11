@@ -69,6 +69,37 @@ func CopiesIn[T any](o Ord[T], b Bag[T], x T) Int {
 	return MkInt(j - i)
 }
 
+// BagCardinality compiles Bags!BagCardinality(B), the total number of copies
+// in b across every element.
+//
+// The representation is sorted-with-duplicates, so total multiplicity is
+// just the slice length — same reasoning as Cardinality (sets.go).
+func BagCardinality[T any](b Bag[T]) Int {
+	return MkInt(len(b))
+}
+
+// BagOfAll compiles Bags!BagOfAll(F, B): the bag analog of SetMap, applying F
+// to every element of B and renormalizing, read back as the function view
+// Bags!BagOfAll's own real TLA+ definition returns.
+//
+// Mapping every individual copy — rather than every distinct element scaled
+// by its count — is what makes multiplicities sum correctly when F is not
+// injective: two copies of x, or a copy each of x1 and x2 with F(x1) =
+// F(x2), both land as two entries mapping to the same image, which is
+// exactly what BagOfAll's own Sum does. Sorting without compacting recovers
+// Bag's invariant while keeping every one of them, the same distinction
+// BagSum's tie case makes. FnConstructor/BagToSet/CopiesIn then read the
+// resulting bag back as the Function(τ, Int) real TLA+ returns, the same
+// coercion Bag(τ) <: τ -> Int already gives every other bag.
+func BagOfAll[T, U any](o Ord[U], b Bag[T], f func(x T) U) LazyFunction[U, Int] {
+	mapped := make(Bag[U], len(b))
+	for i, x := range b {
+		mapped[i] = f(x)
+	}
+	slices.SortFunc(mapped, o.Cmp)
+	return FnConstructor(o, BagToSet(o, mapped), func(y U) Int { return CopiesIn(o, mapped, y) })
+}
+
 // BagSum compiles Bags!(+), the union of bags b1 and b2 — multiplicities add.
 //
 // Merges the two sorted representations in one pass, the same technique

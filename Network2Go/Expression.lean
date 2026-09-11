@@ -536,8 +536,20 @@ partial def compileBuiltinCall (pos : SourceSpan) (mod name : String) (τ : Typ)
     | _ =>
       throw (.internalInvariantViolated pos
         s!"'CopiesIn' has type {repr τ}, which type checking should already have rejected")
-  -- `BagOfAll`/`BagCardinality` are `Sum`-based (`BagOfAll` a `SetMap`-style renormalizing fold
-  -- over an arbitrary function argument) and stay unsupported — nothing in scope calls them.
+  -- The representation is sorted-with-duplicates, so total multiplicity is just the slice length —
+  -- same reasoning as `FiniteSets!Cardinality` above.
+  | "Bags", "BagCardinality", [b] => return tlaplusCall "BagCardinality" [b]
+  -- `F` compiles like any other operator reference — the top-level Go function `Definition.lean`
+  -- already gave it — so the runtime `BagOfAll` can just call it directly, the same way `SetMap`'s
+  -- `f`/`FnConstructor`'s `gen` take a plain callback. Needs the codomain's dictionary (`b`, `F`'s
+  -- result type): that's what the intermediate bag gets sorted by before `BagToSet`/`CopiesIn` read
+  -- it back as the `Function(b, Int)` real TLA+ returns.
+  | "Bags", "BagOfAll", [f, b] =>
+    match τ with
+    | .operator [.operator [_] cod, .bag _] _ => return tlaplusCall "BagOfAll" [← ordDict cod, b, f]
+    | _ =>
+      throw (.internalInvariantViolated pos
+        s!"'BagOfAll' has type {repr τ}, which type checking should already have rejected")
   | "Bags", _, _ =>
     throw (.unsupported pos s!"Bags!{name}" "the Bags module has no runtime representation")
   -- The whole point of `Fugue`'s `\prec` (`Driver/Builtins.lean`): the order on `Address` that the
@@ -568,10 +580,14 @@ partial def compileBuiltinCall (pos : SourceSpan) (mod name : String) (τ : Typ)
     let snd : ComputableGo.Expression :=
       .funcLit [(p, pairτ)] [bτ] [.return [.field (.var p) (projName 2)]]
     return tlaplusCall "SetAsFun" [← ordDict a, s, fst, snd]
-  | "Fugue", "MkSeq", _ =>
-    throw (.unsupported pos "MkSeq"
-      "its second argument is an operator, and passing an operator as an argument needs LAMBDA, \
-       which this compiler does not have")
+  -- `[i \in 1..N |-> F(i)]`: `F` compiles like any other operator reference (a plain Go function
+  -- value, same as `BagOfAll`'s argument above), so this composes existing runtime pieces —
+  -- `IntRange` for the domain, `FnConstructor` to build the lazy map, `FunAsSeq` to read it back as
+  -- a sequence — rather than needing a dedicated runtime function.
+  | "Fugue", "MkSeq", [n, f] =>
+    return tlaplusCall "FunAsSeq"
+      [tlaplusCall "FnConstructor"
+        [tlaplusVar "IntOrd", tlaplusCall "IntRange" [tlaplusCall "MkInt" [.nat "1"], n], f]]
   | _, _, [] => compileBuiltinVar pos mod name τ
   | _, _, _ => wrongArity pos s!"{mod}!{name}" args.length
 

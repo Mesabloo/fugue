@@ -454,46 +454,22 @@ re-triggers the clash. Blocks further development on top of the correctness theo
 `zflean @ v{Lean.versionString}`, so this arrives with the toolchain bump to Lean 4.33. Revisit
 then: `public import Guarded2Network.CorrectInstance` and drop the workaround.
 
-### 9.35 `EvalBuiltin` has no rule for `Cardinality`/`IsFiniteSet`/`SetAsFun`/`Address` order
+### 9.35 `EvalBuiltin` has no rule for `Cardinality`/`IsFiniteSet`/`Address` order
 `Core/ComputableTLAPlus/Semantics/Operational.lean:232-236` doc comment: these denote nothing in
-the reference operational semantics — no `EvalBuiltin` arm. Same for `funAsSeq`'s partiality (only
-`IsSeqVal` domain covered, line 307-311). `Bags` (resolved — 12 of 13 operators now have real
-rules, `PLAN.md`'s builtin-module section) and `MkSeq` (its own blocker precisely identified, not
-merely "no rule yet" — §9.37) no longer belong in this entry.
+the reference operational semantics — no `EvalBuiltin` arm, each already total and closed-form
+elsewhere (`FiniteSets!IsFiniteSet`/`Cardinality`: every `Value` set is finite by construction; the
+`Address` order: unspecified by design, `runtime/comm/address.go`). `Bags` (resolved — 12 of 13
+operators now have real rules, `PLAN.md`'s builtin-module section), `MkSeq` (its own blocker
+precisely identified, not merely "no rule yet" — §9.37), and `SetAsFun` (resolved — real rule now,
+`PLAN.md`'s builtin-module section) no longer belong in this entry.
 
 Cost: `Network2Go` already compiles `Cardinality`/`IsFiniteSet` and the `Address` order operators
-proof-free — nothing shows compiled behavior matches spec for them. `SetAsFun` stays rejected at
-`go` instead (`-Wunsafe` at the reference), the more conservative choice.
+proof-free — nothing shows compiled behavior matches spec for them.
 
 To resolve: per operator, decide (a) add an `EvalBuiltin` rule — and, separately, whether to also
 prove `Network2Go` sound against it, since no such proof exists for *any* operator yet, `Bags`
-included — or (b) accept permanently proof-free codegen, `Cardinality`/`IsFiniteSet`'s status, and
-record that choice here rather than leaving it implicit in the doc comment.
-
-### 9.36 `Network2Go` rejects `Bags!BagOfAll`/`Bags!BagCardinality`
-`Network2Go/Expression.lean:539-542`: both `E0061`. Conceded out during Go-codegen phase
-(`bags-go-codegen.md`), "`Sum`-based ... excluded by agreement, not because hard" — true for
-`BagCardinality` (free one-liner, `len(b)`, same shape `FiniteSets!Cardinality`'s own
-compilation) but not for `BagOfAll`: it takes an operator-typed argument (`Driver/
-Builtins.lean:131`, `("F", 1)`, same higher-order-parameter shape `Fugue!MkSeq` has), and neither
-`Elaborator` nor `Network2Go` has ever compiled a builtin call with one — no existing pattern to
-mirror, not just unimplemented.
-
-Surfaced 2026-09-11, project owner request while scoping `.claude/plans/bags-semantics.md` (Lean
-reference semantics for `Bags`) — want both added to the Go backend too, not just given
-`EvalBuiltin` rules.
-
-Cost: Paxos-class specs using `BagOfAll`/`BagCardinality` can't reach `.go`. Low urgency today —
-nothing in scope calls either yet, same as when originally conceded out.
-
-`BagCardinality`'s Lean-side precondition is now met — real `EvalBuiltin` rule, proven correct,
-not just well-typed (`Value.bagCardinality`/`ZFSet.IsFinite.sum`, `PLAN.md`'s builtin-module
-section). Only the Go-codegen half is still open.
-
-To resolve: `BagCardinality` — mirror `Cardinality`'s compilation (`Network2Go/Expression.lean`),
-nothing left blocking it. `BagOfAll` — bigger: design how an operator-valued builtin argument
-compiles at all (`MkSeq` hits the identical gap, so solve once, not `Bags`-specific) before
-`BagOfAll` specifically.
+included — or (b) accept permanently proof-free codegen and record that choice here rather than
+leaving it implicit in the doc comment.
 
 ### 9.37 `EvalBuiltin` structurally cannot give `BagOfAll`/`MkSeq` a rule
 `EvalBuiltin : BuiltinOp → List Value → Value → Prop` (Operational.lean:241) takes only
@@ -502,7 +478,8 @@ already-evaluated `Value`s — `opCall_builtin`'s `EvalList Ξ Ω M args argVals
 BagOfAll(F, B)`/`Fugue!MkSeq(N, F)` pass `F`, an *operator*, not a value (`Driver/
 Builtins.lean:131,167`, `("F", 1)`) — no `Value` encoding exists for an operator in this system
 (`Value := ZFSet`), so neither can ever get an `EvalBuiltin` arm as the relation is shaped today.
-Root of §9.35's "`MkSeq`/`SetAsFun` have no rule at all" and §9.36's `BagOfAll` half.
+This is about the reference semantics only — `Network2Go` compiles both to Go already, an
+independent, unverified backend (`PLAN.md`'s builtin-module section); that half is resolved.
 
 Surfaced 2026-09-11, project owner, while scoping `.claude/plans/bags-semantics.md`.
 
@@ -524,3 +501,4 @@ not bookkeeping. Bigger than either `bags-semantics.md` or `MkSeq` alone; solve 
 To resolve: attempt the `mutual`-block merge, scope the induction-principle ripple for real before
 committing (don't estimate from this entry alone), decide whether `BagOfAll` and `MkSeq` land
 together or separately.
+

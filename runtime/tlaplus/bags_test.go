@@ -207,3 +207,32 @@ func TestBagOrd(t *testing.T) {
 		t.Errorf("BagOrd.Lt({1,2}, {2}) = false, want true (1 < 2 at the first position)")
 	}
 }
+
+// TestBagCardinality checks the total copy count, not the distinct-element
+// count — the property BagToSet's own dedup would otherwise hide.
+func TestBagCardinality(t *testing.T) {
+	if got := BagCardinality(intBag(1, 1, 2)); !eqInt(got, 3) {
+		t.Errorf("BagCardinality({1,1,2}) = %v, want 3", got)
+	}
+	if got := BagCardinality(Bag[Int]{}); !eqInt(got, 0) {
+		t.Errorf("BagCardinality(empty) = %v, want 0", got)
+	}
+}
+
+// TestBagOfAll checks multiplicities sum correctly when F is not injective:
+// mapping x mod 2 over {1,1,2,3} sends three copies (1, 1, and 3) to image 1
+// and one copy (2) to image 0 — not one copy each the way a Set-valued map
+// would collapse them.
+func TestBagOfAll(t *testing.T) {
+	f := func(x Int) Int { return Mod(x, MkInt(2)) }
+	got := BagOfAll(IntOrd, intBag(1, 1, 2, 3), f)
+	if n := len(Domain(got)); n != 2 {
+		t.Fatalf("DOMAIN BagOfAll({1,1,2,3}, x -> x mod 2) has %d elements, want 2", n)
+	}
+	if c := FnApply(IntOrd, got, MkInt(0)); !eqInt(c, 1) {
+		t.Errorf("BagOfAll({1,1,2,3}, x -> x mod 2)[0] = %v, want 1", c)
+	}
+	if c := FnApply(IntOrd, got, MkInt(1)); !eqInt(c, 3) {
+		t.Errorf("BagOfAll({1,1,2,3}, x -> x mod 2)[1] = %v, want 3", c)
+	}
+}
