@@ -247,6 +247,44 @@ func TestCmpPanicsOnPartialOrder(t *testing.T) {
 	never.Cmp(MkInt(1), MkInt(2))
 }
 
+// TestSetProduct checks the pairs produced, that the result comes out already
+// sorted and duplicate-free (row-major over two sorted inputs, lexicographic
+// on the pair's own Proj1-then-Proj2 order — the claim SetProduct's doc
+// comment relies on instead of renormalizing), and that neither input is
+// mutated.
+func TestSetProduct(t *testing.T) {
+	type pair = struct{ Proj1, Proj2 Int }
+	mk := func(a, b int) pair { return pair{MkInt(a), MkInt(b)} }
+
+	s, other := intSet(1, 2), intSet(3, 4)
+	sBefore, otherBefore := slices.Clone(s), slices.Clone(other)
+
+	got := SetProduct(s, other, func(x, y Int) pair { return pair{x, y} })
+	want := []pair{mk(1, 3), mk(1, 4), mk(2, 3), mk(2, 4)}
+
+	if len(got) != len(want) {
+		t.Fatalf("SetProduct(%v, %v) = %v, want %v", s, other, got, want)
+	}
+	for i := range want {
+		if !IntOrd.Eq(got[i].Proj1, want[i].Proj1) || !IntOrd.Eq(got[i].Proj2, want[i].Proj2) {
+			t.Errorf("SetProduct(%v, %v)[%d] = %v, want %v", s, other, i, got[i], want[i])
+		}
+	}
+	if !intsEqual(s, sBefore) {
+		t.Errorf("SetProduct mutated its left input: %v, was %v", s, sBefore)
+	}
+	if !intsEqual(other, otherBefore) {
+		t.Errorf("SetProduct mutated its right input: %v, was %v", other, otherBefore)
+	}
+
+	if got := SetProduct(intSet(), intSet(1, 2), func(x, y Int) pair { return pair{x, y} }); len(got) != 0 {
+		t.Errorf("SetProduct with an empty left operand = %v, want empty", got)
+	}
+	if got := SetProduct(intSet(1, 2), intSet(), func(x, y Int) pair { return pair{x, y} }); len(got) != 0 {
+		t.Errorf("SetProduct with an empty right operand = %v, want empty", got)
+	}
+}
+
 // TestSetUnion, TestSetIntersect and TestSetDifference check the answers and,
 // just as importantly, that the merge produces a representation the rest of the
 // package may rely on: sorted and duplicate-free without a renormalization pass.

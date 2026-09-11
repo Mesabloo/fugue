@@ -122,14 +122,19 @@ All run, all still fail as described, and an unexpected pass is reported as XPAS
 know.
 - `AcceptFunctionDefinitionMultiArgTupleDomain.tla` — parser rejects `f[x \in S, y \in T] ==
   ...` (`unexpected identifier f`). Looks like a `Parser_/TLAPlus.lean` gap, not traced.
-- `AcceptFunctionLiteralCartesianProductBinder.tla` — types now (`\X` is in `builtinContext` at
-  `(Set(a), Set(b)) => Set(<<a,b>>)`), but has **no Go compilation**: a product's elements are
-  pairs, and a tuple compiles to an *anonymous* struct that only the site building it can name,
-  so a runtime `SetProduct` cannot construct its own elements the way `SetUnion` does. It would
-  have to take the pair constructor as a callback, the way `SetMap` takes its function — not
-  written, nothing needing it yet.
 Fix at the root, drop the `xfail` from the sidecar, re-run the suite. Don't patch the fixture
 unless it encodes an unsupported construct (check §8 first).
+
+**Left this list already:** `AcceptFunctionLiteralCartesianProductBinder.tla` — `\X` typed
+(`(Set(a), Set(b)) => Set(<<a,b>>)`, `builtinContext`) but had no Go compilation: a product's
+elements are pairs, and a tuple compiles to an *anonymous* struct only the site building it can
+name, so a runtime `SetProduct` could not construct its own elements the way `SetUnion` does.
+Fixed by taking the pair constructor as a callback, the way `SetMap` takes its mapping function —
+`runtime/tlaplus/sets.go`'s `SetProduct`, called from `Network2Go/Expression.lean`'s `"\\X"` case.
+No dictionary parameter or renormalizing pass needed there, unlike `SetMap`: the pair constructor
+is always injective and row-major order over two sorted inputs is already ascending in the tuple's
+own lexicographic order, so both invariants hold by construction. Sidecar dropped, fixture passes
+for real (confirmed via a real `go build`, not just the in-process pipeline check).
 
 **Three left this list by that last rule**, all rewritten as `Reject*` fixtures asserting the
 rejection they actually produce, since each encodes a construct outside §8:
@@ -152,7 +157,8 @@ C` is `(A \X B) \X C`, whose elements are pairs holding a pair rather than the f
 means. Nothing accepts the wrong shape — `collapseToSingleBinder` projects component `i` as
 `z[i]`, and `z[3]` on a pair is caught by the tuple-index bound — but a genuinely n-ary `\X`
 (needed before three-component products of any kind work, including multicast filters) is
-unwritten.
+unwritten. Binary `\X` itself compiles to Go now (`SetProduct`, above); this paragraph is only
+about the n≥3 shape.
 
 ### 9.13 Two well-formedness checks are currently unreachable
 The rule is right in each case; the parser/type-checker just can't produce the triggering input:

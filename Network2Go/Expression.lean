@@ -402,14 +402,27 @@ partial def compileIntrinsic (pos : SourceSpan) (name : String) (τ : Typ)
   -- reaches code generation solely because `Coercion.applyComputable` inserted it. The runtime
   -- fixes the semantics — the sequence of the string's Unicode code points.
   | "StrToSeq", [s] => return tlaplusCall "StrToSeq" [s]
-  -- Typed (`builtinContext`) but not compiled. A product's elements are pairs, and a tuple
-  -- compiles to an *anonymous* struct built at the site that needs it — so a runtime product
-  -- cannot construct its own elements the way `SetUnion` can, and would have to take the pair
-  -- constructor as a callback the way `SetMap` takes its function.
-  | "\\X", _ =>
-    throw (.unsupported pos name
-      "a Cartesian product has no runtime representation: its elements are pairs, and a tuple \
-       compiles to an anonymous struct that only the site building it can name")
+  -- `\X`'s own type is the scheme `(Set(a), Set(b)) => Set(<<a,b>>)` (`Elaborator/Declarations.lean`
+  -- `builtinContext`), specialized here, so both element types and the pair type all come out of
+  -- `τ` directly — unlike `\cup`/`\subseteq`/etc., no `setElemDict` needed. `SetProduct` cannot
+  -- construct its own elements the way `SetUnion` can (a tuple compiles to an *anonymous* struct
+  -- only the site building it can name), so the pair constructor is passed in as a callback, the
+  -- same way `SetMap` takes its mapping function.
+  | "\\X", [s, t] => do
+    match τ with
+    | .operator [.set α, .set β] (.set pairτ) => do
+      let x ← goIdent <$> freshName "x"
+      let y ← goIdent <$> freshName "y"
+      let goα ← compileTyp α
+      let goβ ← compileTyp β
+      let goPairτ ← compileTyp pairτ
+      return tlaplusCall "SetProduct"
+        [s, t, .funcLit [(x, goα), (y, goβ)] [goPairτ]
+          [.return [.structLit goPairτ [(projName 1, .var x), (projName 2, .var y)]]]]
+    | _ =>
+      throw (.internalInvariantViolated pos
+        s!"'\\X' has an unexpected operator type {repr τ}, not the binary scheme type checking \
+           should have given it")
   -- Banned from anything reachable from the algorithm by `WellFormedness/Restrictions.lean`'s
   -- check 3, so reaching code generation means that check did not run or did not hold.
   | "ENABLED", _ | "UNCHANGED", _ | "[]", _ | "<>", _ | "'", _ =>

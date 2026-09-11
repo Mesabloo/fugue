@@ -123,6 +123,28 @@ func SetMap[T, U any](o Ord[U], s Set[T], f func(y T) U) Set[U] {
 	return normalize(o, out)
 }
 
+// SetProduct compiles s \X other, the Cartesian product.
+//
+// pair cannot build its own result the way SetUnion's elements build
+// themselves: a tuple compiles to an anonymous struct only its own
+// construction site can name, so pair is taken as a callback, the same way
+// SetMap takes its mapping function. Unlike SetMap, though, neither a
+// dictionary for U nor a renormalizing pass is needed: pair is always
+// injective (distinct (x, y) build distinct tuples, tuple equality being
+// componentwise), and row-major order over two sorted, duplicate-free inputs
+// is already ascending in a tuple's own lexicographic order — component one
+// first, same as the dictionary Network2Go/Ord.lean's ordDict builds for
+// Typ.tuple — so both invariants hold by construction.
+func SetProduct[S, T, U any](s Set[S], other Set[T], pair func(x S, y T) U) Set[U] {
+	out := make(Set[U], 0, len(s)*len(other))
+	for _, x := range s {
+		for _, y := range other {
+			out = append(out, pair(x, y))
+		}
+	}
+	return out
+}
+
 // SetUnion compiles s \cup other, SetIntersect s \cap other, and
 // SetDifference s \ other.
 //
