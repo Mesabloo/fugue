@@ -1,17 +1,18 @@
 module
 
+meta import CustomPrelude
 public import ZFLean.Functions
 public import ZFLean.Naturals
 import all ZFLean.Functions
 
 /-!
   `ZFSet.IsFinite` carries no `@[expose]` upstream (`ZFLean.Functions`), so a downstream
-  `obtain`/`cases` on an `IsFinite` hypothesis fails ("not an inductive datatype") — same
-  situation `.claude/FINDINGS.md` already documents for `ZFSet.ZFInt` (`Value.ofInt`'s case), same
-  escape hatch: `import all` exposes the body privately. Kept to this one small file rather than
-  reaching for `import all` inside `Value.lean` directly, so the exposure's blast radius (every
-  private declaration of `ZFLean.Functions`, not just `IsFinite`) stays contained — `Value.lean`
-  and everything downstream only ever sees the ordinary, already-exposed conclusion below.
+  `obtain`/`cases` on an `IsFinite` hypothesis fails ("not an inductive datatype") — the same
+  problem `Value.ofInt` has with the private-bodied `ZFSet.ZFInt`, same escape hatch: `import all`
+  exposes the body privately. Kept to this one small file rather than reaching for `import all`
+  inside `Value.lean` directly, so the exposure's blast radius (every private declaration of
+  `ZFLean.Functions`, not just `IsFinite`) stays contained — `Value.lean` and everything downstream
+  only ever sees the ordinary, already-exposed conclusion below.
 -/
 
 @[expose] public section
@@ -32,7 +33,7 @@ instead sweeps through which part of the *codomain* has been accounted for so fa
 whichever element of `x` (unique, by injectivity) `f` sends to the ordinal being peeled off. -/
 noncomputable def ZFSet.sumUpTo (x f : ZFSet) (g : ZFSet → ℕ) (n : ZFNat) : ℕ :=
   ZFNat.rec n 0
-    (fun (k : ZFNat) ih ↦
+    (λ (k : ZFNat) ih ↦
       if h : ∃ a ∈ x, ZFSet.pair a k.val ∈ f then ih + g h.choose else ih)
 
 /-- `sumUpTo _ _ _ 0 = 0` — nothing has been swept yet. -/
@@ -72,8 +73,7 @@ theorem ZFSet.sumUpTo_insert_aux {x a f : ZFSet} {g : ZFSet → ℕ} (ha : a ∉
     rintro ⟨b, hb, -⟩
     exact ZFSet.notMem_empty b hb
   | succ k ih =>
-    rw [ZFNat.add_one_eq_succ]
-    simp only [ZFSet.sumUpTo_succ, ih]
+    simp only [ZFNat.add_one_eq_succ, ZFSet.sumUpTo_succ, ih]
     by_cases hak : ZFSet.pair a k.val ∈ f
     · have hnx : ¬∃ a' ∈ x, ZFSet.pair a' k.val ∈ f := by
         rintro ⟨a', ha', hp⟩
@@ -98,7 +98,7 @@ theorem ZFSet.sumUpTo_insert_aux {x a f : ZFSet} {g : ZFSet → ℕ} (ha : a ∉
         constructor
         · rintro ⟨a1, ha1, hp⟩
           rcases ZFSet.mem_insert_iff.mp ha1 with rfl | ha1x
-          · exact absurd hp hak
+          · nomatch hak hp
           · exact ⟨a1, ha1x, hp⟩
         · rintro ⟨a', ha', hp⟩
           exact ⟨a', ZFSet.mem_insert_iff.mpr (Or.inr ha'), hp⟩
@@ -109,7 +109,7 @@ theorem ZFSet.sumUpTo_insert_aux {x a f : ZFSet} {g : ZFSet → ℕ} (ha : a ∉
         constructor
         · rintro ⟨b, hb, hp⟩
           rcases ZFSet.mem_insert_iff.mp hb with rfl | hb
-          · exact absurd hp hak
+          · nomatch hak hp
           · exact ⟨b, hb, hp⟩
         · rintro ⟨b, hb, hp⟩
           exact ⟨b, ZFSet.mem_insert_iff.mpr (Or.inr hb), hp⟩
