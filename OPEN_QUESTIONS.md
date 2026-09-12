@@ -458,10 +458,10 @@ then: `public import Guarded2Network.CorrectInstance` and drop the workaround.
 `Core/ComputableTLAPlus/Semantics/Operational.lean:232-236` doc comment: these denote nothing in
 the reference operational semantics — no `EvalBuiltin` arm, each already total and closed-form
 elsewhere (`FiniteSets!IsFiniteSet`/`Cardinality`: every `Value` set is finite by construction; the
-`Address` order: unspecified by design, `runtime/comm/address.go`). `Bags` (resolved — 12 of 13
-operators now have real rules, `PLAN.md`'s builtin-module section), `MkSeq` (its own blocker
-precisely identified, not merely "no rule yet" — §9.37), and `SetAsFun` (resolved — real rule now,
-`PLAN.md`'s builtin-module section) no longer belong in this entry.
+`Address` order: unspecified by design, `runtime/comm/address.go`). `Bags` (resolved — all 13
+operators now have real rules, `PLAN.md`'s builtin-module section), `MkSeq` (resolved — real rule
+now, same section), and `SetAsFun` (resolved — real rule now, same section) no longer belong in
+this entry. `Cardinality`/`IsFiniteSet`/`Address` order stay, untouched, still open.
 
 Cost: `Network2Go` already compiles `Cardinality`/`IsFiniteSet` and the `Address` order operators
 proof-free — nothing shows compiled behavior matches spec for them.
@@ -470,35 +470,4 @@ To resolve: per operator, decide (a) add an `EvalBuiltin` rule — and, separate
 prove `Network2Go` sound against it, since no such proof exists for *any* operator yet, `Bags`
 included — or (b) accept permanently proof-free codegen and record that choice here rather than
 leaving it implicit in the doc comment.
-
-### 9.37 `EvalBuiltin` structurally cannot give `BagOfAll`/`MkSeq` a rule
-`EvalBuiltin : BuiltinOp → List Value → Value → Prop` (Operational.lean:241) takes only
-already-evaluated `Value`s — `opCall_builtin`'s `EvalList Ξ Ω M args argVals` premise
-(line 405) evaluates every builtin argument uniformly before `EvalBuiltin` ever sees it. `Bags!
-BagOfAll(F, B)`/`Fugue!MkSeq(N, F)` pass `F`, an *operator*, not a value (`Driver/
-Builtins.lean:131,167`, `("F", 1)`) — no `Value` encoding exists for an operator in this system
-(`Value := ZFSet`), so neither can ever get an `EvalBuiltin` arm as the relation is shaped today.
-This is about the reference semantics only — `Network2Go` compiles both to Go already, an
-independent, unverified backend (`PLAN.md`'s builtin-module section); that half is resolved.
-
-Surfaced 2026-09-11, project owner, while scoping `.claude/plans/bags-semantics.md`.
-
-Resolution direction (project owner, not yet attempted): make `EvalBuiltin` mutually recursive
-with `Eval`/`EvalList`/`EvalPath` (currently one-way — `Eval.opCall_builtin` depends on
-`EvalBuiltin`, Operational.lean:355-362,406 — `EvalBuiltin` cannot depend back without joining
-that `mutual … end` block). Once mutual, a `bagOfAll`/`mkSeq` rule can carry a precondition of
-the shape `∀ w ∈ Dom B, Eval Ξ Ω M (F applied at w) (img w)`, mirroring `Eval.fn`'s own `himg`
-hypothesis (line 474) — an existence-law rule, not a closed-form builder, same as `.fn`.
-
-Cost: joining the `mutual` block regenerates its combined induction/recursion principle across
-all four relations — every proof using that combined principle (not just a targeted `cases` on
-one hypothesis, which is most of the file and stays unaffected) needs re-checking. `evalBuiltinUnique`
-(line 719, self-contained `cases` over `EvalBuiltin`'s own constructors) survives for the existing
-rules; the new `bagOfAll`/`mkSeq` cases additionally need `Eval`'s own determinism lemma
-(`evalUnique'`, referenced line 410) to pin `img` before `v = w` goes through — real proof work,
-not bookkeeping. Bigger than either `bags-semantics.md` or `MkSeq` alone; solve once, shared.
-
-To resolve: attempt the `mutual`-block merge, scope the induction-principle ripple for real before
-committing (don't estimate from this entry alone), decide whether `BagOfAll` and `MkSeq` land
-together or separately.
 

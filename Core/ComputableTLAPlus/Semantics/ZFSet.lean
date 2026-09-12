@@ -173,3 +173,21 @@ theorem ZFSet.sumUpTo_insert {x a f : ZFSet} {g : ZFSet → ℕ} {n : ZFNat} (ha
 to build `ℕ` data is exactly what `Exists.casesOn` refuses. -/
 noncomputable def ZFSet.IsFinite.sum {x : ZFSet} (h : x.IsFinite) (g : ZFSet → ℕ) : ℕ :=
   ZFSet.sumUpTo x h.exists_witness.choose_spec.choose g h.exists_witness.choose
+
+/-- `sumUpTo` only ever calls `g` at elements of `x` (`sumUpTo_succ`'s own `h.choose ∈ x`), so two
+`g`s agreeing there sum the same — the sweep itself (`x`/`f`/`n`) is untouched. -/
+theorem ZFSet.sumUpTo_congr {x f : ZFSet} {g₁ g₂ : ZFSet → ℕ} {n : ZFNat}
+    (h : ∀ a ∈ x, g₁ a = g₂ a) : ZFSet.sumUpTo x f g₁ n = ZFSet.sumUpTo x f g₂ n := by
+  induction n with
+  | zero => rw [ZFSet.sumUpTo_zero, ZFSet.sumUpTo_zero]
+  | succ k ih =>
+    rw [ZFNat.add_one_eq_succ, ZFSet.sumUpTo_succ, ZFSet.sumUpTo_succ, ih]
+    split_ifs with hex
+    · rw [h hex.choose hex.choose_spec.1]
+    · rfl
+
+/-- `IsFinite.sum` at two `g`s agreeing on `x` — `sumUpTo_congr` through the fixed witness
+enumeration `IsFinite.sum` itself uses. -/
+theorem ZFSet.IsFinite.sum_congr {x : ZFSet} (hx : x.IsFinite) {g₁ g₂ : ZFSet → ℕ}
+    (h : ∀ a ∈ x, g₁ a = g₂ a) : hx.sum g₁ = hx.sum g₂ :=
+  ZFSet.sumUpTo_congr h

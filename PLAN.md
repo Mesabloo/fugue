@@ -797,9 +797,11 @@ instantiation, below):
     and raise `W0008` (`-Wunsafe`) at the reference (`Elaborator/Expressions.lean`
     `inferExpr` `.var` case); `MkSeq` is total, raises nothing. `FunAsSeq`'s `EvalBuiltin`
     rule is `funAsSeq (hf : IsSeqVal f) : EvalBuiltin .funAsSeq [f] f` (identity on a value
-    already a sequence); `MkSeq` gets no rule for the same reason `Bags!BagOfAll` doesn't
-    (below) — it takes an operator-typed argument, which `EvalBuiltin`'s `List Value` shape
-    can't accept (§9.37). `SetAsFun`'s rule is `setAsFun {S A B} (h : S.IsPFunc A B) :
+    already a sequence); `MkSeq`'s rule is an existence law, `Eval.fn`'s own style — `himg`
+    calls `F` via a synthesized `.opCall F [.var (Typ.var "_") (.free z)]` under a fresh
+    binder rather than needing a `Value` encoding for an operator argument (`EvalBuiltin`
+    joined the `Eval`/`EvalList`/`EvalPath` mutual block to carry this). `SetAsFun`'s
+    rule is `setAsFun {S A B} (h : S.IsPFunc A B) :
     EvalBuiltin .setAsFun [S] S` — identity, same shape as `FunAsSeq`'s: a function value *is*
     its own graph, a `ZFSet` of pairs, the same representation a set of pairs already has, so
     once `S` is single-valued (`IsPFunc`'s own second conjunct — same first component forces
@@ -807,8 +809,8 @@ instantiation, below):
     the shape. `evalBuiltinUnique`'s generic `cases <;> cases <;> first | rfl | …` combinator
     (Operational.lean:758) closed the new diagonal case for free, no bespoke proof needed.
     `Network2Go` compiles `FunAsSeq`/`SetAsFun` to `tlaplus.FunAsSeq`/`SetAsFun` (the latter
-    handed both tuple projections as callbacks). `MkSeq` compiles too, despite having no
-    `EvalBuiltin` rule: `F` reaches `Network2Go` as an ordinary operator reference, which
+    handed both tuple projections as callbacks). `MkSeq`'s own compilation is independent of
+    its `EvalBuiltin` rule: `F` reaches `Network2Go` as an ordinary operator reference, which
     already compiles to a plain Go function value (`Definition.lean`'s parametric-operator
     form — the same mechanism any user-defined higher-order call already used, since a TLA⁺
     operator argument is never a runtime value there, only a name `Network2Go` resolves to a
@@ -825,10 +827,10 @@ instantiation, below):
     `[i ∈ BagToSet(e) ↦ CopiesIn(i,e)]`, through the real module's own operators — not a bare
     identity, even though the underlying representation already agrees.
 
-    12 of `Bags`' 13 operators have `EvalBuiltin` rules (`Core/ComputableTLAPlus/Semantics/
-    Operational.lean`), built on `Value.lean`'s `rawDom`/`copiesInRaw` — witness-free, total on any
-    `Value` — rather than `Dom`/`fnApply`'s `IsPFunc`-witness style, which stays reserved for the
-    three operators asserting something meaningfully *about* `B` being a bag: `IsABag`,
+    All 13 of `Bags`' operators have `EvalBuiltin` rules (`Core/ComputableTLAPlus/Semantics/
+    Operational.lean`). 12 build on `Value.lean`'s `rawDom`/`copiesInRaw` — witness-free, total on
+    any `Value` — rather than `Dom`/`fnApply`'s `IsPFunc`-witness style, which stays reserved for
+    the three operators asserting something meaningfully *about* `B` being a bag: `IsABag`,
     `BagToSet`, `BagIn` gate on `Value.IsBagVal B` (mirrors `domain`'s own gate); `EmptyBag`,
     `SetToBag`, `(+)`, `(-)`, `SubBag`, `CopiesIn` are total, no witness to fire; `\sqsubseteq` is
     total too, a direct `copiesInRaw` comparison (mirrors `subseteq_pos`/`_neg`'s witness-free
@@ -837,13 +839,16 @@ instantiation, below):
     (`Core/ComputableTLAPlus/Semantics/ZFSet.lean`) compute it by recursion on the finiteness
     witness's own ordinal, `Bags.tla`'s `DSum` algorithm adapted to sweep the codomain rather than
     shrink the domain (needs no "remove one element, codomain shrinks by one" lemma), proven
-    correct (`sumUpTo_insert`/`sumUpTo_insert_aux`) rather than merely well-typed. `BagOfAll` stays
-    ruleless — takes an operator-typed argument, which `EvalBuiltin`'s uniform `List Value` shape
-    cannot accept, same gap `Fugue!MkSeq` has (§9.37).
+    correct (`sumUpTo_insert`/`sumUpTo_insert_aux`) rather than merely well-typed. The 13th,
+    `BagOfAll`, is an existence law like `MkSeq`'s (`EvalBuiltin` joined the `Eval`/`EvalList`/
+    `EvalPath` mutual block to carry an operator-typed argument): `himg` calls `F` the same
+    synthesized-`.opCall` way, and the result's count at each key is a genuine collision sum —
+    `ZFSet.IsFinite.sum` over `rawDom B`, zeroed off each key's own `img`-fibre via an `if`
+    (`ZFSet.sumUpTo_congr`/`IsFinite.sum_congr`, `ZFSet.lean`, back the resulting reconciliation
+    proof) — not a relabeling, since a non-injective `F` must merge multiplicities.
 
-    `Network2Go` compiles all 13 `Bags` operators — `BagCardinality`/`BagOfAll` included —
-    despite that pair still having no `EvalBuiltin` rule between them: Go codegen and the
-    reference semantics are separate efforts here, only Guarded→Network under a completeness
+    `Network2Go` compiles all 13 `Bags` operators — `BagCardinality`/`BagOfAll` included — as an
+    independent effort from the reference semantics, only Guarded→Network under a completeness
     proof. `BagCardinality(B)` mirrors `FiniteSets!Cardinality`: the representation is
     sorted-with-duplicates, so total multiplicity is the slice length, `len(b)`. `BagOfAll(F,
     B)` reuses the same fact `MkSeq` does — `F` compiles to a plain Go function value —

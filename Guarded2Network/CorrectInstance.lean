@@ -24,18 +24,18 @@ namespace Guarded2Network
 open ComputableTLAPlus ComputableTLAPlus.Operational
 
 /-- `Head` denotes only on a non-empty sequence — the `EvalBuiltin` rule, inverted. -/
-private theorem evalBuiltin_head_inv {a b : Value} (h : EvalBuiltin .head [a] b) :
-    ∃ vs, a = Value.ofSeq (b :: vs) := by
-  generalize hA : [a] = A at h
+private theorem evalBuiltin_head_inv {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
+    {a : Expression Typ} {b : Value} (h : EvalBuiltin Ξ Ω M .head [a] b) :
+    ∃ vs, Eval Ξ Ω M a (Value.ofSeq (b :: vs)) := by
   cases h with
-  | head => obtain ⟨rfl, -⟩ := List.cons.injEq .. |>.mp hA; exact ⟨_, rfl⟩
+  | head h => exact ⟨_, h⟩
 
 /-- `Tail` denotes only on a non-empty sequence — the `EvalBuiltin` rule, inverted. -/
-private theorem evalBuiltin_tail_inv {a b : Value} (h : EvalBuiltin .tail [a] b) :
-    ∃ v vs, a = Value.ofSeq (v :: vs) ∧ b = Value.ofSeq vs := by
-  generalize hA : [a] = A at h
+private theorem evalBuiltin_tail_inv {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
+    {a : Expression Typ} {b : Value} (h : EvalBuiltin Ξ Ω M .tail [a] b) :
+    ∃ v vs, Eval Ξ Ω M a (Value.ofSeq (v :: vs)) ∧ b = Value.ofSeq vs := by
   cases h with
-  | tail => obtain ⟨rfl, -⟩ := List.cons.injEq .. |>.mp hA; exact ⟨_, _, rfl, rfl⟩
+  | tail h => exact ⟨_, _, h, rfl⟩
 
 private theorem builtinOpOf?_head :
     TypedTLAPlus.builtinOpOf? (.module "Sequences" "Head") = some .head := rfl
@@ -56,11 +56,11 @@ theorem eval_head_iff' {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
       ∃ s vs, Eval Ξ Ω M e s ∧ IsSeq s (v :: vs) := by
   rw [Guarded2Network.head]
   iff_rintro h ⟨s, vs, hes, hseq⟩
-  · obtain ⟨a, hea, hb⟩ := evalOpCall1_inv builtinOpOf?_head h
-    obtain ⟨vs, rfl⟩ := evalBuiltin_head_inv hb
+  · have hb := evalOpCall1_inv builtinOpOf?_head h
+    obtain ⟨vs, hea⟩ := evalBuiltin_head_inv hb
     exact ⟨_, vs, hea, isSeq_ofSeq _⟩
   · obtain rfl := isSeq_iff_ofSeq.mp hseq
-    exact .opCall_builtin builtinOpOf?_head (.cons hes .nil) .head
+    exact .opCall_builtin builtinOpOf?_head (.head hes)
 
 /-- `Tail(e)` evaluates exactly to the sequence of everything but the first element. -/
 theorem eval_tail_iff' {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
@@ -69,12 +69,12 @@ theorem eval_tail_iff' {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
       ∃ s v vs, Eval Ξ Ω M e s ∧ IsSeq s (v :: vs) ∧ IsSeq t vs := by
   rw [Guarded2Network.tail]
   iff_rintro h ⟨s, v, vs, hes, hseq, htseq⟩
-  · obtain ⟨a, hea, hb⟩ := evalOpCall1_inv builtinOpOf?_tail h
-    obtain ⟨v, vs, rfl, rfl⟩ := evalBuiltin_tail_inv hb
+  · have hb := evalOpCall1_inv builtinOpOf?_tail h
+    obtain ⟨v, vs, hea, rfl⟩ := evalBuiltin_tail_inv hb
     exact ⟨_, v, vs, hea, isSeq_ofSeq _, isSeq_ofSeq _⟩
   · obtain rfl := isSeq_iff_ofSeq.mp hseq
     obtain rfl := isSeq_iff_ofSeq.mp htseq
-    exact .opCall_builtin builtinOpOf?_tail (.cons hes .nil) .tail
+    exact .opCall_builtin builtinOpOf?_tail (.tail hes)
 
 /-- `Len(e) > n` evaluates to a boolean whenever `e` is a sequence, `TRUE` exactly when that
 sequence is longer than `n`. -/
@@ -88,17 +88,15 @@ theorem eval_lenGt' {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
   have hLen : Eval Ξ Ω M
       (Expression.opCall (.var (.operator [.seq τ] .int) (.module "Sequences" "Len")) [e])
       (Value.ofNat vs.length) :=
-    .opCall_builtin builtinOpOf?_len (.cons hes .nil) .len
+    .opCall_builtin builtinOpOf?_len (.len hes)
   have hNat : Eval Ξ Ω M (Expression.nat (toString n)) (Value.ofNat n) :=
     .nat (Nat.toNat?_repr n)
   by_cases hlt : n < vs.length
-  · refine ⟨Value.tru, .opCall_builtin builtinOpOf?_gt (.cons hLen (.cons hNat .nil)) ?_,
+  · exact ⟨Value.tru, .opCall_builtin builtinOpOf?_gt (.gt_pos hLen hNat (Int.ofNat_lt.mpr hlt)),
       .inl rfl, iff_of_true rfl hlt⟩
-    exact EvalBuiltin.gt_pos (x := (vs.length : ℤ)) (y := (n : ℤ)) (Int.ofNat_lt.mpr hlt)
-  · refine ⟨Value.fls, .opCall_builtin builtinOpOf?_gt (.cons hLen (.cons hNat .nil)) ?_,
+  · exact ⟨Value.fls,
+      .opCall_builtin builtinOpOf?_gt (.gt_neg hLen hNat (λ hc ↦ hlt (Int.ofNat_lt.mp hc))),
       .inr rfl, iff_of_false Value.tru_ne_fls.symm hlt⟩
-    exact EvalBuiltin.gt_neg (x := (vs.length : ℤ)) (y := (n : ℤ))
-      (λ hc ↦ hlt (Int.ofNat_lt.mp hc))
 
 /-- `<<>>` evaluates to the empty sequence, and only that. -/
 theorem eval_seq_nil_iff' {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value} {τ : Typ}

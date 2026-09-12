@@ -227,128 +227,6 @@ theorem isSeq_iff_ofSeq {s : Value} {vs : List Value} : IsSeq s vs ↔ s = Value
 /-- `ofSeq vs` is the sequence value of `vs`. -/
 theorem isSeq_ofSeq (vs : List Value) : IsSeq (Value.ofSeq vs) vs := isSeq_iff_ofSeq.mpr rfl
 
-/-! ## Builtin operator evaluation -/
-
-/-- `EvalBuiltin op args v` — the builtin `op`, applied to already-evaluated arguments `args`,
-denotes `v`. Strict in argument kinds: an arm exists only for the shapes the operator is defined
-on. Covers the operators reachable from a computable algorithm. `BagOfAll` (takes an
-operator-typed argument `EvalBuiltin`'s uniform `List Value` shape cannot accept),
-`Cardinality`/`IsFiniteSet`, the `Address` order (`\prec`/`\preceq`/`\succ`/`\succeq`), and `MkSeq`
-have no arm — a call to one of them denotes nothing.
-
-Set-valued results are given by a `ZFSet`/`zflean` term wherever one exists (`∪`/`∩`/`\` for the
-set combinators, `f.Dom` for `DOMAIN`), and by a closed-form `Value` builder otherwise
-(`Value.intRange` for `..`). No arm characterises its result only by an existence law. -/
-inductive EvalBuiltin : BuiltinOp → List Value → Value → Prop
-  -- equality
-  | eq_pos {a : Value} : EvalBuiltin .eq [a, a] Value.tru
-  | eq_neg {a b : Value} (h : a ≠ b) : EvalBuiltin .eq [a, b] Value.fls
-  | neq_pos {a b : Value} (h : a ≠ b) : EvalBuiltin .neq [a, b] Value.tru
-  | neq_neg {a : Value} : EvalBuiltin .neq [a, a] Value.fls
-  -- propositional
-  | and_tt : EvalBuiltin .and [Value.tru, Value.tru] Value.tru
-  | and_ff {a b : Value} (ha : IsBool a) (hb : IsBool b) (h : a = Value.fls ∨ b = Value.fls) :
-      EvalBuiltin .and [a, b] Value.fls
-  | or_tt {a b : Value} (ha : IsBool a) (hb : IsBool b) (h : a = Value.tru ∨ b = Value.tru) :
-      EvalBuiltin .or [a, b] Value.tru
-  | or_ff : EvalBuiltin .or [Value.fls, Value.fls] Value.fls
-  | implies_t {a b : Value} (ha : IsBool a) (hb : IsBool b) (h : a = Value.fls ∨ b = Value.tru) :
-      EvalBuiltin .implies [a, b] Value.tru
-  | implies_f : EvalBuiltin .implies [Value.tru, Value.fls] Value.fls
-  | iff_t {a : Value} (ha : IsBool a) : EvalBuiltin .iff [a, a] Value.tru
-  | iff_f {a b : Value} (ha : IsBool a) (hb : IsBool b) (h : a ≠ b) :
-      EvalBuiltin .iff [a, b] Value.fls
-  | neg_t : EvalBuiltin .neg [Value.tru] Value.fls
-  | neg_f : EvalBuiltin .neg [Value.fls] Value.tru
-  -- set membership and relations
-  | inSet_pos {a S : Value} (h : a ∈ S) : EvalBuiltin .inSet [a, S] Value.tru
-  | inSet_neg {a S : Value} (h : a ∉ S) : EvalBuiltin .inSet [a, S] Value.fls
-  | notInSet_pos {a S : Value} (h : a ∉ S) : EvalBuiltin .notInSet [a, S] Value.tru
-  | notInSet_neg {a S : Value} (h : a ∈ S) : EvalBuiltin .notInSet [a, S] Value.fls
-  | subseteq_pos {A B : Value} (h : A ⊆ B) : EvalBuiltin .subseteq [A, B] Value.tru
-  | subseteq_neg {A B : Value} (h : ¬ A ⊆ B) : EvalBuiltin .subseteq [A, B] Value.fls
-  -- set constructors
-  | cup {A B : Value} : EvalBuiltin .cup [A, B] (A ∪ B)
-  | cap {A B : Value} : EvalBuiltin .cap [A, B] (A ∩ B)
-  | setMinus {A B : Value} : EvalBuiltin .setMinus [A, B] (A \ B)
-  | cartesianProduct {A B : Value} :
-      EvalBuiltin .cartesianProduct [A, B] (Value.cartesian A B)
-  | domain {f A B : Value} (hf : f.IsPFunc A B) :
-      EvalBuiltin .domain [f] (f.Dom hf.1)
-  -- integer arithmetic
-  | plus {x y : ℤ} : EvalBuiltin .plus [Value.ofInt x, Value.ofInt y] (Value.ofInt (x + y))
-  | minus {x y : ℤ} : EvalBuiltin .minus [Value.ofInt x, Value.ofInt y] (Value.ofInt (x - y))
-  | unaryMinus {x : ℤ} : EvalBuiltin .unaryMinus [Value.ofInt x] (Value.ofInt (-x))
-  | times {x y : ℤ} : EvalBuiltin .times [Value.ofInt x, Value.ofInt y] (Value.ofInt (x * y))
-  | intDiv {x y : ℤ} : EvalBuiltin .intDiv [Value.ofInt x, Value.ofInt y] (Value.ofInt (x.fdiv y))
-  | mod {x y : ℤ} : EvalBuiltin .mod [Value.ofInt x, Value.ofInt y] (Value.ofInt (x.fmod y))
-  | pow {x y : ℤ} : EvalBuiltin .pow [Value.ofInt x, Value.ofInt y] (Value.ofInt (x ^ y.toNat))
-  | lt_pos {x y : ℤ} (h : x < y) : EvalBuiltin .lt [Value.ofInt x, Value.ofInt y] Value.tru
-  | lt_neg {x y : ℤ} (h : ¬ x < y) : EvalBuiltin .lt [Value.ofInt x, Value.ofInt y] Value.fls
-  | gt_pos {x y : ℤ} (h : y < x) : EvalBuiltin .gt [Value.ofInt x, Value.ofInt y] Value.tru
-  | gt_neg {x y : ℤ} (h : ¬ y < x) : EvalBuiltin .gt [Value.ofInt x, Value.ofInt y] Value.fls
-  | leq_pos {x y : ℤ} (h : x ≤ y) : EvalBuiltin .leq [Value.ofInt x, Value.ofInt y] Value.tru
-  | leq_neg {x y : ℤ} (h : ¬ x ≤ y) : EvalBuiltin .leq [Value.ofInt x, Value.ofInt y] Value.fls
-  | geq_pos {x y : ℤ} (h : y ≤ x) : EvalBuiltin .geq [Value.ofInt x, Value.ofInt y] Value.tru
-  | geq_neg {x y : ℤ} (h : ¬ y ≤ x) : EvalBuiltin .geq [Value.ofInt x, Value.ofInt y] Value.fls
-  | dotdot {a b : ℤ} :
-      EvalBuiltin .dotdot [Value.ofInt a, Value.ofInt b] (Value.intRange a b)
-  -- `Naturals`'s `Nat` and `Integers`'s `Int` are not here: they are never *called* (`Nat()` is not
-  -- a term), only referenced by bare name, so they are `Eval` rules on the `.var` node directly
-  -- (`Eval.natSet`/`Eval.intSet`), not builtin operators.
-  -- sequences
-  | len {vs : List Value} : EvalBuiltin .len [Value.ofSeq vs] (Value.ofNat vs.length)
-  | head {v : Value} {vs : List Value} : EvalBuiltin .head [Value.ofSeq (v :: vs)] v
-  | tail {v : Value} {vs : List Value} :
-      EvalBuiltin .tail [Value.ofSeq (v :: vs)] (Value.ofSeq vs)
-  | append {vs : List Value} {x : Value} :
-      EvalBuiltin .append [Value.ofSeq vs, x] (Value.ofSeq (vs ++ [x]))
-  -- strings are already their code-point sequence, so `StrToSeq` is the identity
-  | strToSeq {v : Value} : EvalBuiltin .strToSeq [v] v
-  -- `FunAsSeq(f)` reads a function back as a sequence. A sequence value *is* a function over an
-  -- index interval `1 .. n`, so when `f` already has that shape the cast is the identity; there is
-  -- no rule for any other `f`, which is the partiality Apalache leaves to the user. `MkSeq` has no
-  -- rule at all — like `BagOfAll` below, a call to it denotes nothing.
-  | funAsSeq {f : Value} (hf : Value.IsSeqVal f) : EvalBuiltin .funAsSeq [f] f
-  -- `SetAsFun(S)` reads a set of pairs back as a function. A function value *is* its own graph — a
-  -- `ZFSet` of pairs, `IsPFunc`-recognized — the same representation a set of pairs already has, so
-  -- when `S` is already single-valued (`IsPFunc`'s second conjunct: same first component forces
-  -- same second) the cast is the identity too, mirroring `funAsSeq` exactly. Undefined — real
-  -- TLA+'s own partiality — when two pairs share a first component but disagree on the second; no
-  -- rule for that shape, same as `FunAsSeq` outside `IsSeqVal`.
-  | setAsFun {S A B : Value} (h : S.IsPFunc A B) : EvalBuiltin .setAsFun [S] S
-  -- `Bags`. Every arm here builds on `Value.rawDom`/`Value.copiesInRaw`, not `Value.Dom`/
-  -- `fnApply`'s `IsPFunc`-witness style `domain`/`fnCall` use — those two are already total
-  -- (0 off-domain, no witness needed to construct), so every closed-form builder in this family
-  -- reuses them directly rather than introducing a second, witness-carrying representation that
-  -- would need its own bridging lemma back to `Value.bagAdd`/`Value.bagUnion`/etc., which are
-  -- themselves built the witness-free way (see `Value.lean`). `IsBagVal` still gates the arms
-  -- that assert something meaningfully *about* `B` being a bag (`IsABag`, `BagToSet`, `BagIn`) —
-  -- mirrors `domain`'s own `IsPFunc` gate. `CopiesIn`/`\sqsubseteq` need no such gate: both are
-  -- already total off-domain in the real module too (`CopiesIn`'s own `ELSE 0`), so they fire
-  -- unconditionally, matching `subseteq_pos`/`_neg`'s witness-free style above.
-  | emptyBag : EvalBuiltin .emptyBag [] (∅ : Value)
-  | setToBag {S : Value} : EvalBuiltin .setToBag [S] (Value.setToBag S)
-  | bagAdd {B1 B2 : Value} : EvalBuiltin .bagAdd [B1, B2] (Value.bagAdd B1 B2)
-  | bagSub {B1 B2 : Value} : EvalBuiltin .bagSub [B1, B2] (Value.bagSub B1 B2)
-  | subBag {B : Value} : EvalBuiltin .subBag [B] (Value.subBag B)
-  | copiesIn {e B : Value} :
-      EvalBuiltin .copiesIn [e, B] (Value.ofNat (Value.copiesInRaw e B))
-  | bagUnion {S : Value} (hS : S.IsFinite) : EvalBuiltin .bagUnion [S] (Value.bagUnion S hS)
-  | bagCardinality {B : Value} (hB : (Value.rawDom B).IsFinite) :
-      EvalBuiltin .bagCardinality [B] (Value.ofNat (Value.bagCardinality B hB))
-  | isABag {B : Value} (h : Value.IsBagVal B) : EvalBuiltin .isABag [B] Value.tru
-  | bagToSet {B : Value} (h : Value.IsBagVal B) :
-      EvalBuiltin .bagToSet [B] (Value.rawDom B)
-  | bagIn_pos {e B : Value} (he : e ∈ Value.rawDom B) : EvalBuiltin .bagIn [e, B] Value.tru
-  | bagIn_neg {e B : Value} (he : e ∉ Value.rawDom B) : EvalBuiltin .bagIn [e, B] Value.fls
-  | bagLeq_pos {B1 B2 : Value}
-      (h : ∀ e ∈ Value.rawDom B1, Value.copiesInRaw e B1 ≤ Value.copiesInRaw e B2) :
-      EvalBuiltin .bagLeq [B1, B2] Value.tru
-  | bagLeq_neg {B1 B2 : Value}
-      (h : ¬ ∀ e ∈ Value.rawDom B1, Value.copiesInRaw e B1 ≤ Value.copiesInRaw e B2) :
-      EvalBuiltin .bagLeq [B1, B2] Value.fls
-
 /-! ## Expression evaluation -/
 
 /-- Substitute a call's actual arguments for its operator's formal parameters. The parameters form a
@@ -393,11 +271,14 @@ theorem subst_var_of_builtin {x : String} {e' : Expression Typ} {τ : Typ} {o : 
 
 mutual
 /-- `Eval Ξ Ω M e v` — under operator environment `Ξ`, model `Ω`, and memory `M`, expression `e`
-denotes `v`. Mutually defined with `EvalList` (a list of expressions against a list of values) and
-`EvalPath` (a reference's syntactic access path against its resolved one); a nested `List.Forall₂`
-or `ResolvesPath` cannot carry `Eval` through the kernel's positivity check, so both are inlined as
-mutual companions. Every recursive premise mentions `Eval` directly — never wrapped in `And`/
-`Exists`/`Iff`, which the kernel rejects when the other arguments carry local variables. -/
+denotes `v`. Mutually defined with `EvalList` (a list of expressions against a list of values),
+`EvalPath` (a reference's syntactic access path against its resolved one), and `EvalBuiltin` (a
+builtin operator call, declared last in this block — see its own doc comment for why: mutual
+recursor motive numbering follows declaration order, and `EvalList`/`EvalPath`'s existing
+`motive_2`/`motive_3` call sites fix that order). A nested `List.Forall₂` or `ResolvesPath` cannot
+carry `Eval` through the kernel's positivity check, so all three companions are inlined as mutual
+members. Every recursive premise mentions `Eval` directly — never wrapped in `And`/`Exists`/`Iff`,
+which the kernel rejects when the other arguments carry local variables. -/
 inductive Eval (Ξ : OperatorEnv) (Ω : Model Value) : Memory Value → Expression Typ → Value → Prop
   -- literals
   | nat {M : Memory Value} {s : String} {n : ℕ} (hn : s.toNat? = some n) :
@@ -439,10 +320,9 @@ inductive Eval (Ξ : OperatorEnv) (Ω : Model Value) : Memory Value → Expressi
   -- operator application: builtin, by kind-strict value semantics. A builtin's meaning is fixed by
   -- its `Origin` here, not by `Ξ`; `opCall_op`'s `hnb` is the other half of that split.
   | opCall_builtin {M : Memory Value} {τ : Typ} {o : Origin} {op : BuiltinOp}
-      {args : List (Expression Typ)} {argVals : List Value} {v : Value}
+      {args : List (Expression Typ)} {v : Value}
       (hop : TypedTLAPlus.builtinOpOf? o = some op)
-      (hargs : EvalList Ξ Ω M args argVals)
-      (hb : EvalBuiltin op argVals v) :
+      (hb : EvalBuiltin Ξ Ω M op args v) :
       Eval Ξ Ω M (.opCall (.var τ o) args) v
   -- bounded quantifiers. Each opens `body` with a name `z` drawn from *outside* a finite set `L`
   -- the derivation names — never the binder's own hint. `M.insert z w` then answers for it. `L`
@@ -584,6 +464,243 @@ inductive EvalPath (Ξ : OperatorEnv) (Ω : Model Value) :
       {rest : List (String ⊕ Expression Typ)} {resolved : List (PathStep Value)}
       (h : Eval Ξ Ω M e v) (hs : EvalPath Ξ Ω M rest resolved) :
       EvalPath Ξ Ω M (.inr e :: rest) (.inr v :: resolved)
+
+/-- `EvalBuiltin Ξ Ω M op args v` — the builtin `op`, called on argument expressions `args` under
+`Ξ`/`Ω`/`M`, denotes `v`. Mutual with `Eval` (unlike before this operator joined the family): most
+arms evaluate every argument through an ordinary `Eval` premise, the same per-argument style
+`Eval.fnCall`/`Eval.except`/`Eval.recordAccess` already use elsewhere in this file — `EvalList`'s
+old "evaluate every argument uniformly, then hand `EvalBuiltin` the values" no longer fits once an
+argument can be an *operator* reference rather than a value (`bagOfAll`/`mkSeq`, whose own argument
+`F` is called via a synthesized `.opCall` under a fresh binder, mirroring `Eval.forall_true`/
+`Eval.map'`/`Eval.fn`'s existence-law style rather than being evaluated itself). Strict in argument
+kinds otherwise: an arm exists only for the shapes the operator is defined on. Covers every
+operator reachable from a computable algorithm except `Cardinality`/`IsFiniteSet` and the `Address`
+order (`\prec`/`\preceq`/`\succ`/`\succeq`) — no arm for those, each already total and closed-form
+elsewhere (every `Value` set is finite by construction; the `Address` order is deliberately
+unspecified at this layer).
+
+Set-valued results are given by a `ZFSet`/`zflean` term wherever one exists (`∪`/`∩`/`\` for the
+set combinators, `f.Dom` for `DOMAIN`), and by a closed-form `Value` builder otherwise
+(`Value.intRange` for `..`). `bagOfAll`/`mkSeq` characterise their result by an existence law
+instead, same reason `Eval.fn`/`Eval.map'` do: "which value did `F` return at `w`" is itself an
+`Eval` fact, not a closed-form term.
+
+Declared last in this `mutual` block on purpose: the generated combined recursor numbers its
+sibling motives (`motive_2`, `motive_3`, …) by declaration order, and `evalUnique'`/`evalLocal'`
+already fix `EvalList`/`EvalPath` as `motive_2`/`motive_3` — putting `EvalBuiltin` first would have
+shifted those, breaking every existing call site instead of just adding a new `motive_4`. -/
+inductive EvalBuiltin (Ξ : OperatorEnv) (Ω : Model Value) :
+    Memory Value → BuiltinOp → List (Expression Typ) → Value → Prop
+  -- equality
+  | eq_pos {M : Memory Value} {a₁ a₂ : Expression Typ} {a : Value} (h₁ : Eval Ξ Ω M a₁ a)
+      (h₂ : Eval Ξ Ω M a₂ a) : EvalBuiltin Ξ Ω M .eq [a₁, a₂] Value.tru
+  | eq_neg {M : Memory Value} {a₁ a₂ : Expression Typ} {a b : Value} (h₁ : Eval Ξ Ω M a₁ a)
+      (h₂ : Eval Ξ Ω M a₂ b) (h : a ≠ b) : EvalBuiltin Ξ Ω M .eq [a₁, a₂] Value.fls
+  | neq_pos {M : Memory Value} {a₁ a₂ : Expression Typ} {a b : Value} (h₁ : Eval Ξ Ω M a₁ a)
+      (h₂ : Eval Ξ Ω M a₂ b) (h : a ≠ b) : EvalBuiltin Ξ Ω M .neq [a₁, a₂] Value.tru
+  | neq_neg {M : Memory Value} {a₁ a₂ : Expression Typ} {a : Value} (h₁ : Eval Ξ Ω M a₁ a)
+      (h₂ : Eval Ξ Ω M a₂ a) : EvalBuiltin Ξ Ω M .neq [a₁, a₂] Value.fls
+  -- propositional
+  | and_tt {M : Memory Value} {a₁ a₂ : Expression Typ} (h₁ : Eval Ξ Ω M a₁ Value.tru)
+      (h₂ : Eval Ξ Ω M a₂ Value.tru) : EvalBuiltin Ξ Ω M .and [a₁, a₂] Value.tru
+  | and_ff {M : Memory Value} {a₁ a₂ : Expression Typ} {a b : Value} (h₁ : Eval Ξ Ω M a₁ a)
+      (h₂ : Eval Ξ Ω M a₂ b) (ha : IsBool a) (hb : IsBool b) (h : a = Value.fls ∨ b = Value.fls) :
+      EvalBuiltin Ξ Ω M .and [a₁, a₂] Value.fls
+  | or_tt {M : Memory Value} {a₁ a₂ : Expression Typ} {a b : Value} (h₁ : Eval Ξ Ω M a₁ a)
+      (h₂ : Eval Ξ Ω M a₂ b) (ha : IsBool a) (hb : IsBool b) (h : a = Value.tru ∨ b = Value.tru) :
+      EvalBuiltin Ξ Ω M .or [a₁, a₂] Value.tru
+  | or_ff {M : Memory Value} {a₁ a₂ : Expression Typ} (h₁ : Eval Ξ Ω M a₁ Value.fls)
+      (h₂ : Eval Ξ Ω M a₂ Value.fls) : EvalBuiltin Ξ Ω M .or [a₁, a₂] Value.fls
+  | implies_t {M : Memory Value} {a₁ a₂ : Expression Typ} {a b : Value} (h₁ : Eval Ξ Ω M a₁ a)
+      (h₂ : Eval Ξ Ω M a₂ b) (ha : IsBool a) (hb : IsBool b) (h : a = Value.fls ∨ b = Value.tru) :
+      EvalBuiltin Ξ Ω M .implies [a₁, a₂] Value.tru
+  | implies_f {M : Memory Value} {a₁ a₂ : Expression Typ} (h₁ : Eval Ξ Ω M a₁ Value.tru)
+      (h₂ : Eval Ξ Ω M a₂ Value.fls) : EvalBuiltin Ξ Ω M .implies [a₁, a₂] Value.fls
+  | iff_t {M : Memory Value} {a₁ a₂ : Expression Typ} {a : Value} (h₁ : Eval Ξ Ω M a₁ a)
+      (h₂ : Eval Ξ Ω M a₂ a) (ha : IsBool a) : EvalBuiltin Ξ Ω M .iff [a₁, a₂] Value.tru
+  | iff_f {M : Memory Value} {a₁ a₂ : Expression Typ} {a b : Value} (h₁ : Eval Ξ Ω M a₁ a)
+      (h₂ : Eval Ξ Ω M a₂ b) (ha : IsBool a) (hb : IsBool b) (h : a ≠ b) :
+      EvalBuiltin Ξ Ω M .iff [a₁, a₂] Value.fls
+  | neg_t {M : Memory Value} {a : Expression Typ} (h : Eval Ξ Ω M a Value.tru) :
+      EvalBuiltin Ξ Ω M .neg [a] Value.fls
+  | neg_f {M : Memory Value} {a : Expression Typ} (h : Eval Ξ Ω M a Value.fls) :
+      EvalBuiltin Ξ Ω M .neg [a] Value.tru
+  -- set membership and relations
+  | inSet_pos {M : Memory Value} {a S : Expression Typ} {av Sv : Value} (ha : Eval Ξ Ω M a av)
+      (hS : Eval Ξ Ω M S Sv) (h : av ∈ Sv) : EvalBuiltin Ξ Ω M .inSet [a, S] Value.tru
+  | inSet_neg {M : Memory Value} {a S : Expression Typ} {av Sv : Value} (ha : Eval Ξ Ω M a av)
+      (hS : Eval Ξ Ω M S Sv) (h : av ∉ Sv) : EvalBuiltin Ξ Ω M .inSet [a, S] Value.fls
+  | notInSet_pos {M : Memory Value} {a S : Expression Typ} {av Sv : Value} (ha : Eval Ξ Ω M a av)
+      (hS : Eval Ξ Ω M S Sv) (h : av ∉ Sv) : EvalBuiltin Ξ Ω M .notInSet [a, S] Value.tru
+  | notInSet_neg {M : Memory Value} {a S : Expression Typ} {av Sv : Value} (ha : Eval Ξ Ω M a av)
+      (hS : Eval Ξ Ω M S Sv) (h : av ∈ Sv) : EvalBuiltin Ξ Ω M .notInSet [a, S] Value.fls
+  | subseteq_pos {M : Memory Value} {a₁ a₂ : Expression Typ} {A B : Value} (h₁ : Eval Ξ Ω M a₁ A)
+      (h₂ : Eval Ξ Ω M a₂ B) (h : A ⊆ B) : EvalBuiltin Ξ Ω M .subseteq [a₁, a₂] Value.tru
+  | subseteq_neg {M : Memory Value} {a₁ a₂ : Expression Typ} {A B : Value} (h₁ : Eval Ξ Ω M a₁ A)
+      (h₂ : Eval Ξ Ω M a₂ B) (h : ¬ A ⊆ B) : EvalBuiltin Ξ Ω M .subseteq [a₁, a₂] Value.fls
+  -- set constructors
+  | cup {M : Memory Value} {a₁ a₂ : Expression Typ} {A B : Value} (h₁ : Eval Ξ Ω M a₁ A)
+      (h₂ : Eval Ξ Ω M a₂ B) : EvalBuiltin Ξ Ω M .cup [a₁, a₂] (A ∪ B)
+  | cap {M : Memory Value} {a₁ a₂ : Expression Typ} {A B : Value} (h₁ : Eval Ξ Ω M a₁ A)
+      (h₂ : Eval Ξ Ω M a₂ B) : EvalBuiltin Ξ Ω M .cap [a₁, a₂] (A ∩ B)
+  | setMinus {M : Memory Value} {a₁ a₂ : Expression Typ} {A B : Value} (h₁ : Eval Ξ Ω M a₁ A)
+      (h₂ : Eval Ξ Ω M a₂ B) : EvalBuiltin Ξ Ω M .setMinus [a₁, a₂] (A \ B)
+  | cartesianProduct {M : Memory Value} {a₁ a₂ : Expression Typ} {A B : Value}
+      (h₁ : Eval Ξ Ω M a₁ A) (h₂ : Eval Ξ Ω M a₂ B) :
+      EvalBuiltin Ξ Ω M .cartesianProduct [a₁, a₂] (Value.cartesian A B)
+  | domain {M : Memory Value} {a : Expression Typ} {f A B : Value} (ha : Eval Ξ Ω M a f)
+      (hf : f.IsPFunc A B) : EvalBuiltin Ξ Ω M .domain [a] (f.Dom hf.1)
+  -- integer arithmetic
+  | plus {M : Memory Value} {a₁ a₂ : Expression Typ} {x y : ℤ} (h₁ : Eval Ξ Ω M a₁ (Value.ofInt x))
+      (h₂ : Eval Ξ Ω M a₂ (Value.ofInt y)) : EvalBuiltin Ξ Ω M .plus [a₁, a₂] (Value.ofInt (x + y))
+  | minus {M : Memory Value} {a₁ a₂ : Expression Typ} {x y : ℤ} (h₁ : Eval Ξ Ω M a₁ (Value.ofInt x))
+      (h₂ : Eval Ξ Ω M a₂ (Value.ofInt y)) : EvalBuiltin Ξ Ω M .minus [a₁, a₂] (Value.ofInt (x - y))
+  | unaryMinus {M : Memory Value} {a : Expression Typ} {x : ℤ} (h : Eval Ξ Ω M a (Value.ofInt x)) :
+      EvalBuiltin Ξ Ω M .unaryMinus [a] (Value.ofInt (-x))
+  | times {M : Memory Value} {a₁ a₂ : Expression Typ} {x y : ℤ} (h₁ : Eval Ξ Ω M a₁ (Value.ofInt x))
+      (h₂ : Eval Ξ Ω M a₂ (Value.ofInt y)) : EvalBuiltin Ξ Ω M .times [a₁, a₂] (Value.ofInt (x * y))
+  | intDiv {M : Memory Value} {a₁ a₂ : Expression Typ} {x y : ℤ}
+      (h₁ : Eval Ξ Ω M a₁ (Value.ofInt x)) (h₂ : Eval Ξ Ω M a₂ (Value.ofInt y)) :
+      EvalBuiltin Ξ Ω M .intDiv [a₁, a₂] (Value.ofInt (x.fdiv y))
+  | mod {M : Memory Value} {a₁ a₂ : Expression Typ} {x y : ℤ} (h₁ : Eval Ξ Ω M a₁ (Value.ofInt x))
+      (h₂ : Eval Ξ Ω M a₂ (Value.ofInt y)) :
+      EvalBuiltin Ξ Ω M .mod [a₁, a₂] (Value.ofInt (x.fmod y))
+  | pow {M : Memory Value} {a₁ a₂ : Expression Typ} {x y : ℤ} (h₁ : Eval Ξ Ω M a₁ (Value.ofInt x))
+      (h₂ : Eval Ξ Ω M a₂ (Value.ofInt y)) :
+      EvalBuiltin Ξ Ω M .pow [a₁, a₂] (Value.ofInt (x ^ y.toNat))
+  | lt_pos {M : Memory Value} {a₁ a₂ : Expression Typ} {x y : ℤ} (h₁ : Eval Ξ Ω M a₁ (Value.ofInt x))
+      (h₂ : Eval Ξ Ω M a₂ (Value.ofInt y)) (h : x < y) : EvalBuiltin Ξ Ω M .lt [a₁, a₂] Value.tru
+  | lt_neg {M : Memory Value} {a₁ a₂ : Expression Typ} {x y : ℤ} (h₁ : Eval Ξ Ω M a₁ (Value.ofInt x))
+      (h₂ : Eval Ξ Ω M a₂ (Value.ofInt y)) (h : ¬ x < y) : EvalBuiltin Ξ Ω M .lt [a₁, a₂] Value.fls
+  | gt_pos {M : Memory Value} {a₁ a₂ : Expression Typ} {x y : ℤ} (h₁ : Eval Ξ Ω M a₁ (Value.ofInt x))
+      (h₂ : Eval Ξ Ω M a₂ (Value.ofInt y)) (h : y < x) : EvalBuiltin Ξ Ω M .gt [a₁, a₂] Value.tru
+  | gt_neg {M : Memory Value} {a₁ a₂ : Expression Typ} {x y : ℤ} (h₁ : Eval Ξ Ω M a₁ (Value.ofInt x))
+      (h₂ : Eval Ξ Ω M a₂ (Value.ofInt y)) (h : ¬ y < x) : EvalBuiltin Ξ Ω M .gt [a₁, a₂] Value.fls
+  | leq_pos {M : Memory Value} {a₁ a₂ : Expression Typ} {x y : ℤ}
+      (h₁ : Eval Ξ Ω M a₁ (Value.ofInt x)) (h₂ : Eval Ξ Ω M a₂ (Value.ofInt y)) (h : x ≤ y) :
+      EvalBuiltin Ξ Ω M .leq [a₁, a₂] Value.tru
+  | leq_neg {M : Memory Value} {a₁ a₂ : Expression Typ} {x y : ℤ}
+      (h₁ : Eval Ξ Ω M a₁ (Value.ofInt x)) (h₂ : Eval Ξ Ω M a₂ (Value.ofInt y)) (h : ¬ x ≤ y) :
+      EvalBuiltin Ξ Ω M .leq [a₁, a₂] Value.fls
+  | geq_pos {M : Memory Value} {a₁ a₂ : Expression Typ} {x y : ℤ}
+      (h₁ : Eval Ξ Ω M a₁ (Value.ofInt x)) (h₂ : Eval Ξ Ω M a₂ (Value.ofInt y)) (h : y ≤ x) :
+      EvalBuiltin Ξ Ω M .geq [a₁, a₂] Value.tru
+  | geq_neg {M : Memory Value} {a₁ a₂ : Expression Typ} {x y : ℤ}
+      (h₁ : Eval Ξ Ω M a₁ (Value.ofInt x)) (h₂ : Eval Ξ Ω M a₂ (Value.ofInt y)) (h : ¬ y ≤ x) :
+      EvalBuiltin Ξ Ω M .geq [a₁, a₂] Value.fls
+  | dotdot {M : Memory Value} {a₁ a₂ : Expression Typ} {a b : ℤ}
+      (h₁ : Eval Ξ Ω M a₁ (Value.ofInt a)) (h₂ : Eval Ξ Ω M a₂ (Value.ofInt b)) :
+      EvalBuiltin Ξ Ω M .dotdot [a₁, a₂] (Value.intRange a b)
+  -- `Naturals`'s `Nat` and `Integers`'s `Int` are not here: they are never *called* (`Nat()` is not
+  -- a term), only referenced by bare name, so they are `Eval` rules on the `.var` node directly
+  -- (`Eval.natSet`/`Eval.intSet`), not builtin operators.
+  -- sequences
+  | len {M : Memory Value} {a : Expression Typ} {vs : List Value}
+      (h : Eval Ξ Ω M a (Value.ofSeq vs)) : EvalBuiltin Ξ Ω M .len [a] (Value.ofNat vs.length)
+  | head {M : Memory Value} {a : Expression Typ} {v : Value} {vs : List Value}
+      (h : Eval Ξ Ω M a (Value.ofSeq (v :: vs))) : EvalBuiltin Ξ Ω M .head [a] v
+  | tail {M : Memory Value} {a : Expression Typ} {v : Value} {vs : List Value}
+      (h : Eval Ξ Ω M a (Value.ofSeq (v :: vs))) :
+      EvalBuiltin Ξ Ω M .tail [a] (Value.ofSeq vs)
+  | append {M : Memory Value} {a₁ a₂ : Expression Typ} {vs : List Value} {x : Value}
+      (h₁ : Eval Ξ Ω M a₁ (Value.ofSeq vs)) (h₂ : Eval Ξ Ω M a₂ x) :
+      EvalBuiltin Ξ Ω M .append [a₁, a₂] (Value.ofSeq (vs ++ [x]))
+  -- strings are already their code-point sequence, so `StrToSeq` is the identity
+  | strToSeq {M : Memory Value} {a : Expression Typ} {v : Value} (h : Eval Ξ Ω M a v) :
+      EvalBuiltin Ξ Ω M .strToSeq [a] v
+  -- `FunAsSeq(f)` reads a function back as a sequence. A sequence value *is* a function over an
+  -- index interval `1 .. n`, so when `f` already has that shape the cast is the identity; there is
+  -- no rule for any other `f`, which is the partiality Apalache leaves to the user.
+  | funAsSeq {M : Memory Value} {a : Expression Typ} {f : Value} (h : Eval Ξ Ω M a f)
+      (hf : Value.IsSeqVal f) : EvalBuiltin Ξ Ω M .funAsSeq [a] f
+  -- `SetAsFun(S)` reads a set of pairs back as a function. A function value *is* its own graph — a
+  -- `ZFSet` of pairs, `IsPFunc`-recognized — the same representation a set of pairs already has, so
+  -- when `S` is already single-valued (`IsPFunc`'s second conjunct: same first component forces
+  -- same second) the cast is the identity too, mirroring `funAsSeq` exactly. Undefined — real
+  -- TLA+'s own partiality — when two pairs share a first component but disagree on the second; no
+  -- rule for that shape, same as `FunAsSeq` outside `IsSeqVal`.
+  | setAsFun {M : Memory Value} {a : Expression Typ} {S A B : Value} (ha : Eval Ξ Ω M a S)
+      (h : S.IsPFunc A B) : EvalBuiltin Ξ Ω M .setAsFun [a] S
+  -- `Bags`. Every arm here builds on `Value.rawDom`/`Value.copiesInRaw`, not `Value.Dom`/
+  -- `fnApply`'s `IsPFunc`-witness style `domain`/`fnCall` use — those two are already total
+  -- (0 off-domain, no witness needed to construct), so every closed-form builder in this family
+  -- reuses them directly rather than introducing a second, witness-carrying representation that
+  -- would need its own bridging lemma back to `Value.bagAdd`/`Value.bagUnion`/etc., which are
+  -- themselves built the witness-free way (see `Value.lean`). `IsBagVal` still gates the arms
+  -- that assert something meaningfully *about* `B` being a bag (`IsABag`, `BagToSet`, `BagIn`) —
+  -- mirrors `domain`'s own `IsPFunc` gate. `CopiesIn`/`\sqsubseteq` need no such gate: both are
+  -- already total off-domain in the real module too (`CopiesIn`'s own `ELSE 0`), so they fire
+  -- unconditionally, matching `subseteq_pos`/`_neg`'s witness-free style above.
+  | emptyBag {M : Memory Value} : EvalBuiltin Ξ Ω M .emptyBag [] (∅ : Value)
+  | setToBag {M : Memory Value} {a : Expression Typ} {S : Value} (h : Eval Ξ Ω M a S) :
+      EvalBuiltin Ξ Ω M .setToBag [a] (Value.setToBag S)
+  | bagAdd {M : Memory Value} {a₁ a₂ : Expression Typ} {B1 B2 : Value} (h₁ : Eval Ξ Ω M a₁ B1)
+      (h₂ : Eval Ξ Ω M a₂ B2) : EvalBuiltin Ξ Ω M .bagAdd [a₁, a₂] (Value.bagAdd B1 B2)
+  | bagSub {M : Memory Value} {a₁ a₂ : Expression Typ} {B1 B2 : Value} (h₁ : Eval Ξ Ω M a₁ B1)
+      (h₂ : Eval Ξ Ω M a₂ B2) : EvalBuiltin Ξ Ω M .bagSub [a₁, a₂] (Value.bagSub B1 B2)
+  | subBag {M : Memory Value} {a : Expression Typ} {B : Value} (h : Eval Ξ Ω M a B) :
+      EvalBuiltin Ξ Ω M .subBag [a] (Value.subBag B)
+  | copiesIn {M : Memory Value} {a₁ a₂ : Expression Typ} {e B : Value} (h₁ : Eval Ξ Ω M a₁ e)
+      (h₂ : Eval Ξ Ω M a₂ B) :
+      EvalBuiltin Ξ Ω M .copiesIn [a₁, a₂] (Value.ofNat (Value.copiesInRaw e B))
+  | bagUnion {M : Memory Value} {a : Expression Typ} {S : Value} (h : Eval Ξ Ω M a S)
+      (hS : S.IsFinite) : EvalBuiltin Ξ Ω M .bagUnion [a] (Value.bagUnion S hS)
+  | bagCardinality {M : Memory Value} {a : Expression Typ} {B : Value} (h : Eval Ξ Ω M a B)
+      (hB : (Value.rawDom B).IsFinite) :
+      EvalBuiltin Ξ Ω M .bagCardinality [a] (Value.ofNat (Value.bagCardinality B hB))
+  | isABag {M : Memory Value} {a : Expression Typ} {B : Value} (h : Eval Ξ Ω M a B)
+      (hb : Value.IsBagVal B) : EvalBuiltin Ξ Ω M .isABag [a] Value.tru
+  | bagToSet {M : Memory Value} {a : Expression Typ} {B : Value} (h : Eval Ξ Ω M a B)
+      (hb : Value.IsBagVal B) : EvalBuiltin Ξ Ω M .bagToSet [a] (Value.rawDom B)
+  | bagIn_pos {M : Memory Value} {a₁ a₂ : Expression Typ} {e B : Value} (h₁ : Eval Ξ Ω M a₁ e)
+      (h₂ : Eval Ξ Ω M a₂ B) (he : e ∈ Value.rawDom B) :
+      EvalBuiltin Ξ Ω M .bagIn [a₁, a₂] Value.tru
+  | bagIn_neg {M : Memory Value} {a₁ a₂ : Expression Typ} {e B : Value} (h₁ : Eval Ξ Ω M a₁ e)
+      (h₂ : Eval Ξ Ω M a₂ B) (he : e ∉ Value.rawDom B) :
+      EvalBuiltin Ξ Ω M .bagIn [a₁, a₂] Value.fls
+  | bagLeq_pos {M : Memory Value} {a₁ a₂ : Expression Typ} {B1 B2 : Value} (h₁ : Eval Ξ Ω M a₁ B1)
+      (h₂ : Eval Ξ Ω M a₂ B2)
+      (h : ∀ e ∈ Value.rawDom B1, Value.copiesInRaw e B1 ≤ Value.copiesInRaw e B2) :
+      EvalBuiltin Ξ Ω M .bagLeq [a₁, a₂] Value.tru
+  | bagLeq_neg {M : Memory Value} {a₁ a₂ : Expression Typ} {B1 B2 : Value} (h₁ : Eval Ξ Ω M a₁ B1)
+      (h₂ : Eval Ξ Ω M a₂ B2)
+      (h : ¬ ∀ e ∈ Value.rawDom B1, Value.copiesInRaw e B1 ≤ Value.copiesInRaw e B2) :
+      EvalBuiltin Ξ Ω M .bagLeq [a₁, a₂] Value.fls
+  -- `MkSeq(N,F)`: the total sequence constructor `[i \in 1 .. N |-> F(i)]` (`Fugue`'s own, no
+  -- `-Wunsafe`: total on every input). Existence law, same reason `fn` is one: "which value did
+  -- `F` return at `w`" is itself an `Eval` fact, not a closed-form term. `F` is an argument-position
+  -- operator reference, so its call at each index is a synthesized `.opCall`, not inline syntax —
+  -- mirrors `fn`'s `himg` pointed at a built node instead of an existing one. The synthesized
+  -- `.var`'s own `Typ` tag is inert (nothing inspects a `.var` node's `Typ`, only its `Origin`,
+  -- confirmed pattern throughout this file) — fixed to `Typ.var "_"` (the rigid-type-variable
+  -- constructor, genuinely opaque here — not `Typ.int`, which would misleadingly read as "this is
+  -- an Int") rather than a fresh per-instance implicit, so two derivations of the same call agree
+  -- on the exact expression `himg` names (a free `{τw : Typ}` let two `mkSeq`/`bagOfAll`
+  -- derivations disagree on it, breaking `evalUnique'`/`evalBuiltinUnique`'s own reconciliation,
+  -- which needs the *same* expression).
+  | mkSeq {M : Memory Value} {N F : Expression Typ} {n : ℤ} {v : Value}
+      (hN : Eval Ξ Ω M N (Value.ofInt n)) (img : Value → Value) (L : Finset String)
+      (himg : ∀ z, z ∉ L → ∀ w ∈ Value.intRange 1 n, Eval Ξ Ω (M.insert z w)
+        (.opCall F [.var (.var "_") (.free z)]) (img w))
+      (hto : ∀ e ∈ v, ∃ w ∈ Value.intRange 1 n, e = ZFSet.pair w (img w))
+      (hof : ∀ w ∈ Value.intRange 1 n, ZFSet.pair w (img w) ∈ v) :
+      EvalBuiltin Ξ Ω M .mkSeq [N, F] v
+  -- `BagOfAll(F,B)`: `[y \in {F[x] : x \in DOMAIN B} |-> Sum([x \in {x \in DOMAIN B : F[x] = y}
+  -- |-> CopiesIn(x,B)])]` — a genuine collision sum, merging multiplicities when `F` is
+  -- non-injective, not a mere relabeling. `hfin` sums `copiesInRaw` across the whole `rawDom Bval`
+  -- zeroed off `e`'s `img`-fibre, same total as summing the fibre alone, without a second
+  -- finiteness witness. Same existence-law/synthesized-`.opCall` style as `mkSeq` above.
+  | bagOfAll {M : Memory Value} {F B : Expression Typ} {Bval v : Value}
+      (hB : Eval Ξ Ω M B Bval) (img : Value → Value) (L : Finset String)
+      (hfin : (Value.rawDom Bval).IsFinite)
+      (himg : ∀ z, z ∉ L → ∀ w ∈ Value.rawDom Bval, Eval Ξ Ω (M.insert z w)
+        (.opCall F [.var (.var "_") (.free z)]) (img w))
+      (hto : ∀ z ∈ v, ∃ e, (∃ w ∈ Value.rawDom Bval, e = img w) ∧
+        z = ZFSet.pair e (Value.ofNat
+          (hfin.sum (λ w ↦ if img w = e then Value.copiesInRaw w Bval else 0))))
+      (hof : ∀ w ∈ Value.rawDom Bval, ZFSet.pair (img w) (Value.ofNat
+          (hfin.sum (λ w' ↦ if img w' = img w then Value.copiesInRaw w' Bval else 0))) ∈ v) :
+      EvalBuiltin Ξ Ω M .bagOfAll [F, B] v
 end
 
 /-! ## Coercions -/
@@ -750,115 +867,494 @@ theorem evalVar' {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
           | nil => rw [hΞ] at h; exact .var_op0 hΞ hb h
           | cons _ _ => rw [hΞ] at h; exact h.elim
 
-/-- Determinism for the builtin-operator relation: each `(op, args)` pair `EvalBuiltin` is defined
-on denotes a single value. `args` is generalized before the case split so that both hypotheses can
-be inverted while the shared argument list is still a variable — the value encodings
-(`Value.ofInt`, `Value.ofSeq`, `Value.tru`) are not constructor-headed, so `cases` on the second
-hypothesis would otherwise stall on an unsolvable index equation. -/
-theorem evalBuiltinUnique {op : BuiltinOp} {args : List Value} {v w : Value}
-    (h₁ : EvalBuiltin op args v) (h₂ : EvalBuiltin op args w) : v = w := by
-  generalize hA : args = A at h₂
-  cases h₁ <;> cases h₂ <;>
-    simp only [List.cons.injEq, and_true, and_self, Value.ofInt_inj, Value.ofNat_inj,
-      Value.ofSeq_inj, Value.tru_ne_fls, Value.fls_ne_tru] at hA ⊢ <;>
-    first
-      | rfl
-      | (exfalso; omega)
-      | contradiction
-      | (subst hA; exact dom_eq_dom _ _)
-      | (rw [ZFSet.ext_iff]; simp_all)
-      | (obtain ⟨rfl, rfl⟩ := hA; solve | rfl | contradiction | simp_all)
+/-- Every argument of a builtin call denotes at most one value. Named rather than written out
+because it is `evalUnique'`'s `motive_4`: a recursor motive that opens with `∀` has its binders
+introduced into each alternative's context, which would leave every `EvalBuiltin` arm re-closing a
+goal it means to hand over whole. -/
+private def ArgsDet (Ξ : OperatorEnv) (Ω : Model Value) (M : Memory Value)
+    (args : List (Expression Typ)) : Prop :=
+  ∀ a ∈ args, ∀ x y : Value, Eval Ξ Ω M a x → Eval Ξ Ω M a y → x = y
 
-/-- `Len` denotes only on sequences — inversion. `Value.ofSeq` is not constructor-headed, so
-`generalize` the argument before `cases`. -/
-theorem evalBuiltin_len_inv {a b : Value} (h : EvalBuiltin .len [a] b) :
-    ∃ vs, a = Value.ofSeq vs ∧ b = Value.ofNat vs.length := by
-  generalize hA : [a] = A at h
+/-- Determinism at the first argument position, read off the whole argument list's. Every
+`EvalBuiltin` arm reconciles one or two argument positions; `argDet₁`/`argDet₂` name those two, so
+the membership proof is written once instead of in each arm. -/
+private theorem argDet₁ {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
+    {a : Expression Typ} {as : List (Expression Typ)} {x y : Value}
+    (hdet : ArgsDet Ξ Ω M (a :: as)) (hx : Eval Ξ Ω M a x) (hy : Eval Ξ Ω M a y) : x = y :=
+  hdet a List.mem_cons_self x y hx hy
+
+/-- Determinism at the second argument position — `argDet₁` one position along. -/
+private theorem argDet₂ {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
+    {a₁ a₂ : Expression Typ} {as : List (Expression Typ)} {x y : Value}
+    (hdet : ArgsDet Ξ Ω M (a₁ :: a₂ :: as)) (hx : Eval Ξ Ω M a₂ x) (hy : Eval Ξ Ω M a₂ y) : x = y :=
+  argDet₁ (λ b hb ↦ hdet b (List.mem_cons_of_mem _ hb)) hx hy
+
+/-- Determinism for the builtin-operator relation, relative to determinism at each of its argument
+positions: each `(op, args)` pair `EvalBuiltin` is defined on denotes a single value. An argument is
+an `Eval` sub-derivation rather than a bare `Value`, so a same-`op` pair of derivations is first
+reconciled argument by argument (`argDet₁`/`argDet₂`), and the value-level equality/inequality
+reasoning follows from there.
+
+The argument hypothesis is exactly what `evalUnique'` carries as its `motive_4`, which is why it is
+a premise here rather than an appeal to `evalUnique'`: that theorem's own `opCall_builtin` step is
+this lemma's caller. `evalBuiltinUnique` is the same statement against full `Eval` determinism. -/
+private theorem evalBuiltinUnique_of {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
+    {op : BuiltinOp} {args : List (Expression Typ)} {v w : Value} (hdet : ArgsDet Ξ Ω M args)
+    (hne1 : op ≠ .mkSeq) (hne2 : op ≠ .bagOfAll)
+    (h₁ : EvalBuiltin Ξ Ω M op args v) (h₂ : EvalBuiltin Ξ Ω M op args w) : v = w := by
+  cases h₁ with
+  | mkSeq _ _ _ _ _ _ => nomatch hne1 rfl
+  | bagOfAll _ _ _ _ _ _ _ => nomatch hne2 rfl
+  | eq_pos p₁ p₂ =>
+    cases h₂ with
+    | eq_pos _ _ => rfl
+    | eq_neg q₁ q₂ _ =>
+      obtain rfl := argDet₁ hdet p₁ q₁
+      obtain rfl := argDet₂ hdet p₂ q₂
+      contradiction
+  | eq_neg p₁ p₂ _ =>
+    cases h₂ with
+    | eq_pos q₁ q₂ =>
+      obtain rfl := argDet₁ hdet p₁ q₁
+      obtain rfl := argDet₂ hdet p₂ q₂
+      contradiction
+    | eq_neg _ _ _ => rfl
+  | neq_pos p₁ p₂ _ =>
+    cases h₂ with
+    | neq_pos _ _ _ => rfl
+    | neq_neg q₁ q₂ =>
+      obtain rfl := argDet₁ hdet p₁ q₁
+      obtain rfl := argDet₂ hdet p₂ q₂
+      contradiction
+  | neq_neg p₁ p₂ =>
+    cases h₂ with
+    | neq_pos q₁ q₂ _ =>
+      obtain rfl := argDet₁ hdet p₁ q₁
+      obtain rfl := argDet₂ hdet p₂ q₂
+      contradiction
+    | neq_neg _ _ => rfl
+  | and_tt p₁ p₂ =>
+    cases h₂ with
+    | and_tt _ _ => rfl
+    | and_ff q₁ q₂ _ _ hq =>
+      obtain rfl := argDet₁ hdet p₁ q₁
+      obtain rfl := argDet₂ hdet p₂ q₂
+      simp only [Value.tru_ne_fls, or_self] at hq
+  | and_ff p₁ p₂ _ _ hp =>
+    cases h₂ with
+    | and_tt q₁ q₂ =>
+      obtain rfl := argDet₁ hdet p₁ q₁
+      obtain rfl := argDet₂ hdet p₂ q₂
+      simp only [Value.tru_ne_fls, or_self] at hp
+    | and_ff _ _ _ _ _ => rfl
+  | or_tt p₁ p₂ _ _ hp =>
+    cases h₂ with
+    | or_tt _ _ _ _ _ => rfl
+    | or_ff q₁ q₂ =>
+      obtain rfl := argDet₁ hdet p₁ q₁
+      obtain rfl := argDet₂ hdet p₂ q₂
+      simp only [Value.fls_ne_tru, or_self] at hp
+  | or_ff p₁ p₂ =>
+    cases h₂ with
+    | or_tt q₁ q₂ _ _ hq =>
+      obtain rfl := argDet₁ hdet p₁ q₁
+      obtain rfl := argDet₂ hdet p₂ q₂
+      simp only [Value.fls_ne_tru, or_self] at hq
+    | or_ff _ _ => rfl
+  | implies_t p₁ p₂ _ _ hp =>
+    cases h₂ with
+    | implies_t _ _ _ _ _ => rfl
+    | implies_f q₁ q₂ =>
+      obtain rfl := argDet₁ hdet p₁ q₁
+      obtain rfl := argDet₂ hdet p₂ q₂
+      simp only [Value.tru_ne_fls, Value.fls_ne_tru, or_self] at hp
+  | implies_f p₁ p₂ =>
+    cases h₂ with
+    | implies_t q₁ q₂ _ _ hq =>
+      obtain rfl := argDet₁ hdet p₁ q₁
+      obtain rfl := argDet₂ hdet p₂ q₂
+      simp only [Value.tru_ne_fls, Value.fls_ne_tru, or_self] at hq
+    | implies_f _ _ => rfl
+  | iff_t p₁ p₂ _ =>
+    cases h₂ with
+    | iff_t _ _ _ => rfl
+    | iff_f q₁ q₂ _ _ _ =>
+      obtain rfl := argDet₁ hdet p₁ q₁
+      obtain rfl := argDet₂ hdet p₂ q₂
+      contradiction
+  | iff_f p₁ p₂ _ _ _ =>
+    cases h₂ with
+    | iff_t q₁ q₂ _ =>
+      obtain rfl := argDet₁ hdet p₁ q₁
+      obtain rfl := argDet₂ hdet p₂ q₂
+      contradiction
+    | iff_f _ _ _ _ _ => rfl
+  | neg_t p =>
+    cases h₂ with
+    | neg_t _ => rfl
+    | neg_f q =>
+      absurd (argDet₁ hdet p q)
+      exact Value.tru_ne_fls
+  | neg_f p =>
+    cases h₂ with
+    | neg_t q =>
+      absurd (argDet₁ hdet p q)
+      exact Value.fls_ne_tru
+    | neg_f _ => rfl
+  | inSet_pos p₁ p₂ _ =>
+    cases h₂ with
+    | inSet_pos _ _ _ => rfl
+    | inSet_neg q₁ q₂ _ =>
+      obtain rfl := argDet₁ hdet p₁ q₁
+      obtain rfl := argDet₂ hdet p₂ q₂
+      contradiction
+  | inSet_neg p₁ p₂ _ =>
+    cases h₂ with
+    | inSet_pos q₁ q₂ _ =>
+      obtain rfl := argDet₁ hdet p₁ q₁
+      obtain rfl := argDet₂ hdet p₂ q₂
+      contradiction
+    | inSet_neg _ _ _ => rfl
+  | notInSet_pos p₁ p₂ _ =>
+    cases h₂ with
+    | notInSet_pos _ _ _ => rfl
+    | notInSet_neg q₁ q₂ _ =>
+      obtain rfl := argDet₁ hdet p₁ q₁
+      obtain rfl := argDet₂ hdet p₂ q₂
+      contradiction
+  | notInSet_neg p₁ p₂ _ =>
+    cases h₂ with
+    | notInSet_pos q₁ q₂ _ =>
+      obtain rfl := argDet₁ hdet p₁ q₁
+      obtain rfl := argDet₂ hdet p₂ q₂
+      contradiction
+    | notInSet_neg _ _ _ => rfl
+  | subseteq_pos p₁ p₂ _ =>
+    cases h₂ with
+    | subseteq_pos _ _ _ => rfl
+    | subseteq_neg q₁ q₂ _ =>
+      obtain rfl := argDet₁ hdet p₁ q₁
+      obtain rfl := argDet₂ hdet p₂ q₂
+      contradiction
+  | subseteq_neg p₁ p₂ _ =>
+    cases h₂ with
+    | subseteq_pos q₁ q₂ _ =>
+      obtain rfl := argDet₁ hdet p₁ q₁
+      obtain rfl := argDet₂ hdet p₂ q₂
+      contradiction
+    | subseteq_neg _ _ _ => rfl
+  | cup p₁ p₂ =>
+    cases h₂ with
+    | cup q₁ q₂ => rw [argDet₁ hdet p₁ q₁, argDet₂ hdet p₂ q₂]
+  | cap p₁ p₂ =>
+    cases h₂ with
+    | cap q₁ q₂ => rw [argDet₁ hdet p₁ q₁, argDet₂ hdet p₂ q₂]
+  | setMinus p₁ p₂ =>
+    cases h₂ with
+    | setMinus q₁ q₂ => rw [argDet₁ hdet p₁ q₁, argDet₂ hdet p₂ q₂]
+  | cartesianProduct p₁ p₂ =>
+    cases h₂ with
+    | cartesianProduct q₁ q₂ => rw [argDet₁ hdet p₁ q₁, argDet₂ hdet p₂ q₂]
+  | domain p _ =>
+    cases h₂ with
+    | domain q _ =>
+      obtain rfl := argDet₁ hdet p q
+      exact dom_eq_dom _ _
+  | plus p₁ p₂ =>
+    cases h₂ with
+    | plus q₁ q₂ =>
+      rw [Value.ofInt_inj.mp (argDet₁ hdet p₁ q₁), Value.ofInt_inj.mp (argDet₂ hdet p₂ q₂)]
+  | minus p₁ p₂ =>
+    cases h₂ with
+    | minus q₁ q₂ =>
+      rw [Value.ofInt_inj.mp (argDet₁ hdet p₁ q₁), Value.ofInt_inj.mp (argDet₂ hdet p₂ q₂)]
+  | unaryMinus p =>
+    cases h₂ with
+    | unaryMinus q => rw [Value.ofInt_inj.mp (argDet₁ hdet p q)]
+  | times p₁ p₂ =>
+    cases h₂ with
+    | times q₁ q₂ =>
+      rw [Value.ofInt_inj.mp (argDet₁ hdet p₁ q₁), Value.ofInt_inj.mp (argDet₂ hdet p₂ q₂)]
+  | intDiv p₁ p₂ =>
+    cases h₂ with
+    | intDiv q₁ q₂ =>
+      rw [Value.ofInt_inj.mp (argDet₁ hdet p₁ q₁), Value.ofInt_inj.mp (argDet₂ hdet p₂ q₂)]
+  | mod p₁ p₂ =>
+    cases h₂ with
+    | mod q₁ q₂ =>
+      rw [Value.ofInt_inj.mp (argDet₁ hdet p₁ q₁), Value.ofInt_inj.mp (argDet₂ hdet p₂ q₂)]
+  | pow p₁ p₂ =>
+    cases h₂ with
+    | pow q₁ q₂ =>
+      rw [Value.ofInt_inj.mp (argDet₁ hdet p₁ q₁), Value.ofInt_inj.mp (argDet₂ hdet p₂ q₂)]
+  | lt_pos p₁ p₂ _ =>
+    cases h₂ with
+    | lt_pos _ _ _ => rfl
+    | lt_neg q₁ q₂ _ =>
+      obtain rfl := Value.ofInt_inj.mp (argDet₁ hdet p₁ q₁)
+      obtain rfl := Value.ofInt_inj.mp (argDet₂ hdet p₂ q₂)
+      contradiction
+  | lt_neg p₁ p₂ _ =>
+    cases h₂ with
+    | lt_pos q₁ q₂ _ =>
+      obtain rfl := Value.ofInt_inj.mp (argDet₁ hdet p₁ q₁)
+      obtain rfl := Value.ofInt_inj.mp (argDet₂ hdet p₂ q₂)
+      contradiction
+    | lt_neg _ _ _ => rfl
+  | gt_pos p₁ p₂ _ =>
+    cases h₂ with
+    | gt_pos _ _ _ => rfl
+    | gt_neg q₁ q₂ _ =>
+      obtain rfl := Value.ofInt_inj.mp (argDet₁ hdet p₁ q₁)
+      obtain rfl := Value.ofInt_inj.mp (argDet₂ hdet p₂ q₂)
+      contradiction
+  | gt_neg p₁ p₂ _ =>
+    cases h₂ with
+    | gt_pos q₁ q₂ _ =>
+      obtain rfl := Value.ofInt_inj.mp (argDet₁ hdet p₁ q₁)
+      obtain rfl := Value.ofInt_inj.mp (argDet₂ hdet p₂ q₂)
+      contradiction
+    | gt_neg _ _ _ => rfl
+  | leq_pos p₁ p₂ _ =>
+    cases h₂ with
+    | leq_pos _ _ _ => rfl
+    | leq_neg q₁ q₂ _ =>
+      obtain rfl := Value.ofInt_inj.mp (argDet₁ hdet p₁ q₁)
+      obtain rfl := Value.ofInt_inj.mp (argDet₂ hdet p₂ q₂)
+      contradiction
+  | leq_neg p₁ p₂ _ =>
+    cases h₂ with
+    | leq_pos q₁ q₂ _ =>
+      obtain rfl := Value.ofInt_inj.mp (argDet₁ hdet p₁ q₁)
+      obtain rfl := Value.ofInt_inj.mp (argDet₂ hdet p₂ q₂)
+      contradiction
+    | leq_neg _ _ _ => rfl
+  | geq_pos p₁ p₂ _ =>
+    cases h₂ with
+    | geq_pos _ _ _ => rfl
+    | geq_neg q₁ q₂ _ =>
+      obtain rfl := Value.ofInt_inj.mp (argDet₁ hdet p₁ q₁)
+      obtain rfl := Value.ofInt_inj.mp (argDet₂ hdet p₂ q₂)
+      contradiction
+  | geq_neg p₁ p₂ _ =>
+    cases h₂ with
+    | geq_pos q₁ q₂ _ =>
+      obtain rfl := Value.ofInt_inj.mp (argDet₁ hdet p₁ q₁)
+      obtain rfl := Value.ofInt_inj.mp (argDet₂ hdet p₂ q₂)
+      contradiction
+    | geq_neg _ _ _ => rfl
+  | dotdot p₁ p₂ =>
+    cases h₂ with
+    | dotdot q₁ q₂ =>
+      rw [Value.ofInt_inj.mp (argDet₁ hdet p₁ q₁), Value.ofInt_inj.mp (argDet₂ hdet p₂ q₂)]
+  | len p =>
+    cases h₂ with
+    | len q => rw [Value.ofSeq_inj.mp (argDet₁ hdet p q)]
+  | head p =>
+    cases h₂ with
+    | head q =>
+      have hvs := Value.ofSeq_inj.mp (argDet₁ hdet p q)
+      simp only [List.cons.injEq] at hvs
+      exact hvs.1
+  | tail p =>
+    cases h₂ with
+    | tail q =>
+      have hvs := Value.ofSeq_inj.mp (argDet₁ hdet p q)
+      simp only [List.cons.injEq] at hvs
+      rw [hvs.2]
+  | append p₁ p₂ =>
+    cases h₂ with
+    | append q₁ q₂ => rw [Value.ofSeq_inj.mp (argDet₁ hdet p₁ q₁), argDet₂ hdet p₂ q₂]
+  | strToSeq p =>
+    cases h₂ with
+    | strToSeq q => exact argDet₁ hdet p q
+  | funAsSeq p _ =>
+    cases h₂ with
+    | funAsSeq q _ => exact argDet₁ hdet p q
+  | setAsFun p _ =>
+    cases h₂ with
+    | setAsFun q _ => exact argDet₁ hdet p q
+  | emptyBag =>
+    cases h₂ with
+    | emptyBag => rfl
+  | setToBag p =>
+    cases h₂ with
+    | setToBag q => rw [argDet₁ hdet p q]
+  | bagAdd p₁ p₂ =>
+    cases h₂ with
+    | bagAdd q₁ q₂ => rw [argDet₁ hdet p₁ q₁, argDet₂ hdet p₂ q₂]
+  | bagSub p₁ p₂ =>
+    cases h₂ with
+    | bagSub q₁ q₂ => rw [argDet₁ hdet p₁ q₁, argDet₂ hdet p₂ q₂]
+  | subBag p =>
+    cases h₂ with
+    | subBag q => rw [argDet₁ hdet p q]
+  | copiesIn p₁ p₂ =>
+    cases h₂ with
+    | copiesIn q₁ q₂ => rw [argDet₁ hdet p₁ q₁, argDet₂ hdet p₂ q₂]
+  | bagUnion p _ =>
+    cases h₂ with
+    | bagUnion q _ =>
+      obtain rfl := argDet₁ hdet p q
+      rfl
+  | bagCardinality p _ =>
+    cases h₂ with
+    | bagCardinality q _ =>
+      obtain rfl := argDet₁ hdet p q
+      rfl
+  | isABag _ _ =>
+    cases h₂ with
+    | isABag _ _ => rfl
+  | bagToSet p _ =>
+    cases h₂ with
+    | bagToSet q _ => rw [argDet₁ hdet p q]
+  | bagIn_pos p₁ p₂ _ =>
+    cases h₂ with
+    | bagIn_pos _ _ _ => rfl
+    | bagIn_neg q₁ q₂ _ =>
+      obtain rfl := argDet₁ hdet p₁ q₁
+      obtain rfl := argDet₂ hdet p₂ q₂
+      contradiction
+  | bagIn_neg p₁ p₂ _ =>
+    cases h₂ with
+    | bagIn_pos q₁ q₂ _ =>
+      obtain rfl := argDet₁ hdet p₁ q₁
+      obtain rfl := argDet₂ hdet p₂ q₂
+      contradiction
+    | bagIn_neg _ _ _ => rfl
+  | bagLeq_pos p₁ p₂ _ =>
+    cases h₂ with
+    | bagLeq_pos _ _ _ => rfl
+    | bagLeq_neg q₁ q₂ _ =>
+      obtain rfl := argDet₁ hdet p₁ q₁
+      obtain rfl := argDet₂ hdet p₂ q₂
+      contradiction
+  | bagLeq_neg p₁ p₂ _ =>
+    cases h₂ with
+    | bagLeq_pos q₁ q₂ _ =>
+      obtain rfl := argDet₁ hdet p₁ q₁
+      obtain rfl := argDet₂ hdet p₂ q₂
+      contradiction
+    | bagLeq_neg _ _ _ => rfl
+
+/-- `Len` denotes only on sequences — inversion. -/
+theorem evalBuiltin_len_inv {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
+    {a : Expression Typ} {b : Value} (h : EvalBuiltin Ξ Ω M .len [a] b) :
+    ∃ vs, Eval Ξ Ω M a (Value.ofSeq vs) ∧ b = Value.ofNat vs.length := by
   cases h with
-  | len => obtain ⟨rfl, -⟩ := List.cons.injEq .. |>.mp hA; exact ⟨_, rfl, rfl⟩
+  | len h => exact ⟨_, h, rfl⟩
 
 /-- `..` builds an integer interval — inversion. -/
-theorem evalBuiltin_dotdot_inv {a b s : Value} (h : EvalBuiltin .dotdot [a, b] s) :
-    ∃ x y : ℤ, a = Value.ofInt x ∧ b = Value.ofInt y ∧
+theorem evalBuiltin_dotdot_inv {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
+    {a b : Expression Typ} {s : Value} (h : EvalBuiltin Ξ Ω M .dotdot [a, b] s) :
+    ∃ x y : ℤ, Eval Ξ Ω M a (Value.ofInt x) ∧ Eval Ξ Ω M b (Value.ofInt y) ∧
       ∀ z, z ∈ s ↔ ∃ k : ℤ, x ≤ k ∧ k ≤ y ∧ z = Value.ofInt k := by
-  generalize hA : [a, b] = A at h
   cases h with
-  | dotdot =>
-    obtain ⟨rfl, rfl, -⟩ := by simpa only [List.cons.injEq, and_true] using hA
-    exact ⟨_, _, rfl, rfl, λ _ ↦ Value.mem_intRange⟩
+  | dotdot h1 h2 => exact ⟨_, _, h1, h2, λ _ ↦ Value.mem_intRange⟩
 
 /-- `DOMAIN` denotes the set of keys of a function value — inversion. -/
-theorem evalBuiltin_domain_inv {f s : Value} (h : EvalBuiltin .domain [f] s) :
-    ∀ z, z ∈ s ↔ ∃ w, ZFSet.pair z w ∈ f := by
-  generalize hA : [f] = A at h
+theorem evalBuiltin_domain_inv {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
+    {a : Expression Typ} {s : Value} (h : EvalBuiltin Ξ Ω M .domain [a] s) :
+    ∃ f, Eval Ξ Ω M a f ∧ ∀ z, z ∈ s ↔ ∃ w, ZFSet.pair z w ∈ f := by
   cases h with
-  | domain hf => obtain ⟨rfl, -⟩ := List.cons.injEq .. |>.mp hA; exact λ _ ↦ mem_dom_iff hf
+  | domain ha hf => exact ⟨_, ha, λ _ ↦ mem_dom_iff hf⟩
 
 /-- `DOMAIN` denotes a set over which its argument is still a partial function — inversion. -/
-theorem evalBuiltin_domain_isPFunc {f s : Value} (h : EvalBuiltin .domain [f] s) :
-    ∃ B : Value, f.IsPFunc s B := by
-  generalize hA : [f] = A at h
+theorem evalBuiltin_domain_isPFunc {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
+    {a : Expression Typ} {s : Value} (h : EvalBuiltin Ξ Ω M .domain [a] s) :
+    ∃ f B, Eval Ξ Ω M a f ∧ f.IsPFunc s B := by
   cases h with
-  | domain hf =>
-    obtain ⟨rfl, -⟩ := List.cons.injEq .. |>.mp hA
-    exact ⟨_, isPFunc_restrict_dom hf⟩
+  | domain ha hf => exact ⟨_, _, ha, isPFunc_restrict_dom hf⟩
 
 /-- `=` on values denotes `TRUE` on equal arguments, `FALSE` otherwise — inversion. -/
-theorem evalBuiltin_eq_inv {a b c : Value} (h : EvalBuiltin .eq [a, b] c) :
-    (a = b ∧ c = Value.tru) ∨ (a ≠ b ∧ c = Value.fls) := by
-  generalize hA : [a, b] = A at h
+theorem evalBuiltin_eq_inv {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
+    {a b : Expression Typ} {c : Value} (h : EvalBuiltin Ξ Ω M .eq [a, b] c) :
+    (∃ v, Eval Ξ Ω M a v ∧ Eval Ξ Ω M b v ∧ c = Value.tru) ∨
+      (∃ v w, Eval Ξ Ω M a v ∧ Eval Ξ Ω M b w ∧ v ≠ w ∧ c = Value.fls) := by
   cases h with
-  | eq_pos =>
-    obtain ⟨rfl, rfl, -⟩ := by simpa only [List.cons.injEq, and_true] using hA
-    exact .inl ⟨rfl, rfl⟩
-  | eq_neg hne =>
-    obtain ⟨rfl, rfl, -⟩ := by simpa only [List.cons.injEq, and_true] using hA
-    exact .inr ⟨hne, rfl⟩
+  | eq_pos h1 h2 => exact .inl ⟨_, h1, h2, rfl⟩
+  | eq_neg h1 h2 hne => exact .inr ⟨_, _, h1, h2, hne, rfl⟩
 
-/-- A one-argument builtin call inverts to its argument's value and the builtin step. The
-`opCall_op` alternative cannot fire: its `hnb` says the name is not a builtin, contradicting the
-premise that it is. -/
+/-- A one-argument builtin call inverts to the builtin step directly — `EvalBuiltin` already
+carries its own argument's `Eval` sub-derivation, so there is no separate value to extract first.
+The `opCall_op` alternative cannot fire: its `hnb` says the name is not a builtin, contradicting
+the premise that it is. -/
 theorem evalOpCall1_inv {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
     {τ : Typ} {o : Origin} {op : BuiltinOp} {arg : Expression Typ} {s : Value}
     (hname : TypedTLAPlus.builtinOpOf? o = some op)
     (h : Eval Ξ Ω M (.opCall (.var τ o) [arg]) s) :
-    ∃ a, Eval Ξ Ω M arg a ∧ EvalBuiltin op [a] s := by
+    EvalBuiltin Ξ Ω M op [arg] s := by
   cases h with
   | opCall_op _ hnb _ _ => rw [hname] at hnb; simp at hnb
-  | opCall_builtin hop hargs hb =>
-    rw [hname] at hop; obtain rfl := Option.some.inj hop
-    cases hargs with
-    | cons ha htl => cases htl; exact ⟨_, ha, hb⟩
+  | opCall_builtin hop hb => rw [hname] at hop; obtain rfl := Option.some.inj hop; exact hb
 
-/-- A two-argument builtin call inverts to both argument values and the builtin step. -/
+/-- A two-argument builtin call inverts to the builtin step directly. -/
 theorem evalOpCall2_inv {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
     {τ : Typ} {o : Origin} {op : BuiltinOp}
     {a1 a2 : Expression Typ} {s : Value}
     (hname : TypedTLAPlus.builtinOpOf? o = some op)
     (h : Eval Ξ Ω M (.opCall (.var τ o) [a1, a2]) s) :
-    ∃ v1 v2, Eval Ξ Ω M a1 v1 ∧ Eval Ξ Ω M a2 v2 ∧ EvalBuiltin op [v1, v2] s := by
+    EvalBuiltin Ξ Ω M op [a1, a2] s := by
   cases h with
   | opCall_op _ hnb _ _ => rw [hname] at hnb; simp at hnb
-  | opCall_builtin hop hargs hb =>
-    rw [hname] at hop; obtain rfl := Option.some.inj hop
-    cases hargs with
-    | cons h1 htl => cases htl with | cons h2 htl2 => cases htl2; exact ⟨_, _, h1, h2, hb⟩
+  | opCall_builtin hop hb => rw [hname] at hop; obtain rfl := Option.some.inj hop; exact hb
 
 /-- Some name outside a given finite set — `String` is infinite. The cofinite binder rules of
 `Eval` hand out "for every `z ∉ L`"; a determinism/inversion proof feeds back one `z` chosen
 outside the union of both derivations' `L`s. -/
 private theorem exists_fresh (s : Finset String) : ∃ z : String, z ∉ s := s.exists_notMem
 
+/-- An empty argument list is argument-wise deterministic outright — `EvalBuiltin.emptyBag`'s
+`motive_4` obligation in `evalUnique'`. -/
+private theorem argsDet_nil {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value} :
+    ArgsDet Ξ Ω M [] :=
+  λ _ h ↦ nomatch h
+
+/-- A one-argument list is argument-wise deterministic when its argument is — the shape
+`evalUnique'`'s `motive_4` takes on every one-argument `EvalBuiltin` arm, where the argument's own
+determinism is the arm's induction hypothesis. -/
+private theorem argsDet_one {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
+    {a₁ : Expression Typ} {v₁ : Value} (ih₁ : ∀ {w : Value}, Eval Ξ Ω M a₁ w → v₁ = w) :
+    ArgsDet Ξ Ω M [a₁] := by
+  intro a ha x y hx hy
+  obtain rfl := List.mem_singleton.mp ha
+  exact (ih₁ hx).symm.trans (ih₁ hy)
+
+/-- `argsDet_one` at two arguments. -/
+private theorem argsDet_two {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
+    {a₁ a₂ : Expression Typ} {v₁ v₂ : Value} (ih₁ : ∀ {w : Value}, Eval Ξ Ω M a₁ w → v₁ = w)
+    (ih₂ : ∀ {w : Value}, Eval Ξ Ω M a₂ w → v₂ = w) : ArgsDet Ξ Ω M [a₁, a₂] := by
+  intro a ha
+  rcases List.mem_cons.mp ha with rfl | ha
+  · exact λ x y hx hy ↦ (ih₁ hx).symm.trans (ih₁ hy)
+  · exact argsDet_one ih₂ a ha
+
+/-- `evalUnique'`'s `motive_4`: `EvalBuiltin`'s share of the big mutual determinism induction.
+*Argument-wise* determinism (`ArgsDet`) for every arm except `mkSeq`/`bagOfAll`, whose second
+argument is never itself evaluated at `M` — only a synthesized `.opCall` under a fresh binder is,
+inside `himg` — so `ArgsDet` cannot be produced for them from local induction hypotheses alone.
+Those two carry the builtin relation's own determinism directly instead. Named (rather than inlined
+into the `induction ... (motive_4 := ·)` call) because a `match` on `op` written inline there left
+Lean unable to resolve `Ξ`/`Ω` while elaborating the motive against `Eval.rec`'s expected shape. -/
+private def EvalBuiltinMotive (Ξ : OperatorEnv) (Ω : Model Value) (M : Memory Value)
+    (op : BuiltinOp) (args : List (Expression Typ)) (v : Value) : Prop :=
+  match op with
+  | .mkSeq => ∀ {w}, EvalBuiltin Ξ Ω M .mkSeq args w → v = w
+  | .bagOfAll => ∀ {w}, EvalBuiltin Ξ Ω M .bagOfAll args w → v = w
+  | _ => ArgsDet Ξ Ω M args
+
 /-- Evaluation is deterministic: an expression denotes at most one value. Proved through the mutual
 recursor `Eval.rec` — `induction` does not fire on a member of a mutual inductive family, so the
 `EvalList`/`EvalPath` determinism is threaded in as `motive_2`/`motive_3` and discharged in the same
-pass. -/
+pass. `motive_4` is `EvalBuiltinMotive` (see its own doc) — the `opCall_builtin` step case-splits on
+`op` to pick the right shape back up. -/
 theorem evalUnique' {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
     {e : Expression Typ} {v w : Value} (h₁ : Eval Ξ Ω M e v) (h₂ : Eval Ξ Ω M e w) : v = w := by
   revert w
   induction h₁ using Eval.rec
     (motive_2 := λ M es vs _ ↦ ∀ ws, EvalList Ξ Ω M es ws → vs = ws)
-    (motive_3 := λ M p rs _ ↦ ∀ rs', EvalPath Ξ Ω M p rs' → rs = rs') with
+    (motive_3 := λ M p rs _ ↦ ∀ rs', EvalPath Ξ Ω M p rs' → rs = rs')
+    (motive_4 := λ M op args v _ ↦ EvalBuiltinMotive Ξ Ω M op args v) with
   | nat hn =>
     intro w h₂; cases h₂ with
     | nat hn' => rw [hn] at hn'; exact congrArg Value.ofNat (Option.some.inj hn')
@@ -898,19 +1394,21 @@ theorem evalUnique' {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
       simp only [hΞ, Option.some.injEq, Prod.mk.injEq] at hΞ'
       obtain ⟨rfl, rfl⟩ := hΞ'
       exact ihbdy hbdy'
-    | opCall_builtin hop' hargs' hb' =>
+    | opCall_builtin hop' hb' =>
       rw [hnb] at hop'
       contradiction
-  | opCall_builtin hop hargs hb ihargs =>
+  | @opCall_builtin _ _ _ op _ _ hop hb ihb =>
     intro w h₂; cases h₂ with
     | opCall_op hΞ' hnb' hlen' hbdy' =>
       rw [hnb'] at hop
       contradiction
-    | opCall_builtin hop' hargs' hb' =>
+    | opCall_builtin hop' hb' =>
       rw [hop] at hop'
       obtain rfl := Option.some.inj hop'
-      obtain rfl := ihargs _ hargs'
-      exact evalBuiltinUnique hb hb'
+      cases op with
+      | mkSeq => exact ihb hb'
+      | bagOfAll => exact ihb hb'
+      | _ => exact evalBuiltinUnique_of ihb (by decide) (by decide) hb hb'
   | forall_true L hdom hall ihdom ihall =>
     intro w h₂; cases h₂ with
     | forall_true L' hdom' hall' => rfl
@@ -1049,7 +1547,111 @@ theorem evalUnique' {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
     cases hp with | inl hrest' => rw [ih _ hrest']
   | inr _ _ ihv ihrest _ hp =>
     cases hp with | inr hv' hrest' => rw [ihv hv', ihrest _ hrest']
-  | _ => next h => cases h; rfl
+  -- `EvalBuiltin`'s 62 arms. `motive_4` is argument-wise determinism, so each arm hands over the
+  -- induction hypotheses of its own `Eval` premises; the grouping is by arity, nothing else.
+  | eq_pos _ _ ih₁ ih₂ | neq_neg _ _ ih₁ ih₂ | and_tt _ _ ih₁ ih₂ | or_ff _ _ ih₁ ih₂
+  | implies_f _ _ ih₁ ih₂ | cup _ _ ih₁ ih₂ | cap _ _ ih₁ ih₂ | setMinus _ _ ih₁ ih₂
+  | cartesianProduct _ _ ih₁ ih₂ | plus _ _ ih₁ ih₂ | minus _ _ ih₁ ih₂ | times _ _ ih₁ ih₂
+  | intDiv _ _ ih₁ ih₂ | mod _ _ ih₁ ih₂ | pow _ _ ih₁ ih₂ | dotdot _ _ ih₁ ih₂
+  | append _ _ ih₁ ih₂ | bagAdd _ _ ih₁ ih₂ | bagSub _ _ ih₁ ih₂ | copiesIn _ _ ih₁ ih₂
+  | eq_neg _ _ _ ih₁ ih₂ | neq_pos _ _ _ ih₁ ih₂ | iff_t _ _ _ ih₁ ih₂ | inSet_pos _ _ _ ih₁ ih₂
+  | inSet_neg _ _ _ ih₁ ih₂ | notInSet_pos _ _ _ ih₁ ih₂ | notInSet_neg _ _ _ ih₁ ih₂
+  | subseteq_pos _ _ _ ih₁ ih₂ | subseteq_neg _ _ _ ih₁ ih₂ | lt_pos _ _ _ ih₁ ih₂
+  | lt_neg _ _ _ ih₁ ih₂ | gt_pos _ _ _ ih₁ ih₂ | gt_neg _ _ _ ih₁ ih₂ | leq_pos _ _ _ ih₁ ih₂
+  | leq_neg _ _ _ ih₁ ih₂ | geq_pos _ _ _ ih₁ ih₂ | geq_neg _ _ _ ih₁ ih₂
+  | bagIn_pos _ _ _ ih₁ ih₂ | bagIn_neg _ _ _ ih₁ ih₂ | bagLeq_pos _ _ _ ih₁ ih₂
+  | bagLeq_neg _ _ _ ih₁ ih₂ | and_ff _ _ _ _ _ ih₁ ih₂ | or_tt _ _ _ _ _ ih₁ ih₂
+  | implies_t _ _ _ _ _ ih₁ ih₂ | iff_f _ _ _ _ _ ih₁ ih₂ => exact argsDet_two ih₁ ih₂
+  | neg_t _ ih₁ | neg_f _ ih₁ | unaryMinus _ ih₁ | len _ ih₁ | head _ ih₁ | tail _ ih₁
+  | strToSeq _ ih₁ | setToBag _ ih₁ | subBag _ ih₁ | domain _ _ ih₁ | funAsSeq _ _ ih₁
+  | setAsFun _ _ ih₁ | bagUnion _ _ ih₁ | bagCardinality _ _ ih₁ | isABag _ _ ih₁
+  | bagToSet _ _ ih₁ => exact argsDet_one ih₁
+  | emptyBag => exact argsDet_nil
+  -- `mkSeq`/`bagOfAll`: `EvalBuiltinMotive` gives these two the builtin relation's own determinism
+  -- directly (not `ArgsDet`) — proved self-contained via `himg`'s own induction hypothesis, same
+  -- funext-free technique `fn`'s own case above uses (pointwise agreement at each witness `hto`
+  -- hands back, never a global `img = img'`, which would be false off the domain).
+  | mkSeq hN img L himg hto hof ihN ihHimg =>
+    intro w h₂; cases h₂ with
+    | mkSeq hN' img' L' himg' hto' hof' =>
+      obtain rfl := Value.ofInt_inj.mp (ihN hN')
+      obtain ⟨y, hy⟩ := exists_fresh (L ∪ L')
+      obtain ⟨hyL, hyL'⟩ := Finset.notMem_union.mp hy
+      refine ZFSet.ext λ z ↦ ⟨λ hz ↦ ?_, λ hz ↦ ?_⟩
+      · obtain ⟨u, huS, rfl⟩ := hto z hz
+        rw [(ihHimg y hyL u huS (himg' y hyL' u huS) : img u = img' u)]
+        exact hof' u huS
+      · obtain ⟨u, huS, rfl⟩ := hto' z hz
+        rw [← (ihHimg y hyL u huS (himg' y hyL' u huS) : img u = img' u)]
+        exact hof u huS
+  | @bagOfAll _ _ _ Bval _ hB img L hfin himg hto hof ihB ihHimg =>
+    intro w h₂; cases h₂ with
+    | bagOfAll hB' img' L' hfin' himg' hto' hof' =>
+      obtain rfl := ihB hB'
+      obtain ⟨y, hy⟩ := exists_fresh (L ∪ L')
+      obtain ⟨hyL, hyL'⟩ := Finset.notMem_union.mp hy
+      have himgeq : ∀ u ∈ Value.rawDom Bval, img u = img' u :=
+        λ u huB ↦ ihHimg y hyL u huB (himg' y hyL' u huB)
+      have hsumeq : ∀ e, hfin.sum (λ u ↦ if img u = e then Value.copiesInRaw u Bval else 0)
+          = hfin'.sum (λ u ↦ if img' u = e then Value.copiesInRaw u Bval else 0) := λ e ↦
+        hfin.sum_congr (λ u huB ↦ by rw [himgeq u huB])
+      refine ZFSet.ext λ z ↦ ⟨λ hz ↦ ?_, λ hz ↦ ?_⟩
+      · obtain ⟨e, ⟨u, huB, rfl⟩, rfl⟩ := hto z hz
+        rw [himgeq u huB, hsumeq (img' u)]
+        exact hof' u huB
+      · obtain ⟨e, ⟨u, huB, rfl⟩, rfl⟩ := hto' z hz
+        rw [← himgeq u huB, ← hsumeq (img u)]
+        exact hof u huB
+  -- `EvalList.nil` and `EvalPath.nil`: a wildcard is the only way to reach the second of two
+  -- like-named alternatives of a mutual recursor.
+  | _ _ h => cases h; rfl
+
+/-- Determinism for the builtin-operator relation: each `(op, args)` pair `EvalBuiltin` is defined
+on denotes a single value. Against full `Eval` determinism, so it is stated here rather than beside
+`evalBuiltinUnique_of` — its argument-wise premise is `evalUnique'`. `mkSeq`/`bagOfAll` case-split
+out first: their own `img` reconciliation needs full `evalUnique'` access at `M.insert z w`, not
+just `ArgsDet`'s `M`-only, args-only shape, so `evalBuiltinUnique_of` can't carry it — same
+`EvalBuiltinMotive`/`fn`-style pointwise proof as `evalUnique'`'s own `mkSeq`/`bagOfAll` case. -/
+theorem evalBuiltinUnique {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value} {op : BuiltinOp}
+    {args : List (Expression Typ)} {v w : Value}
+    (h₁ : EvalBuiltin Ξ Ω M op args v) (h₂ : EvalBuiltin Ξ Ω M op args w) : v = w := by
+  cases op with
+  | mkSeq =>
+    cases h₁ with
+    | mkSeq hN img L himg hto hof =>
+      cases h₂ with
+      | mkSeq hN' img' L' himg' hto' hof' =>
+        obtain rfl := Value.ofInt_inj.mp (evalUnique' hN hN')
+        obtain ⟨y, hy⟩ := exists_fresh (L ∪ L')
+        obtain ⟨hyL, hyL'⟩ := Finset.notMem_union.mp hy
+        refine ZFSet.ext λ z ↦ ⟨λ hz ↦ ?_, λ hz ↦ ?_⟩
+        · obtain ⟨u, huS, rfl⟩ := hto z hz
+          rw [(evalUnique' (himg y hyL u huS) (himg' y hyL' u huS) : img u = img' u)]
+          exact hof' u huS
+        · obtain ⟨u, huS, rfl⟩ := hto' z hz
+          rw [← (evalUnique' (himg y hyL u huS) (himg' y hyL' u huS) : img u = img' u)]
+          exact hof u huS
+  | bagOfAll =>
+    cases h₁ with
+    | @bagOfAll _ _ _ Bval _ hB img L hfin himg hto hof =>
+      cases h₂ with
+      | bagOfAll hB' img' L' hfin' himg' hto' hof' =>
+        obtain rfl := evalUnique' hB hB'
+        obtain ⟨y, hy⟩ := exists_fresh (L ∪ L')
+        obtain ⟨hyL, hyL'⟩ := Finset.notMem_union.mp hy
+        have himgeq : ∀ u ∈ Value.rawDom Bval, img u = img' u :=
+          λ u huB ↦ evalUnique' (himg y hyL u huB) (himg' y hyL' u huB)
+        have hsumeq : ∀ e, hfin.sum (λ u ↦ if img u = e then Value.copiesInRaw u Bval else 0)
+            = hfin'.sum (λ u ↦ if img' u = e then Value.copiesInRaw u Bval else 0) := λ e ↦
+          hfin.sum_congr (λ u huB ↦ by rw [himgeq u huB])
+        refine ZFSet.ext λ z ↦ ⟨λ hz ↦ ?_, λ hz ↦ ?_⟩
+        · obtain ⟨e, ⟨u, huB, rfl⟩, rfl⟩ := hto z hz
+          rw [himgeq u huB, hsumeq (img' u)]
+          exact hof' u huB
+        · obtain ⟨e, ⟨u, huB, rfl⟩, rfl⟩ := hto' z hz
+          rw [← himgeq u huB, ← hsumeq (img u)]
+          exact hof u huB
+  | _ => exact evalBuiltinUnique_of (λ _ _ _ _ hx hy ↦ evalUnique' hx hy) (by decide) (by decide) h₁ h₂
 
 /-- `EvalList` determinism, standalone: a list of expressions denotes at most one list of values.
 Recurses on the expression list; the mutual `Eval` determinism is `evalUnique'`. -/
@@ -1224,6 +1826,19 @@ private theorem sizeOf_record_field {fields : List (String × Coercion × Typ)} 
   change sizeOf cc < _
   omega
 
+/-- The first argument position of a restriction quantified over an argument list. Every
+`EvalBuiltin` arm of `evalLocal'`/`evalSubst'` hands each of its induction hypotheses the ambient
+restriction narrowed to the one argument that hypothesis is about; `forall_head`/`forall_snd` name
+those two narrowings once instead of spelling the membership proof out in each arm. -/
+private theorem forall_head {P : Expression Typ → Prop} {a : Expression Typ}
+    {as : List (Expression Typ)} (h : ∀ e ∈ a :: as, P e) : P a :=
+  h a List.mem_cons_self
+
+/-- The second argument position's half of `forall_head`. -/
+private theorem forall_snd {P : Expression Typ → Prop} {a₁ a₂ : Expression Typ}
+    {as : List (Expression Typ)} (h : ∀ e ∈ a₁ :: a₂ :: as, P e) : P a₂ :=
+  h a₂ (List.mem_cons_of_mem _ List.mem_cons_self)
+
 theorem evalLocal' {Ξ : OperatorEnv} {Ω : Model Value} {M₁ M₂ : Memory Value}
     {e : Expression Typ} {v : Value} (hΞ : Ξ.WellScoped)
     (h : ∀ x ∈ e.freeVars, M₁.lookup x = M₂.lookup x) :
@@ -1253,7 +1868,9 @@ theorem evalLocal' {Ξ : OperatorEnv} {Ω : Model Value} {M₁ M₂ : Memory Val
       (motive_2 := λ N es vs _ ↦ ∀ {N' : Memory Value},
         (∀ e ∈ es, ∀ x ∈ e.freeVars, N.lookup x = N'.lookup x) → EvalList Ξ Ω N' es vs)
       (motive_3 := λ N p rs _ ↦ ∀ {N' : Memory Value},
-        (∀ e, Sum.inr e ∈ p → ∀ x ∈ e.freeVars, N.lookup x = N'.lookup x) → EvalPath Ξ Ω N' p rs) with
+        (∀ e, Sum.inr e ∈ p → ∀ x ∈ e.freeVars, N.lookup x = N'.lookup x) → EvalPath Ξ Ω N' p rs)
+      (motive_4 := λ N op args v _ ↦ ∀ {N' : Memory Value},
+        (∀ e ∈ args, ∀ x ∈ e.freeVars, N.lookup x = N'.lookup x) → EvalBuiltin Ξ Ω N' op args v) with
     | nat hn => exact λ _ ↦ .nat hn
     | str => exact λ _ ↦ .str
     | tru => exact λ _ ↦ .tru
@@ -1274,10 +1891,10 @@ theorem evalLocal' {Ξ : OperatorEnv} {Ω : Model Value} {M₁ M₂ : Memory Val
       rcases substParams_freeVars hlen hz with hbz | ⟨a, ha, hza⟩
       · simp [hΞ _ _ _ _ hΞ'] at hbz
       · exact hag z (Expression.mem_freeVars_opCall.mpr (.inr ⟨a, ha, hza⟩))
-    | opCall_builtin hop _ hb ihargs =>
+    | opCall_builtin hop _ ihb =>
       intro N₂ hag
       exact .opCall_builtin hop
-        (ihargs (λ a haa z hz ↦ hag z (Expression.mem_freeVars_opCall.mpr (.inr ⟨a, haa, hz⟩)))) hb
+        (ihb (λ a haa z hz ↦ hag z (Expression.mem_freeVars_opCall.mpr (.inr ⟨a, haa, hz⟩))))
     | forall_true L _ _ ihdom ihall =>
       intro N₂ hag
       rw [Expression.freeVars] at hag
@@ -1382,6 +1999,124 @@ theorem evalLocal' {Ξ : OperatorEnv} {Ω : Model Value} {M₁ M₂ : Memory Val
     | inr _ _ ihh ihrest hag =>
       exact .inr (ihh (λ z hz ↦ hag _ List.mem_cons_self z hz))
         (ihrest (λ e hep z hz ↦ hag e (List.mem_cons_of_mem _ hep) z hz))
+    -- `EvalBuiltin`'s 62 arms. Each rebuilds its own constructor with the argument derivations
+    -- moved across by their induction hypotheses; the side conditions are about values alone, so
+    -- they carry over untouched.
+    | eq_pos _ _ ih₁ ih₂ hag => exact .eq_pos (ih₁ (forall_head hag)) (ih₂ (forall_snd hag))
+    | eq_neg _ _ h ih₁ ih₂ hag =>
+      exact .eq_neg (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) h
+    | neq_pos _ _ h ih₁ ih₂ hag =>
+      exact .neq_pos (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) h
+    | neq_neg _ _ ih₁ ih₂ hag => exact .neq_neg (ih₁ (forall_head hag)) (ih₂ (forall_snd hag))
+    | and_tt _ _ ih₁ ih₂ hag => exact .and_tt (ih₁ (forall_head hag)) (ih₂ (forall_snd hag))
+    | and_ff _ _ ha hb h ih₁ ih₂ hag =>
+      exact .and_ff (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) ha hb h
+    | or_tt _ _ ha hb h ih₁ ih₂ hag =>
+      exact .or_tt (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) ha hb h
+    | or_ff _ _ ih₁ ih₂ hag => exact .or_ff (ih₁ (forall_head hag)) (ih₂ (forall_snd hag))
+    | implies_t _ _ ha hb h ih₁ ih₂ hag =>
+      exact .implies_t (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) ha hb h
+    | implies_f _ _ ih₁ ih₂ hag => exact .implies_f (ih₁ (forall_head hag)) (ih₂ (forall_snd hag))
+    | iff_t _ _ ha ih₁ ih₂ hag =>
+      exact .iff_t (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) ha
+    | iff_f _ _ ha hb h ih₁ ih₂ hag =>
+      exact .iff_f (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) ha hb h
+    | neg_t _ ih₁ hag => exact .neg_t (ih₁ (forall_head hag))
+    | neg_f _ ih₁ hag => exact .neg_f (ih₁ (forall_head hag))
+    | inSet_pos _ _ h ih₁ ih₂ hag =>
+      exact .inSet_pos (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) h
+    | inSet_neg _ _ h ih₁ ih₂ hag =>
+      exact .inSet_neg (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) h
+    | notInSet_pos _ _ h ih₁ ih₂ hag =>
+      exact .notInSet_pos (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) h
+    | notInSet_neg _ _ h ih₁ ih₂ hag =>
+      exact .notInSet_neg (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) h
+    | subseteq_pos _ _ h ih₁ ih₂ hag =>
+      exact .subseteq_pos (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) h
+    | subseteq_neg _ _ h ih₁ ih₂ hag =>
+      exact .subseteq_neg (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) h
+    | cup _ _ ih₁ ih₂ hag => exact .cup (ih₁ (forall_head hag)) (ih₂ (forall_snd hag))
+    | cap _ _ ih₁ ih₂ hag => exact .cap (ih₁ (forall_head hag)) (ih₂ (forall_snd hag))
+    | setMinus _ _ ih₁ ih₂ hag => exact .setMinus (ih₁ (forall_head hag)) (ih₂ (forall_snd hag))
+    | cartesianProduct _ _ ih₁ ih₂ hag =>
+      exact .cartesianProduct (ih₁ (forall_head hag)) (ih₂ (forall_snd hag))
+    | domain _ hf ih₁ hag => exact .domain (ih₁ (forall_head hag)) hf
+    | plus _ _ ih₁ ih₂ hag => exact .plus (ih₁ (forall_head hag)) (ih₂ (forall_snd hag))
+    | minus _ _ ih₁ ih₂ hag => exact .minus (ih₁ (forall_head hag)) (ih₂ (forall_snd hag))
+    | unaryMinus _ ih₁ hag => exact .unaryMinus (ih₁ (forall_head hag))
+    | times _ _ ih₁ ih₂ hag => exact .times (ih₁ (forall_head hag)) (ih₂ (forall_snd hag))
+    | intDiv _ _ ih₁ ih₂ hag => exact .intDiv (ih₁ (forall_head hag)) (ih₂ (forall_snd hag))
+    | mod _ _ ih₁ ih₂ hag => exact .mod (ih₁ (forall_head hag)) (ih₂ (forall_snd hag))
+    | pow _ _ ih₁ ih₂ hag => exact .pow (ih₁ (forall_head hag)) (ih₂ (forall_snd hag))
+    | lt_pos _ _ h ih₁ ih₂ hag =>
+      exact .lt_pos (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) h
+    | lt_neg _ _ h ih₁ ih₂ hag =>
+      exact .lt_neg (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) h
+    | gt_pos _ _ h ih₁ ih₂ hag =>
+      exact .gt_pos (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) h
+    | gt_neg _ _ h ih₁ ih₂ hag =>
+      exact .gt_neg (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) h
+    | leq_pos _ _ h ih₁ ih₂ hag =>
+      exact .leq_pos (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) h
+    | leq_neg _ _ h ih₁ ih₂ hag =>
+      exact .leq_neg (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) h
+    | geq_pos _ _ h ih₁ ih₂ hag =>
+      exact .geq_pos (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) h
+    | geq_neg _ _ h ih₁ ih₂ hag =>
+      exact .geq_neg (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) h
+    | dotdot _ _ ih₁ ih₂ hag => exact .dotdot (ih₁ (forall_head hag)) (ih₂ (forall_snd hag))
+    | len _ ih₁ hag => exact .len (ih₁ (forall_head hag))
+    | head _ ih₁ hag => exact .head (ih₁ (forall_head hag))
+    | tail _ ih₁ hag => exact .tail (ih₁ (forall_head hag))
+    | append _ _ ih₁ ih₂ hag => exact .append (ih₁ (forall_head hag)) (ih₂ (forall_snd hag))
+    | strToSeq _ ih₁ hag => exact .strToSeq (ih₁ (forall_head hag))
+    | funAsSeq _ hf ih₁ hag => exact .funAsSeq (ih₁ (forall_head hag)) hf
+    | setAsFun _ h ih₁ hag => exact .setAsFun (ih₁ (forall_head hag)) h
+    | emptyBag => exact .emptyBag
+    | setToBag _ ih₁ hag => exact .setToBag (ih₁ (forall_head hag))
+    | bagAdd _ _ ih₁ ih₂ hag => exact .bagAdd (ih₁ (forall_head hag)) (ih₂ (forall_snd hag))
+    | bagSub _ _ ih₁ ih₂ hag => exact .bagSub (ih₁ (forall_head hag)) (ih₂ (forall_snd hag))
+    | subBag _ ih₁ hag => exact .subBag (ih₁ (forall_head hag))
+    | copiesIn _ _ ih₁ ih₂ hag => exact .copiesIn (ih₁ (forall_head hag)) (ih₂ (forall_snd hag))
+    | bagUnion _ hS ih₁ hag => exact .bagUnion (ih₁ (forall_head hag)) hS
+    | bagCardinality _ hB ih₁ hag => exact .bagCardinality (ih₁ (forall_head hag)) hB
+    | isABag _ hb ih₁ hag => exact .isABag (ih₁ (forall_head hag)) hb
+    | bagToSet _ hb ih₁ hag => exact .bagToSet (ih₁ (forall_head hag)) hb
+    | bagIn_pos _ _ he ih₁ ih₂ hag =>
+      exact .bagIn_pos (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) he
+    | bagIn_neg _ _ he ih₁ ih₂ hag =>
+      exact .bagIn_neg (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) he
+    | bagLeq_pos _ _ h ih₁ ih₂ hag =>
+      exact .bagLeq_pos (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) h
+    | bagLeq_neg _ _ h ih₁ ih₂ hag =>
+      exact .bagLeq_neg (ih₁ (forall_head hag)) (ih₂ (forall_snd hag)) h
+    -- `mkSeq`/`bagOfAll`: `himg`'s own call is a synthesized `.opCall F [.var (.var "_") (.free z)]`,
+    -- not a member of `args` — its agreement obligation (`F`'s freeVars, or trivially `z` itself
+    -- via the shared insert) is built by hand rather than read off `forall_head`/`forall_snd`.
+    | mkSeq _ img L _ hto hof ihN ihHimg hag =>
+      refine .mkSeq (ihN (forall_head hag)) img L
+        (λ z hz w hw ↦ ihHimg z hz w hw (λ y hy ↦ ?_)) hto hof
+      rcases Expression.mem_freeVars_opCall.mp hy with hyF | ⟨a, ha, hya⟩
+      · by_cases hyz : y = z
+        · subst hyz; rw [Finmap.lookup_insert, Finmap.lookup_insert]
+        · rw [Finmap.lookup_insert_of_ne _ hyz, Finmap.lookup_insert_of_ne _ hyz]
+          exact forall_snd hag y hyF
+      · obtain rfl := List.mem_singleton.mp ha
+        have hyz : y = z := by simpa [Expression.freeVars] using hya
+        subst hyz; rw [Finmap.lookup_insert, Finmap.lookup_insert]
+    | @bagOfAll _ _ _ Bval _ _ img L hfin _ hto hof ihB ihHimg _ hag =>
+      refine .bagOfAll (ihB (forall_snd hag)) img L hfin
+        (λ z hz w hw ↦ ihHimg z hz w hw (λ y hy ↦ ?_)) hto hof
+      rcases Expression.mem_freeVars_opCall.mp hy with hyF | ⟨a, ha, hya⟩
+      · by_cases hyz : y = z
+        · subst hyz; rw [Finmap.lookup_insert, Finmap.lookup_insert]
+        · rw [Finmap.lookup_insert_of_ne _ hyz, Finmap.lookup_insert_of_ne _ hyz]
+          exact forall_head hag y hyF
+      · obtain rfl := List.mem_singleton.mp ha
+        have hyz : y = z := by simpa [Expression.freeVars] using hya
+        subst hyz; rw [Finmap.lookup_insert, Finmap.lookup_insert]
+    -- `EvalList.nil` and `EvalPath.nil`: a wildcard is the only way to reach the second of two
+    -- like-named alternatives of a mutual recursor.
     | _ => exact .nil
   exact ⟨λ hev ↦ key hev h, λ hev ↦ key hev (λ x hx ↦ (h x hx).symm)⟩
 
@@ -1445,29 +2180,20 @@ theorem evalCoerce'_seqToFun {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory V
           ∀ w, w ∈ S ↔ ∃ j : ℕ, j < vs.length ∧ w = Value.ofNat (j + 1) := by
         cases hdom with
         | opCall_op _ hnb _ _ => simp [TypedTLAPlus.builtinOpOf?] at hnb
-        | opCall_builtin hop hargs hb =>
+        | opCall_builtin hop hb =>
           simp only [TypedTLAPlus.builtinOpOf?, Option.some.injEq] at hop; subst hop
-          cases hargs with
-          | cons hnat hrest =>
-            cases hrest with
-            | cons hlenE hnil =>
-              cases hnil
-              cases hlenE with
-              | opCall_op _ hnb _ _ => simp [TypedTLAPlus.builtinOpOf?] at hnb
-              | opCall_builtin hop2 hargs2 hb2 =>
-                simp only [TypedTLAPlus.builtinOpOf?, Option.some.injEq] at hop2; subst hop2
-                cases hargs2 with
-                | cons hee hnil2 =>
-                  cases hnil2
-                  cases hnat with
-                  | @nat _ _ nn hn1 =>
-                    obtain rfl : nn = 1 := Option.some.inj (hn1.symm.trans (Nat.toNat?_repr 1))
-                    obtain ⟨vs, rfl, rfl⟩ := evalBuiltin_len_inv hb2
-                    obtain ⟨x, y, hx, hy, hSraw⟩ := evalBuiltin_dotdot_inv hb
-                    rw [Value.ofNat, Value.ofInt_inj, Nat.cast_one] at hx
-                    rw [Value.ofNat, Value.ofInt_inj] at hy
-                    subst hx; subst hy
-                    exact ⟨vs, hee, λ w ↦ (hSraw w).trans (hidx (n := vs.length))⟩
+          obtain ⟨x, y, hx, hy, hSraw⟩ := evalBuiltin_dotdot_inv hb
+          have hx1 : Value.ofInt x = Value.ofNat 1 := evalUnique' hx (.nat (Nat.toNat?_repr 1))
+          rw [Value.ofNat, Value.ofInt_inj, Nat.cast_one] at hx1
+          subst hx1
+          cases hy with
+          | opCall_op _ hnb _ _ => simp [TypedTLAPlus.builtinOpOf?] at hnb
+          | opCall_builtin hop2 hb2 =>
+            simp only [TypedTLAPlus.builtinOpOf?, Option.some.injEq] at hop2; subst hop2
+            obtain ⟨vs, hee, hy1⟩ := evalBuiltin_len_inv hb2
+            rw [Value.ofNat, Value.ofInt_inj] at hy1
+            subst hy1
+            exact ⟨vs, hee, λ w ↦ (hSraw w).trans (hidx (n := vs.length))⟩
       exists Value.ofSeq vs, he, ⟨vs, isSeq_ofSeq vs⟩
       have himg' : ∀ w ∈ S, ∀ (j : ℕ) (hj : j < vs.length), w = Value.ofNat (j + 1) →
           img w = vs[j] := by
@@ -1497,23 +2223,35 @@ theorem evalCoerce'_seqToFun {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory V
       intro w
       rw [hSdef, Value.mem_intRange]
       exact hidx (n := vs.length)
-    have hrng : EvalBuiltin .dotdot [Value.ofNat 1, Value.ofNat vs.length] S := by
-      have h : EvalBuiltin .dotdot [Value.ofInt 1, Value.ofInt (vs.length : ℤ)]
-          (Value.intRange 1 (vs.length : ℤ)) := .dotdot
-      simpa only [Value.ofNat, Nat.cast_one, hSdef] using h
     have hrangeOp : TypedTLAPlus.builtinOpOf? (.module "Naturals" "..") = some .dotdot := by
       simp [TypedTLAPlus.builtinOpOf?]
     have hlenOp : TypedTLAPlus.builtinOpOf? (.module "Sequences" "Len") = some .len := by
       simp [TypedTLAPlus.builtinOpOf?]
+    have hlenEval : Eval Ξ Ω M
+        (Expression.opCall
+          (Expression.var (.operator [.seq τ] .int) (.module "Sequences" "Len")) [e])
+        (Value.ofNat vs.length) :=
+      .opCall_builtin hlenOp (.len he)
+    have h1 : Eval Ξ Ω M (Expression.nat (toString (1 : Nat))) (Value.ofInt 1) := by
+      have h : Eval Ξ Ω M (Expression.nat (toString (1 : Nat))) (Value.ofNat 1) :=
+        .nat (Nat.toNat?_repr 1)
+      rwa [Value.ofNat, Nat.cast_one] at h
+    have h2 : Eval Ξ Ω M
+        (Expression.opCall
+          (Expression.var (.operator [.seq τ] .int) (.module "Sequences" "Len")) [e])
+        (Value.ofInt (vs.length : ℤ)) := by rwa [Value.ofNat] at hlenEval
+    have hrng : EvalBuiltin Ξ Ω M .dotdot
+        [Expression.nat (toString (1 : Nat)),
+         Expression.opCall
+           (Expression.var (.operator [.seq τ] .int) (.module "Sequences" "Len")) [e]] S := by
+      rw [hSdef]; exact .dotdot h1 h2
     have hdomDeriv : Eval Ξ Ω M
         (Expression.opCall
           (Expression.var (.operator [.int, .int] (.set .int)) (.module "Naturals" ".."))
           [Expression.nat (toString (1 : Nat)),
            Expression.opCall
              (Expression.var (.operator [.seq τ] .int) (.module "Sequences" "Len")) [e]]) S :=
-      .opCall_builtin hrangeOp
-        (.cons (.nat (Nat.toNat?_repr 1))
-          (.cons (.opCall_builtin hlenOp (.cons he .nil) .len) .nil)) hrng
+      .opCall_builtin hrangeOp hrng
     have hpfS := Value.ofSeq_isPFunc vs
     have hkdomS : ∀ j : ℕ, j < vs.length →
         Value.ofNat (j + 1) ∈ (Value.ofSeq vs).Dom hpfS.1 :=
@@ -1571,37 +2309,27 @@ theorem evalCoerce'_bagToFun {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory V
   iff_rintro h ⟨v, he, hbag, rfl⟩
   · cases h with
     | @fn _ _ _ _ _ _ S G img L hdom himg hto hof =>
-      obtain ⟨v, he, hb⟩ : ∃ v, Eval Ξ Ω M e v ∧ EvalBuiltin .bagToSet [v] S := by
+      obtain ⟨v, he, hbag, rfl⟩ : ∃ v, Eval Ξ Ω M e v ∧ Value.IsBagVal v ∧ S = Value.rawDom v := by
         cases hdom with
         | opCall_op _ hnb _ _ => simp [TypedTLAPlus.builtinOpOf?] at hnb
-        | opCall_builtin hop hargs hb =>
-          rw [hbagToSetOp, Option.some.injEq] at hop
-          cases hargs with
-          | cons he hnil => cases hnil; exact ⟨_, he, hop ▸ hb⟩
-      obtain ⟨hbag, rfl⟩ : Value.IsBagVal v ∧ S = Value.rawDom v := by
-        cases hb with | bagToSet hbag => exact ⟨hbag, rfl⟩
+        | opCall_builtin hop hb =>
+          rw [hbagToSetOp, Option.some.injEq] at hop; subst hop
+          cases hb with
+          | bagToSet hev hbagVal => exact ⟨_, hev, hbagVal, rfl⟩
       have himg' : ∀ w ∈ Value.rawDom v, img w = Value.ofNat (Value.copiesInRaw w v) := by
         intro w hw
         obtain ⟨z, hz⟩ := exists_fresh (L ∪ e.freeVars)
         obtain ⟨hzL, hze⟩ := Finset.notMem_union.mp hz
         have hb := himg z hzL w hw
         rw [hob z] at hb
+        have hwit : EvalBuiltin Ξ Ω (M.insert z w) .copiesIn
+            [Expression.var τ (.free z) @@ posOf e, e] (Value.ofNat (Value.copiesInRaw w v)) :=
+          .copiesIn (.var_free (Finmap.lookup_insert _)) ((hloc hze).mpr he)
         cases hb with
         | opCall_op _ hnb _ _ => simp [TypedTLAPlus.builtinOpOf?] at hnb
-        | opCall_builtin hop hargs hb =>
-          rw [hcopiesInOp, Option.some.injEq] at hop
-          cases hargs with
-          | cons hw' hrest =>
-            cases hrest with
-            | cons he' hnil =>
-              cases hnil
-              cases hw' with
-              | var_free hb' =>
-                rw [Finmap.lookup_insert, Option.some.injEq] at hb'
-                subst hb'
-                obtain rfl := evalUnique' ((hloc hze).mp he') he
-                subst hop
-                exact evalBuiltinUnique hb .copiesIn
+        | opCall_builtin hop hb' =>
+          rw [hcopiesInOp, Option.some.injEq] at hop; subst hop
+          exact evalBuiltinUnique hb' hwit
       refine ⟨v, he, hbag, ZFSet.ext λ z ↦ ⟨λ hz ↦ ?_, λ hz ↦ ?_⟩⟩
       · obtain ⟨w, hw, rfl⟩ := hto z hz
         rw [himg' w hw]
@@ -1610,11 +2338,11 @@ theorem evalCoerce'_bagToFun {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory V
         rw [heq, ← himg' w hw]
         exact hof w hw
   · refine .fn (λ w ↦ Value.ofNat (Value.copiesInRaw w v')) e.freeVars
-      (.opCall_builtin hbagToSetOp (.cons he .nil) (.bagToSet hbag)) ?_ ?_ ?_
+      (.opCall_builtin hbagToSetOp (.bagToSet he hbag)) ?_ ?_ ?_
     · intro z hz w hw
       rw [hob z]
       exact .opCall_builtin hcopiesInOp
-        (.cons (.var_free (Finmap.lookup_insert _)) (.cons ((hloc hz).mpr he) .nil)) .copiesIn
+        (.copiesIn (.var_free (Finmap.lookup_insert _)) ((hloc hz).mpr he))
     · intro z hz
       obtain ⟨w, hw, rfl⟩ := hbag.mem_iff.mp hz
       exact ⟨w, hw, rfl⟩
@@ -1706,9 +2434,10 @@ theorem evalCoerce'_function {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory V
       cases hdomND with
       | @map' _ _ _ _ _ _ DV _ imgD Lmap hdomDE himgD htoD hofD =>
         obtain ⟨zx, hzx⟩ := exists_fresh Lmap
-        obtain ⟨ve, hev, hbD⟩ := evalOpCall1_inv hdomOp hdomDE
-        have hDchar : ∀ z, z ∈ DV ↔ ∃ w, ZFSet.pair z w ∈ ve := evalBuiltin_domain_inv hbD
-        obtain ⟨RngV, hpfV⟩ := evalBuiltin_domain_isPFunc hbD
+        have hbD := evalOpCall1_inv hdomOp hdomDE
+        obtain ⟨ve, hev, hDchar⟩ := evalBuiltin_domain_inv hbD
+        obtain ⟨ve2, RngV, hev2, hpfV⟩ := evalBuiltin_domain_isPFunc hbD
+        obtain rfl := evalUnique' hev hev2
         have hcoeD : ∀ k ∈ DV, coerce cD k (imgD k) := by
           intro k hk
           have hd := himgD zx hzx k hk
@@ -1732,9 +2461,10 @@ theorem evalCoerce'_function {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory V
               obtain ⟨zx2, hzx2⟩ := exists_fresh (Lch ∪ {zy})
               obtain ⟨hzx2L, hzx2y⟩ := Finset.notMem_union.mp hzx2
               rw [Finset.notMem_singleton] at hzx2y
-              obtain ⟨ve', hev', hbD'⟩ := evalOpCall1_inv hdomOp hdomRA
+              have hbD' := evalOpCall1_inv hdomOp hdomRA
+              obtain ⟨ve', hev', hSSchar⟩ := evalBuiltin_domain_inv hbD'
               obtain rfl := evalUnique' ((hloc hzye).mp hev') hev
-              have hSSDV : SS = DV := evalBuiltinUnique hbD' hbD
+              have hSSDV : SS = DV := ZFSet.ext λ z ↦ (hSSchar z).trans (hDchar z).symm
               have hpred : (λ k ↦ k ∈ SS ∧ filt k = Value.tru)
                   = (λ k ↦ k ∈ DV ∧ coerce cD k w) := by
                 rw [← hSSDV]
@@ -1744,20 +2474,30 @@ theorem evalCoerce'_function {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory V
                   apply propext
                   have hf3 := hfilt zx2 hzx2L k hk
                   rw [hR3 zx2 zy] at hf3
-                  obtain ⟨c1, c2, hc1, hc2, heqb⟩ := evalOpCall2_inv heqOp hf3
-                  have hc2w : c2 = w := by
-                    simp only [evalVar'] at hc2
-                    rw [Finmap.lookup_insert_of_ne _ hzx2y.symm, Finmap.lookup_insert] at hc2
-                    exact (Option.some.inj hc2).symm
-                  subst c2
-                  have hcoeck : coerce cD k c1 := by
-                    obtain ⟨vv2, hvar2, hc⟩ := ihD.mp hc1
-                    simp only [evalVar', Finmap.lookup_insert, Option.some.injEq] at hvar2
-                    subst hvar2
-                    exact hc
-                  rcases evalBuiltin_eq_inv heqb with ⟨he1, hf1⟩ | ⟨hne1, hf1⟩
-                  · exact iff_of_true hf1 (he1 ▸ hcoeck)
-                  · rw [hf1]
+                  have heqb := evalOpCall2_inv heqOp hf3
+                  rcases evalBuiltin_eq_inv heqb with ⟨c1, hc1, hc2, hf1⟩ | ⟨c1, c2, hc1, hc2, hne1, hf1⟩
+                  · have hc2w : c1 = w := by
+                      simp only [evalVar'] at hc2
+                      rw [Finmap.lookup_insert_of_ne _ hzx2y.symm, Finmap.lookup_insert] at hc2
+                      exact (Option.some.inj hc2).symm
+                    subst hc2w
+                    have hcoeck : coerce cD k c1 := by
+                      obtain ⟨vv2, hvar2, hc⟩ := ihD.mp hc1
+                      simp only [evalVar', Finmap.lookup_insert, Option.some.injEq] at hvar2
+                      subst hvar2
+                      exact hc
+                    exact iff_of_true hf1 hcoeck
+                  · have hc2w : c2 = w := by
+                      simp only [evalVar'] at hc2
+                      rw [Finmap.lookup_insert_of_ne _ hzx2y.symm, Finmap.lookup_insert] at hc2
+                      exact (Option.some.inj hc2).symm
+                    subst hc2w
+                    have hcoeck : coerce cD k c1 := by
+                      obtain ⟨vv2, hvar2, hc⟩ := ihD.mp hc1
+                      simp only [evalVar', Finmap.lookup_insert, Option.some.injEq] at hvar2
+                      subst hvar2
+                      exact hc
+                    rw [hf1]
                     exact iff_of_false Value.fls_ne_tru
                       (λ hcw ↦ hne1 (coerceUnique hcoeck hcw))
                 · simp only [hk, false_and]
@@ -1789,8 +2529,8 @@ theorem evalCoerce'_function {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory V
             exact hofG w hw
   · have hDDdom : DD = v.Dom hpf.1 :=
       ZFSet.ext λ z ↦ (hDchar z).trans (mem_dom_iff hpf).symm
-    have hdomB : EvalBuiltin .domain [v] DD := by
-      rw [hDDdom]; exact EvalBuiltin.domain hpf
+    have hdomB : EvalBuiltin Ξ Ω M .domain [e] DD := by
+      rw [hDDdom]; exact .domain hev hpf
     have hDcoe : ∀ k ∈ DD, coerce cD k (Classical.epsilon λ z ↦ coerce cD k z) :=
       λ k hk ↦ Classical.epsilon_spec (hcDtot k hk)
     let eps : Value → Value := λ w ↦ Classical.epsilon (λ k ↦ k ∈ DD ∧ coerce cD k w)
@@ -1804,7 +2544,7 @@ theorem evalCoerce'_function {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory V
     refine Eval.fn (S := Sd) img e.freeVars ?hdomND ?himgBR ?htoG ?hofG
     case hdomND =>
       refine Eval.map' (S := DD) (λ z ↦ Classical.epsilon λ w ↦ coerce cD z w) ∅ ?_ ?_ ?_ ?_
-      · exact Eval.opCall_builtin hdomOp (.cons hev .nil) hdomB
+      · exact Eval.opCall_builtin hdomOp hdomB
       · intro zx _ w hw
         rw [hR1 zx]
         refine ihD.mpr ⟨w, evalVar'.mpr ?_, hDcoe w hw⟩
@@ -1831,7 +2571,9 @@ theorem evalCoerce'_function {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory V
                 (if coerce cD k w then Value.tru else Value.fls) = Value.tru)
           from congrArg Classical.epsilon hfeq]
       refine Eval.choose (λ k ↦ if coerce cD k w then Value.tru else Value.fls) {zy} ?_ ?_
-      · exact Eval.opCall_builtin hdomOp (.cons ((hloc hzy).mpr hev) .nil) hdomB
+      · have hdomB' : EvalBuiltin Ξ Ω (M.insert zy w) .domain [e] DD := by
+          rw [hDDdom]; exact .domain ((hloc hzy).mpr hev) hpf
+        exact Eval.opCall_builtin hdomOp hdomB'
       · intro zx hzx k hk
         rw [Finset.notMem_singleton] at hzx
         rw [hR3 zx zy]
@@ -1844,14 +2586,15 @@ theorem evalCoerce'_function {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory V
           refine evalVar'.mpr ?_
           change ((M.insert zy w).insert zx k).lookup zy = some w
           rw [Finmap.lookup_insert_of_ne _ hzx.symm, Finmap.lookup_insert]
-        have heqb : EvalBuiltin .eq [Classical.epsilon λ z ↦ coerce cD k z, w]
+        have heqb : EvalBuiltin Ξ Ω ((M.insert zy w).insert zx k) .eq
+            [cD.applyComputable (Expression.var dom (.free zx)), Expression.var dom' (.free zy)]
             (if coerce cD k w then Value.tru else Value.fls) := by
           by_cases hc : coerce cD k w
-          · rw [coerceUnique (hDcoe k hk) hc, if_pos hc]
-            exact EvalBuiltin.eq_pos
+          · rw [if_pos hc]
+            exact .eq_pos (coerceUnique (hDcoe k hk) hc ▸ hcDx) hvy
           · rw [if_neg hc]
-            exact EvalBuiltin.eq_neg λ h ↦ hc (h ▸ hDcoe k hk)
-        exact Eval.opCall_builtin heqOp (.cons hcDx (.cons hvy .nil)) heqb
+            exact .eq_neg hcDx hvy (λ h ↦ hc (h ▸ hDcoe k hk))
+        exact Eval.opCall_builtin heqOp heqb
     case htoG =>
       intro z hz
       obtain ⟨w, hw, vk, r', hpair, hc, rfl⟩ := (hgraph z).mp hz
@@ -1883,12 +2626,11 @@ theorem evalCoerce' {Ξ : OperatorEnv} {Ω : Model Value} (hΞ : Ξ.WellScoped) 
     simp only [TypedTLAPlus.Coercion.applyComputable, coerce]
     iff_rintro hev ⟨v, hv, rfl⟩
     · cases hev with
-      | opCall_builtin hop hargs hb =>
+      | opCall_builtin hop hb =>
         simp only [TypedTLAPlus.builtinOpOf?, Option.some.injEq] at hop
         subst hop
-        cases hargs with
-        | cons he hnil => cases hb with | strToSeq => exact ⟨_, he, rfl⟩
-    · exact .opCall_builtin (op := .strToSeq) rfl (.cons hv .nil) .strToSeq
+        cases hb with | strToSeq h => exact ⟨_, h, rfl⟩
+    · exact .opCall_builtin (op := .strToSeq) rfl (.strToSeq hv)
   | .seqToFun τ i, M, e, v' => evalCoerce'_seqToFun (i := i) hΞ
   | .bagToFun τ i, M, e, v' => evalCoerce'_bagToFun (i := i) hΞ
   | .tupleToSeq n τ hn, M, e, v' => by
@@ -2166,7 +2908,11 @@ private theorem evalSubst'_fwd {Ξ : OperatorEnv} {Ω : Model Value} {x : String
     (motive_3 := λ N p rs _ ↦ ∀ {N' : Memory Value},
       (∀ e, Sum.inr e ∈ p → ∀ y ∈ e.freeVars, y ≠ x → N.lookup y = N'.lookup y) →
       (∀ w, N.lookup x = some w → Eval Ξ Ω N' e' w) →
-      EvalPath Ξ Ω N' (p.map λ s ↦ s.map id (Expression.subst x e')) rs) with
+      EvalPath Ξ Ω N' (p.map λ s ↦ s.map id (Expression.subst x e')) rs)
+    (motive_4 := λ N op args v _ ↦ ∀ {N' : Memory Value},
+      (∀ e ∈ args, ∀ y ∈ e.freeVars, y ≠ x → N.lookup y = N'.lookup y) →
+      (∀ w, N.lookup x = some w → Eval Ξ Ω N' e' w) →
+      EvalBuiltin Ξ Ω N' op (args.map (Expression.subst x e')) v) with
   | nat hn => intro N' _ _; rw [Expression.subst_nat]; exact .nat hn
   | str => intro N' _ _; rw [Expression.subst_str]; exact .str
   | tru => intro N' _ _; rw [Expression.subst_true]; exact .tru
@@ -2211,12 +2957,12 @@ private theorem evalSubst'_fwd {Ξ : OperatorEnv} {Ω : Model Value} {x : String
       · exact (by rw [hclosed]; exact Finset.notMem_empty y : y ∉ bodyv.freeVars) h |>.elim
       · exact hag y (Expression.mem_freeVars_opCall.mpr (.inr ⟨a, ha, hya⟩)) hyx
     · simpa using hargs
-  | opCall_builtin hop hargs hb ihargs =>
+  | opCall_builtin hop _ ihb =>
     intro N' hag hx
     rw [Expression.subst_opCall, subst_var_of_builtin hop]
-    refine .opCall_builtin hop ?_ hb
-    exact ihargs (λ a ha y hy hyx ↦
-      hag y (Expression.mem_freeVars_opCall.mpr (.inr ⟨a, ha, hy⟩)) hyx) hx
+    exact .opCall_builtin hop
+      (ihb (λ a ha y hy hyx ↦
+        hag y (Expression.mem_freeVars_opCall.mpr (.inr ⟨a, ha, hy⟩)) hyx) hx)
   | forall_true L hdom hall ihdom ihall =>
     intro N' hag hx
     rw [Expression.LC.subst_forall hlc]
@@ -2396,6 +3142,157 @@ private theorem evalSubst'_fwd {Ξ : OperatorEnv} {Ω : Model Value} {x : String
   | @inr M ee vv rest resolved hev hrest ihHead hh hhs ihh ihhs =>
     exact .inr (ihHead (λ y hy hyx ↦ ihh ee List.mem_cons_self y hy hyx) ihhs)
       (hh (λ ee' hee' y hy hyx ↦ ihh ee' (List.mem_cons_of_mem _ hee') y hy hyx) ihhs)
+  -- `EvalBuiltin`'s 62 arms. `subst` reaches a builtin call's arguments and nothing else, so each
+  -- arm rebuilds its own constructor over the substituted arguments; the side conditions are about
+  -- values alone and carry over untouched.
+  | eq_pos _ _ ih₁ ih₂ hag hx =>
+    exact .eq_pos (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx)
+  | eq_neg _ _ h ih₁ ih₂ hag hx =>
+    exact .eq_neg (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) h
+  | neq_pos _ _ h ih₁ ih₂ hag hx =>
+    exact .neq_pos (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) h
+  | neq_neg _ _ ih₁ ih₂ hag hx =>
+    exact .neq_neg (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx)
+  | and_tt _ _ ih₁ ih₂ hag hx =>
+    exact .and_tt (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx)
+  | and_ff _ _ ha hb h ih₁ ih₂ hag hx =>
+    exact .and_ff (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) ha hb h
+  | or_tt _ _ ha hb h ih₁ ih₂ hag hx =>
+    exact .or_tt (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) ha hb h
+  | or_ff _ _ ih₁ ih₂ hag hx =>
+    exact .or_ff (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx)
+  | implies_t _ _ ha hb h ih₁ ih₂ hag hx =>
+    exact .implies_t (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) ha hb h
+  | implies_f _ _ ih₁ ih₂ hag hx =>
+    exact .implies_f (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx)
+  | iff_t _ _ ha ih₁ ih₂ hag hx =>
+    exact .iff_t (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) ha
+  | iff_f _ _ ha hb h ih₁ ih₂ hag hx =>
+    exact .iff_f (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) ha hb h
+  | neg_t _ ih₁ hag hx => exact .neg_t (ih₁ (forall_head hag) hx)
+  | neg_f _ ih₁ hag hx => exact .neg_f (ih₁ (forall_head hag) hx)
+  | inSet_pos _ _ h ih₁ ih₂ hag hx =>
+    exact .inSet_pos (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) h
+  | inSet_neg _ _ h ih₁ ih₂ hag hx =>
+    exact .inSet_neg (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) h
+  | notInSet_pos _ _ h ih₁ ih₂ hag hx =>
+    exact .notInSet_pos (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) h
+  | notInSet_neg _ _ h ih₁ ih₂ hag hx =>
+    exact .notInSet_neg (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) h
+  | subseteq_pos _ _ h ih₁ ih₂ hag hx =>
+    exact .subseteq_pos (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) h
+  | subseteq_neg _ _ h ih₁ ih₂ hag hx =>
+    exact .subseteq_neg (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) h
+  | cup _ _ ih₁ ih₂ hag hx =>
+    exact .cup (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx)
+  | cap _ _ ih₁ ih₂ hag hx =>
+    exact .cap (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx)
+  | setMinus _ _ ih₁ ih₂ hag hx =>
+    exact .setMinus (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx)
+  | cartesianProduct _ _ ih₁ ih₂ hag hx =>
+    exact .cartesianProduct (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx)
+  | domain _ hf ih₁ hag hx => exact .domain (ih₁ (forall_head hag) hx) hf
+  | plus _ _ ih₁ ih₂ hag hx =>
+    exact .plus (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx)
+  | minus _ _ ih₁ ih₂ hag hx =>
+    exact .minus (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx)
+  | unaryMinus _ ih₁ hag hx => exact .unaryMinus (ih₁ (forall_head hag) hx)
+  | times _ _ ih₁ ih₂ hag hx =>
+    exact .times (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx)
+  | intDiv _ _ ih₁ ih₂ hag hx =>
+    exact .intDiv (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx)
+  | mod _ _ ih₁ ih₂ hag hx =>
+    exact .mod (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx)
+  | pow _ _ ih₁ ih₂ hag hx =>
+    exact .pow (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx)
+  | lt_pos _ _ h ih₁ ih₂ hag hx =>
+    exact .lt_pos (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) h
+  | lt_neg _ _ h ih₁ ih₂ hag hx =>
+    exact .lt_neg (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) h
+  | gt_pos _ _ h ih₁ ih₂ hag hx =>
+    exact .gt_pos (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) h
+  | gt_neg _ _ h ih₁ ih₂ hag hx =>
+    exact .gt_neg (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) h
+  | leq_pos _ _ h ih₁ ih₂ hag hx =>
+    exact .leq_pos (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) h
+  | leq_neg _ _ h ih₁ ih₂ hag hx =>
+    exact .leq_neg (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) h
+  | geq_pos _ _ h ih₁ ih₂ hag hx =>
+    exact .geq_pos (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) h
+  | geq_neg _ _ h ih₁ ih₂ hag hx =>
+    exact .geq_neg (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) h
+  | dotdot _ _ ih₁ ih₂ hag hx =>
+    exact .dotdot (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx)
+  | len _ ih₁ hag hx => exact .len (ih₁ (forall_head hag) hx)
+  | head _ ih₁ hag hx => exact .head (ih₁ (forall_head hag) hx)
+  | tail _ ih₁ hag hx => exact .tail (ih₁ (forall_head hag) hx)
+  | append _ _ ih₁ ih₂ hag hx =>
+    exact .append (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx)
+  | strToSeq _ ih₁ hag hx => exact .strToSeq (ih₁ (forall_head hag) hx)
+  | funAsSeq _ hf ih₁ hag hx => exact .funAsSeq (ih₁ (forall_head hag) hx) hf
+  | setAsFun _ h ih₁ hag hx => exact .setAsFun (ih₁ (forall_head hag) hx) h
+  | emptyBag => exact .emptyBag
+  | setToBag _ ih₁ hag hx => exact .setToBag (ih₁ (forall_head hag) hx)
+  | bagAdd _ _ ih₁ ih₂ hag hx =>
+    exact .bagAdd (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx)
+  | bagSub _ _ ih₁ ih₂ hag hx =>
+    exact .bagSub (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx)
+  | subBag _ ih₁ hag hx => exact .subBag (ih₁ (forall_head hag) hx)
+  | copiesIn _ _ ih₁ ih₂ hag hx =>
+    exact .copiesIn (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx)
+  | bagUnion _ hS ih₁ hag hx => exact .bagUnion (ih₁ (forall_head hag) hx) hS
+  | bagCardinality _ hB ih₁ hag hx => exact .bagCardinality (ih₁ (forall_head hag) hx) hB
+  | isABag _ hb ih₁ hag hx => exact .isABag (ih₁ (forall_head hag) hx) hb
+  | bagToSet _ hb ih₁ hag hx => exact .bagToSet (ih₁ (forall_head hag) hx) hb
+  | bagIn_pos _ _ he ih₁ ih₂ hag hx =>
+    exact .bagIn_pos (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) he
+  | bagIn_neg _ _ he ih₁ ih₂ hag hx =>
+    exact .bagIn_neg (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) he
+  | bagLeq_pos _ _ h ih₁ ih₂ hag hx =>
+    exact .bagLeq_pos (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) h
+  | bagLeq_neg _ _ h ih₁ ih₂ hag hx =>
+    exact .bagLeq_neg (ih₁ (forall_head hag) hx) (ih₂ (forall_snd hag) hx) h
+  -- `mkSeq`/`bagOfAll`: `subst_opCall` rewrites the synthesized call's substituted form; `z`'s own
+  -- freshness (`freshParts`) means the inner `.var _ (.free z)` survives substitution untouched
+  -- (`subst_var_free_ne`). The agreement `ihHimg` needs is built by hand (`F`'s freeVars via
+  -- `forall_snd`/`forall_head`, or trivially `z` itself), same as `evalLocal'`'s own two cases.
+  | @mkSeq _ _ F _ _ _ img L _ hto hof ihN ihHimg _ hag hx =>
+    refine .mkSeq (ihN (forall_head hag) hx) img (L ∪ e'.freeVars ∪ {x}) (λ z hz w hw ↦ ?_) hto hof
+    obtain ⟨hzL, hze, hzx⟩ := freshParts hz
+    have heq : Expression.subst x e' (F.opCall [Expression.var (.var "_") (.free z)])
+        = (Expression.subst x e' F).opCall [Expression.var (.var "_") (.free z)] := by
+      simp only [Expression.subst_opCall, List.map_cons, List.map_nil,
+        Expression.subst_var_free_ne hzx]
+    rw [← heq]
+    refine ihHimg z hzL w hw (λ y hy hyx ↦ ?_) (xStep hzx hze hx)
+    rcases Expression.mem_freeVars_opCall.mp hy with hyF | ⟨a, ha, hya⟩
+    · by_cases hyz : y = z
+      · subst hyz; rw [Finmap.lookup_insert, Finmap.lookup_insert]
+      · rw [Finmap.lookup_insert_of_ne _ hyz, Finmap.lookup_insert_of_ne _ hyz]
+        exact forall_snd hag y hyF hyx
+    · obtain rfl := List.mem_singleton.mp ha
+      have hyz : y = z := by simpa [Expression.freeVars] using hya
+      subst hyz; rw [Finmap.lookup_insert, Finmap.lookup_insert]
+  | @bagOfAll _ F _ Bval _ _ img L hfin _ hto hof ihB ihHimg _ hag hx =>
+    refine .bagOfAll (ihB (forall_snd hag) hx) img (L ∪ e'.freeVars ∪ {x}) hfin
+      (λ z hz w hw ↦ ?_) hto hof
+    obtain ⟨hzL, hze, hzx⟩ := freshParts hz
+    have heq : Expression.subst x e' (F.opCall [Expression.var (.var "_") (.free z)])
+        = (Expression.subst x e' F).opCall [Expression.var (.var "_") (.free z)] := by
+      simp only [Expression.subst_opCall, List.map_cons, List.map_nil,
+        Expression.subst_var_free_ne hzx]
+    rw [← heq]
+    refine ihHimg z hzL w hw (λ y hy hyx ↦ ?_) (xStep hzx hze hx)
+    rcases Expression.mem_freeVars_opCall.mp hy with hyF | ⟨a, ha, hya⟩
+    · by_cases hyz : y = z
+      · subst hyz; rw [Finmap.lookup_insert, Finmap.lookup_insert]
+      · rw [Finmap.lookup_insert_of_ne _ hyz, Finmap.lookup_insert_of_ne _ hyz]
+        exact forall_head hag y hyF hyx
+    · obtain rfl := List.mem_singleton.mp ha
+      have hyz : y = z := by simpa [Expression.freeVars] using hya
+      subst hyz; rw [Finmap.lookup_insert, Finmap.lookup_insert]
+  -- `EvalList.nil` and `EvalPath.nil`: a wildcard is the only way to reach the second of two
+  -- like-named alternatives of a mutual recursor.
   | _ => exact .nil
 
 /-- The `e = .var τ₀ o₀` arm of `evalSubst'_bwd`'s per-constructor `cases e`, when the derived
@@ -2431,6 +3328,22 @@ private theorem bwdVar {Ξ : OperatorEnv} {Ω : Model Value} {x : String} {e' : 
     rw [Expression.subst_var_intrinsic] at hsub
     absurd hsub.symm
     exact hnotvar _ _
+
+/-- Invert a `List.map` against a one-element list. `evalSubst'_bwd`'s `EvalBuiltin` arms are handed
+the *substituted* argument list by the derivation and have to recover the pre-substitution one;
+`argsMap_one`/`argsMap_two` do that at the two arities every arm but `EmptyBag` is defined at. -/
+private theorem argsMap_one {α β : Type _} {f : α → β} {l : List α} {b : β} (h : l.map f = [b]) :
+    ∃ a, l = [a] ∧ f a = b := by
+  obtain ⟨a, l₁, rfl, hb, hl₁⟩ := List.map_eq_cons_iff.mp h
+  obtain rfl := List.map_eq_nil_iff.mp hl₁
+  exact ⟨a, rfl, hb⟩
+
+/-- `argsMap_one` at two arguments. -/
+private theorem argsMap_two {α β : Type _} {f : α → β} {l : List α} {b₁ b₂ : β}
+    (h : l.map f = [b₁, b₂]) : ∃ a₁ a₂, l = [a₁, a₂] ∧ f a₁ = b₁ ∧ f a₂ = b₂ := by
+  obtain ⟨a₁, l₁, rfl, hb₁, hl₁⟩ := List.map_eq_cons_iff.mp h
+  obtain ⟨a₂, rfl, hb₂⟩ := argsMap_one hl₁
+  exact ⟨a₁, a₂, rfl, hb₁, hb₂⟩
 
 private theorem evalSubst'_bwd {Ξ : OperatorEnv} {Ω : Model Value} {x : String}
     {e' : Expression Typ} {v' : Value} (hΞ : Ξ.WellScoped) (hlc : e'.LC) :
@@ -2473,7 +3386,11 @@ private theorem evalSubst'_bwd {Ξ : OperatorEnv} {Ω : Model Value} {x : String
     (motive_3 := λ N p rs _ ↦ ∀ {p₀ : List (String ⊕ Expression Typ)} {N' : Memory Value},
       (p₀.map λ s ↦ s.map id (Expression.subst x e')) = p →
       (∀ e, Sum.inr e ∈ p₀ → ∀ y ∈ e.freeVars, y ≠ x → N.lookup y = N'.lookup y) →
-      N'.lookup x = some v' → Eval Ξ Ω N e' v' → EvalPath Ξ Ω N' p₀ rs) with
+      N'.lookup x = some v' → Eval Ξ Ω N e' v' → EvalPath Ξ Ω N' p₀ rs)
+    (motive_4 := λ N op args v _ ↦ ∀ {args₀ : List (Expression Typ)} {N' : Memory Value},
+      args₀.map (Expression.subst x e') = args →
+      (∀ e ∈ args₀, ∀ y ∈ e.freeVars, y ≠ x → N.lookup y = N'.lookup y) →
+      N'.lookup x = some v' → Eval Ξ Ω N e' v' → EvalBuiltin Ξ Ω N' op args₀ v) with
   -- literals
   | nat hn =>
     intro e N' hsub hag hN'x hev'
@@ -2652,7 +3569,7 @@ private theorem evalSubst'_bwd {Ξ : OperatorEnv} {Ω : Model Value} {x : String
       | _ => subst_ctor_mismatch hf
     | var τ₀ o₀ => exact bwdVar hlc (.opCall_op hΞ' hnb' hlen hbody hargs) hsub hN'x hev' (by simp)
     | _ => subst_ctor_mismatch hsub
-  | opCall_builtin hop hargsL hb ihargs =>
+  | opCall_builtin hop hb ihb =>
     intro e N' hsub hag hN'x hev'
     cases e with
     | opCall f₀ args₀ =>
@@ -2665,14 +3582,14 @@ private theorem evalSubst'_bwd {Ξ : OperatorEnv} {Ω : Model Value} {x : String
           rw [Expression.subst_var_module] at hf
           injection hf with hτ ho; subst hτ; subst ho; subst ha
           exact .opCall_builtin hop
-            (ihargs rfl (λ a hain y hy hyx ↦
-              hag y (Expression.mem_freeVars_opCall.mpr (.inr ⟨a, hain, hy⟩)) hyx) hN'x hev') hb
+            (ihb rfl (λ a hain y hy hyx ↦
+              hag y (Expression.mem_freeVars_opCall.mpr (.inr ⟨a, hain, hy⟩)) hyx) hN'x hev')
         | intrinsic n₁ =>
           rw [Expression.subst_var_intrinsic] at hf
           injection hf with hτ ho; subst hτ; subst ho; subst ha
           exact .opCall_builtin hop
-            (ihargs rfl (λ a hain y hy hyx ↦
-              hag y (Expression.mem_freeVars_opCall.mpr (.inr ⟨a, hain, hy⟩)) hyx) hN'x hev') hb
+            (ihb rfl (λ a hain y hy hyx ↦
+              hag y (Expression.mem_freeVars_opCall.mpr (.inr ⟨a, hain, hy⟩)) hyx) hN'x hev')
         | free n₁ =>
           by_cases hn : n₁ = x
           · subst hn
@@ -2695,7 +3612,7 @@ private theorem evalSubst'_bwd {Ξ : OperatorEnv} {Ω : Model Value} {x : String
           injection hf with _ ho; subst ho
           simp [TypedTLAPlus.builtinOpOf?] at hop
       | _ => subst_ctor_mismatch hf
-    | var τ₀ o₀ => exact bwdVar hlc (.opCall_builtin hop hargsL hb) hsub hN'x hev' (by simp)
+    | var τ₀ o₀ => exact bwdVar hlc (.opCall_builtin hop hb) hsub hN'x hev' (by simp)
     | _ => subst_ctor_mismatch hsub
   -- bounded quantifiers
   | forall_true L hdom hall ihdom ihall =>
@@ -3019,8 +3936,281 @@ private theorem evalSubst'_bwd {Ξ : OperatorEnv} {Ω : Model Value} {x : String
       exact .inr (ihHead he₀ (λ y hy hyx ↦ hag e₀ List.mem_cons_self y hy hyx) hN'x hev')
         (ihTail hrest (λ ee hein y hy hyx ↦
           hag ee (List.mem_cons_of_mem _ hein) y hy hyx) hN'x hev')
-  | _ =>
-    obtain rfl := List.map_eq_nil_iff.mp ‹List.map _ _ = []›
+  -- `EvalBuiltin`'s 62 arms. No `cases e` here, unlike every `Eval` arm above: the motive already
+  -- fixes the operator, so all that is left is to read the pre-substitution argument list back off
+  -- `args₀.map (subst x e') = args` and rebuild the same constructor over it.
+  | eq_pos _ _ ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .eq_pos (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev')
+  | eq_neg _ _ h ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .eq_neg (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') h
+  | neq_pos _ _ h ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .neq_pos (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') h
+  | neq_neg _ _ ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .neq_neg (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev')
+  | and_tt _ _ ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .and_tt (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev')
+  | and_ff _ _ ha hb h ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .and_ff (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') ha hb h
+  | or_tt _ _ ha hb h ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .or_tt (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') ha hb h
+  | or_ff _ _ ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .or_ff (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev')
+  | implies_t _ _ ha hb h ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .implies_t (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') ha hb h
+  | implies_f _ _ ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .implies_f (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev')
+  | iff_t _ _ ha ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .iff_t (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') ha
+  | iff_f _ _ ha hb h ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .iff_f (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') ha hb h
+  | neg_t _ ih₁ hsub hag hN'x hev' =>
+    obtain ⟨_, rfl, hb₁⟩ := argsMap_one hsub
+    exact .neg_t (ih₁ hb₁ (forall_head hag) hN'x hev')
+  | neg_f _ ih₁ hsub hag hN'x hev' =>
+    obtain ⟨_, rfl, hb₁⟩ := argsMap_one hsub
+    exact .neg_f (ih₁ hb₁ (forall_head hag) hN'x hev')
+  | inSet_pos _ _ h ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .inSet_pos (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') h
+  | inSet_neg _ _ h ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .inSet_neg (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') h
+  | notInSet_pos _ _ h ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .notInSet_pos (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') h
+  | notInSet_neg _ _ h ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .notInSet_neg (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') h
+  | subseteq_pos _ _ h ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .subseteq_pos (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') h
+  | subseteq_neg _ _ h ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .subseteq_neg (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') h
+  | cup _ _ ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .cup (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev')
+  | cap _ _ ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .cap (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev')
+  | setMinus _ _ ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .setMinus (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev')
+  | cartesianProduct _ _ ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .cartesianProduct (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev')
+  | domain _ hf ih₁ hsub hag hN'x hev' =>
+    obtain ⟨_, rfl, hb₁⟩ := argsMap_one hsub
+    exact .domain (ih₁ hb₁ (forall_head hag) hN'x hev') hf
+  | plus _ _ ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .plus (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev')
+  | minus _ _ ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .minus (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev')
+  | unaryMinus _ ih₁ hsub hag hN'x hev' =>
+    obtain ⟨_, rfl, hb₁⟩ := argsMap_one hsub
+    exact .unaryMinus (ih₁ hb₁ (forall_head hag) hN'x hev')
+  | times _ _ ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .times (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev')
+  | intDiv _ _ ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .intDiv (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev')
+  | mod _ _ ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .mod (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev')
+  | pow _ _ ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .pow (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev')
+  | lt_pos _ _ h ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .lt_pos (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') h
+  | lt_neg _ _ h ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .lt_neg (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') h
+  | gt_pos _ _ h ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .gt_pos (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') h
+  | gt_neg _ _ h ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .gt_neg (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') h
+  | leq_pos _ _ h ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .leq_pos (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') h
+  | leq_neg _ _ h ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .leq_neg (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') h
+  | geq_pos _ _ h ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .geq_pos (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') h
+  | geq_neg _ _ h ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .geq_neg (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') h
+  | dotdot _ _ ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .dotdot (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev')
+  | len _ ih₁ hsub hag hN'x hev' =>
+    obtain ⟨_, rfl, hb₁⟩ := argsMap_one hsub
+    exact .len (ih₁ hb₁ (forall_head hag) hN'x hev')
+  | head _ ih₁ hsub hag hN'x hev' =>
+    obtain ⟨_, rfl, hb₁⟩ := argsMap_one hsub
+    exact .head (ih₁ hb₁ (forall_head hag) hN'x hev')
+  | tail _ ih₁ hsub hag hN'x hev' =>
+    obtain ⟨_, rfl, hb₁⟩ := argsMap_one hsub
+    exact .tail (ih₁ hb₁ (forall_head hag) hN'x hev')
+  | append _ _ ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .append (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev')
+  | strToSeq _ ih₁ hsub hag hN'x hev' =>
+    obtain ⟨_, rfl, hb₁⟩ := argsMap_one hsub
+    exact .strToSeq (ih₁ hb₁ (forall_head hag) hN'x hev')
+  | funAsSeq _ hf ih₁ hsub hag hN'x hev' =>
+    obtain ⟨_, rfl, hb₁⟩ := argsMap_one hsub
+    exact .funAsSeq (ih₁ hb₁ (forall_head hag) hN'x hev') hf
+  | setAsFun _ h ih₁ hsub hag hN'x hev' =>
+    obtain ⟨_, rfl, hb₁⟩ := argsMap_one hsub
+    exact .setAsFun (ih₁ hb₁ (forall_head hag) hN'x hev') h
+  | emptyBag hsub _ _ _ =>
+    obtain rfl := List.map_eq_nil_iff.mp hsub
+    exact .emptyBag
+  | setToBag _ ih₁ hsub hag hN'x hev' =>
+    obtain ⟨_, rfl, hb₁⟩ := argsMap_one hsub
+    exact .setToBag (ih₁ hb₁ (forall_head hag) hN'x hev')
+  | bagAdd _ _ ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .bagAdd (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev')
+  | bagSub _ _ ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .bagSub (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev')
+  | subBag _ ih₁ hsub hag hN'x hev' =>
+    obtain ⟨_, rfl, hb₁⟩ := argsMap_one hsub
+    exact .subBag (ih₁ hb₁ (forall_head hag) hN'x hev')
+  | copiesIn _ _ ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .copiesIn (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev')
+  | bagUnion _ hS ih₁ hsub hag hN'x hev' =>
+    obtain ⟨_, rfl, hb₁⟩ := argsMap_one hsub
+    exact .bagUnion (ih₁ hb₁ (forall_head hag) hN'x hev') hS
+  | bagCardinality _ hB ih₁ hsub hag hN'x hev' =>
+    obtain ⟨_, rfl, hb₁⟩ := argsMap_one hsub
+    exact .bagCardinality (ih₁ hb₁ (forall_head hag) hN'x hev') hB
+  | isABag _ hb ih₁ hsub hag hN'x hev' =>
+    obtain ⟨_, rfl, hb₁⟩ := argsMap_one hsub
+    exact .isABag (ih₁ hb₁ (forall_head hag) hN'x hev') hb
+  | bagToSet _ hb ih₁ hsub hag hN'x hev' =>
+    obtain ⟨_, rfl, hb₁⟩ := argsMap_one hsub
+    exact .bagToSet (ih₁ hb₁ (forall_head hag) hN'x hev') hb
+  | bagIn_pos _ _ he ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .bagIn_pos (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') he
+  | bagIn_neg _ _ he ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .bagIn_neg (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') he
+  | bagLeq_pos _ _ h ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .bagLeq_pos (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') h
+  | bagLeq_neg _ _ h ih₁ ih₂ hsub hag hN'x hev' =>
+    obtain ⟨_, _, rfl, hb₁, hb₂⟩ := argsMap_two hsub
+    exact .bagLeq_neg (ih₁ hb₁ (forall_head hag) hN'x hev')
+      (ih₂ hb₂ (forall_snd hag) hN'x hev') h
+  -- `mkSeq`/`bagOfAll`: reconstruct `himg`'s own pre-image the same way as `evalSubst'_fwd` builds
+  -- its post-image — `.var _ (.free z)` is its own pre-image (`z ≠ x`, `subst_var_free_ne`), so
+  -- only `F`'s own pre-image (`argsMap_two`) needs threading through.
+  | mkSeq _ img L _ hto hof ihN ihHimg hsub hag hN'x hev' =>
+    obtain ⟨N₀, F₀, rfl, hN₀, hF₀⟩ := argsMap_two hsub
+    refine .mkSeq (ihN hN₀ (forall_head hag) hN'x hev') img (L ∪ e'.freeVars ∪ {x})
+      (λ z hz w hw ↦ ?_) hto hof
+    obtain ⟨hzL, hze, hzx⟩ := freshParts hz
+    refine ihHimg z hzL w hw
+      (by simp only [Expression.subst_opCall, List.map_cons, List.map_nil, hF₀,
+        Expression.subst_var_free_ne hzx])
+      (λ y hy hyx ↦ ?_) (xStep hzx hN'x) (evStep hze hev')
+    rcases Expression.mem_freeVars_opCall.mp hy with hyF | ⟨a, ha, hya⟩
+    · by_cases hyz : y = z
+      · subst hyz; rw [Finmap.lookup_insert, Finmap.lookup_insert]
+      · rw [Finmap.lookup_insert_of_ne _ hyz, Finmap.lookup_insert_of_ne _ hyz]
+        exact forall_snd hag y hyF hyx
+    · obtain rfl := List.mem_singleton.mp ha
+      have hyz : y = z := by simpa [Expression.freeVars] using hya
+      subst hyz; rw [Finmap.lookup_insert, Finmap.lookup_insert]
+  | bagOfAll _ img L hfin _ hto hof ihB ihHimg hsub hag hN'x hev' =>
+    obtain ⟨F₀, B₀, rfl, hF₀, hB₀⟩ := argsMap_two hsub
+    refine .bagOfAll (ihB hB₀ (forall_snd hag) hN'x hev') img (L ∪ e'.freeVars ∪ {x}) hfin
+      (λ z hz w hw ↦ ?_) hto hof
+    obtain ⟨hzL, hze, hzx⟩ := freshParts hz
+    refine ihHimg z hzL w hw
+      (by simp only [Expression.subst_opCall, List.map_cons, List.map_nil, hF₀,
+        Expression.subst_var_free_ne hzx])
+      (λ y hy hyx ↦ ?_) (xStep hzx hN'x) (evStep hze hev')
+    rcases Expression.mem_freeVars_opCall.mp hy with hyF | ⟨a, ha, hya⟩
+    · by_cases hyz : y = z
+      · subst hyz; rw [Finmap.lookup_insert, Finmap.lookup_insert]
+      · rw [Finmap.lookup_insert_of_ne _ hyz, Finmap.lookup_insert_of_ne _ hyz]
+        exact forall_head hag y hyF hyx
+    · obtain rfl := List.mem_singleton.mp ha
+      have hyz : y = z := by simpa [Expression.freeVars] using hya
+      subst hyz; rw [Finmap.lookup_insert, Finmap.lookup_insert]
+  -- `EvalPath.nil`: a wildcard is the only way to reach the second of two like-named alternatives
+  -- of a mutual recursor, `EvalList.nil` having taken the first.
+  | _ hsub _ _ _ =>
+    obtain rfl := List.map_eq_nil_iff.mp hsub
     exact .nil
 
 /-- Substitution is evaluation-under-extended-memory read backwards. `.mp` (forward) is
