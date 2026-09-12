@@ -897,7 +897,12 @@ reasoning follows from there.
 
 The argument hypothesis is exactly what `evalUnique'` carries as its `motive_4`, which is why it is
 a premise here rather than an appeal to `evalUnique'`: that theorem's own `opCall_builtin` step is
-this lemma's caller. `evalBuiltinUnique` is the same statement against full `Eval` determinism. -/
+this lemma's caller. `evalBuiltinUnique` is the same statement against full `Eval` determinism.
+
+`hne1`/`hne2` exclude `mkSeq`/`bagOfAll`: `ArgsDet` cannot reconcile their own `img`, which lives at
+`M.insert z w` under a fresh binder rather than at `M` — those two are handled by their callers
+directly (`mkSeq_graph_ext`/`bagOfAll_graph_ext`) before ever reaching this lemma, so its own
+`cases h₁` only needs to *discharge*, not solve, those two cases. -/
 private theorem evalBuiltinUnique_of {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
     {op : BuiltinOp} {args : List (Expression Typ)} {v w : Value} (hdet : ArgsDet Ξ Ω M args)
     (hne1 : op ≠ .mkSeq) (hne2 : op ≠ .bagOfAll)
@@ -1329,6 +1334,53 @@ private theorem argsDet_two {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Va
   · exact λ x y hx hy ↦ (ih₁ hx).symm.trans (ih₁ hy)
   · exact argsDet_one ih₂ a ha
 
+/-- Two `mkSeq` existence-law witnesses over the same range, with `img`/`img'` already known to
+agree pointwise there, denote the same graph — the `ZFSet.ext` argument `evalUnique'`'s own
+self-contained `mkSeq` case and `evalBuiltinUnique`'s external one both need, factored out since
+the two differ only in *how* `himgeq` gets proved (a local induction hypothesis vs. `evalUnique'`
+directly), never in what it is used for here. -/
+private theorem mkSeq_graph_ext {n : ℤ} {v w : Value} {img img' : Value → Value}
+    (himgeq : ∀ u ∈ Value.intRange 1 n, img u = img' u)
+    (hto : ∀ e ∈ v, ∃ u ∈ Value.intRange 1 n, e = ZFSet.pair u (img u))
+    (hof : ∀ u ∈ Value.intRange 1 n, ZFSet.pair u (img u) ∈ v)
+    (hto' : ∀ e ∈ w, ∃ u ∈ Value.intRange 1 n, e = ZFSet.pair u (img' u))
+    (hof' : ∀ u ∈ Value.intRange 1 n, ZFSet.pair u (img' u) ∈ w) : v = w := by
+  refine ZFSet.ext λ z ↦ ⟨λ hz ↦ ?_, λ hz ↦ ?_⟩
+  · obtain ⟨u, huS, rfl⟩ := hto z hz
+    rw [himgeq u huS]
+    exact hof' u huS
+  · obtain ⟨u, huS, rfl⟩ := hto' z hz
+    rw [← himgeq u huS]
+    exact hof u huS
+
+/-- `bagOfAll`'s own version of `mkSeq_graph_ext`: two existence-law witnesses over the same bag,
+`img`/`img'` agreeing pointwise on `rawDom Bval`, denote the same graph. The collision-sum count
+needs one extra step past `mkSeq_graph_ext` — `hfin.sum_congr` to carry the pointwise agreement
+through the sum before the same `ZFSet.ext` argument applies. -/
+private theorem bagOfAll_graph_ext {Bval v w : Value} {img img' : Value → Value}
+    (hfin : (Value.rawDom Bval).IsFinite) (hfin' : (Value.rawDom Bval).IsFinite)
+    (himgeq : ∀ u ∈ Value.rawDom Bval, img u = img' u)
+    (hto : ∀ z ∈ v, ∃ e, (∃ u ∈ Value.rawDom Bval, e = img u) ∧
+      z = ZFSet.pair e (Value.ofNat (hfin.sum (λ u ↦ if img u = e then Value.copiesInRaw u Bval else 0))))
+    (hof : ∀ u ∈ Value.rawDom Bval, ZFSet.pair (img u) (Value.ofNat
+        (hfin.sum (λ u' ↦ if img u' = img u then Value.copiesInRaw u' Bval else 0))) ∈ v)
+    (hto' : ∀ z ∈ w, ∃ e, (∃ u ∈ Value.rawDom Bval, e = img' u) ∧
+      z = ZFSet.pair e (Value.ofNat (hfin'.sum (λ u ↦ if img' u = e then Value.copiesInRaw u Bval else 0))))
+    (hof' : ∀ u ∈ Value.rawDom Bval, ZFSet.pair (img' u) (Value.ofNat
+        (hfin'.sum (λ u' ↦ if img' u' = img' u then Value.copiesInRaw u' Bval else 0))) ∈ w) :
+    v = w := by
+  have hsumeq : ∀ e, hfin.sum (λ u ↦ if img u = e then Value.copiesInRaw u Bval else 0)
+      = hfin'.sum (λ u ↦ if img' u = e then Value.copiesInRaw u Bval else 0) := λ e ↦
+    hfin.sum_congr (λ u huB ↦
+      congrArg (if · = e then Value.copiesInRaw u Bval else 0) (himgeq u huB))
+  refine ZFSet.ext λ z ↦ ⟨λ hz ↦ ?_, λ hz ↦ ?_⟩
+  · obtain ⟨e, ⟨u, huB, rfl⟩, rfl⟩ := hto z hz
+    rw [himgeq u huB, hsumeq (img' u)]
+    exact hof' u huB
+  · obtain ⟨e, ⟨u, huB, rfl⟩, rfl⟩ := hto' z hz
+    rw [← himgeq u huB, ← hsumeq (img u)]
+    exact hof u huB
+
 /-- `evalUnique'`'s `motive_4`: `EvalBuiltin`'s share of the big mutual determinism induction.
 *Argument-wise* determinism (`ArgsDet`) for every arm except `mkSeq`/`bagOfAll`, whose second
 argument is never itself evaluated at `M` — only a synthesized `.opCall` under a fresh binder is,
@@ -1408,7 +1460,9 @@ theorem evalUnique' {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
       cases op with
       | mkSeq => exact ihb hb'
       | bagOfAll => exact ihb hb'
-      | _ => exact evalBuiltinUnique_of ihb (by decide) (by decide) hb hb'
+      | _ =>
+        refine evalBuiltinUnique_of ihb ?_ ?_ hb hb'
+        all: decide
   | forall_true L hdom hall ihdom ihall =>
     intro w h₂; cases h₂ with
     | forall_true L' hdom' hall' => rfl
@@ -1577,31 +1631,15 @@ theorem evalUnique' {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Value}
       obtain rfl := Value.ofInt_inj.mp (ihN hN')
       obtain ⟨y, hy⟩ := exists_fresh (L ∪ L')
       obtain ⟨hyL, hyL'⟩ := Finset.notMem_union.mp hy
-      refine ZFSet.ext λ z ↦ ⟨λ hz ↦ ?_, λ hz ↦ ?_⟩
-      · obtain ⟨u, huS, rfl⟩ := hto z hz
-        rw [(ihHimg y hyL u huS (himg' y hyL' u huS) : img u = img' u)]
-        exact hof' u huS
-      · obtain ⟨u, huS, rfl⟩ := hto' z hz
-        rw [← (ihHimg y hyL u huS (himg' y hyL' u huS) : img u = img' u)]
-        exact hof u huS
+      exact mkSeq_graph_ext (λ u huS ↦ ihHimg y hyL u huS (himg' y hyL' u huS)) hto hof hto' hof'
   | @bagOfAll _ _ _ Bval _ hB img L hfin himg hto hof ihB ihHimg =>
     intro w h₂; cases h₂ with
     | bagOfAll hB' img' L' hfin' himg' hto' hof' =>
       obtain rfl := ihB hB'
       obtain ⟨y, hy⟩ := exists_fresh (L ∪ L')
       obtain ⟨hyL, hyL'⟩ := Finset.notMem_union.mp hy
-      have himgeq : ∀ u ∈ Value.rawDom Bval, img u = img' u :=
-        λ u huB ↦ ihHimg y hyL u huB (himg' y hyL' u huB)
-      have hsumeq : ∀ e, hfin.sum (λ u ↦ if img u = e then Value.copiesInRaw u Bval else 0)
-          = hfin'.sum (λ u ↦ if img' u = e then Value.copiesInRaw u Bval else 0) := λ e ↦
-        hfin.sum_congr (λ u huB ↦ by rw [himgeq u huB])
-      refine ZFSet.ext λ z ↦ ⟨λ hz ↦ ?_, λ hz ↦ ?_⟩
-      · obtain ⟨e, ⟨u, huB, rfl⟩, rfl⟩ := hto z hz
-        rw [himgeq u huB, hsumeq (img' u)]
-        exact hof' u huB
-      · obtain ⟨e, ⟨u, huB, rfl⟩, rfl⟩ := hto' z hz
-        rw [← himgeq u huB, ← hsumeq (img u)]
-        exact hof u huB
+      exact bagOfAll_graph_ext hfin hfin'
+        (λ u huB ↦ ihHimg y hyL u huB (himg' y hyL' u huB)) hto hof hto' hof'
   -- `EvalList.nil` and `EvalPath.nil`: a wildcard is the only way to reach the second of two
   -- like-named alternatives of a mutual recursor.
   | _ _ h => cases h; rfl
@@ -1624,13 +1662,8 @@ theorem evalBuiltinUnique {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Valu
         obtain rfl := Value.ofInt_inj.mp (evalUnique' hN hN')
         obtain ⟨y, hy⟩ := exists_fresh (L ∪ L')
         obtain ⟨hyL, hyL'⟩ := Finset.notMem_union.mp hy
-        refine ZFSet.ext λ z ↦ ⟨λ hz ↦ ?_, λ hz ↦ ?_⟩
-        · obtain ⟨u, huS, rfl⟩ := hto z hz
-          rw [(evalUnique' (himg y hyL u huS) (himg' y hyL' u huS) : img u = img' u)]
-          exact hof' u huS
-        · obtain ⟨u, huS, rfl⟩ := hto' z hz
-          rw [← (evalUnique' (himg y hyL u huS) (himg' y hyL' u huS) : img u = img' u)]
-          exact hof u huS
+        exact mkSeq_graph_ext (λ u huS ↦ evalUnique' (himg y hyL u huS) (himg' y hyL' u huS))
+          hto hof hto' hof'
   | bagOfAll =>
     cases h₁ with
     | @bagOfAll _ _ _ Bval _ hB img L hfin himg hto hof =>
@@ -1639,19 +1672,11 @@ theorem evalBuiltinUnique {Ξ : OperatorEnv} {Ω : Model Value} {M : Memory Valu
         obtain rfl := evalUnique' hB hB'
         obtain ⟨y, hy⟩ := exists_fresh (L ∪ L')
         obtain ⟨hyL, hyL'⟩ := Finset.notMem_union.mp hy
-        have himgeq : ∀ u ∈ Value.rawDom Bval, img u = img' u :=
-          λ u huB ↦ evalUnique' (himg y hyL u huB) (himg' y hyL' u huB)
-        have hsumeq : ∀ e, hfin.sum (λ u ↦ if img u = e then Value.copiesInRaw u Bval else 0)
-            = hfin'.sum (λ u ↦ if img' u = e then Value.copiesInRaw u Bval else 0) := λ e ↦
-          hfin.sum_congr (λ u huB ↦ by rw [himgeq u huB])
-        refine ZFSet.ext λ z ↦ ⟨λ hz ↦ ?_, λ hz ↦ ?_⟩
-        · obtain ⟨e, ⟨u, huB, rfl⟩, rfl⟩ := hto z hz
-          rw [himgeq u huB, hsumeq (img' u)]
-          exact hof' u huB
-        · obtain ⟨e, ⟨u, huB, rfl⟩, rfl⟩ := hto' z hz
-          rw [← himgeq u huB, ← hsumeq (img u)]
-          exact hof u huB
-  | _ => exact evalBuiltinUnique_of (λ _ _ _ _ hx hy ↦ evalUnique' hx hy) (by decide) (by decide) h₁ h₂
+        exact bagOfAll_graph_ext hfin hfin'
+          (λ u huB ↦ evalUnique' (himg y hyL u huB) (himg' y hyL' u huB)) hto hof hto' hof'
+  | _ =>
+    refine evalBuiltinUnique_of (λ _ _ _ _ hx hy ↦ evalUnique' hx hy) ?_ ?_ h₁ h₂
+    all: decide
 
 /-- `EvalList` determinism, standalone: a list of expressions denotes at most one list of values.
 Recurses on the expression list; the mutual `Eval` determinism is `evalUnique'`. -/
@@ -2868,6 +2893,18 @@ macro_rules
          simp only [Expression.mapVars, registerSource, reduceCtorEq] at $h:ident)
       | simp only [Expression.subst_case, reduceCtorEq] at $h:ident)
 
+/-- `mkSeq`/`bagOfAll`'s synthesized `himg` call, substituted: `z`'s own freshness means the inner
+`.var _ (.free z)` survives `subst` untouched (`subst_var_free_ne`), so only the head `F₀` moves.
+Shared by `evalSubst'_fwd` (`hF := rfl`, going from `F` to its own substituted form) and
+`evalSubst'_bwd` (`hF := hF₀` from `argsMap_two`, going from a pre-image `F₀` to the given `F`) —
+same fact, one direction of `subst` each time it was needed twice over. -/
+private theorem subst_opCall_synthCall {x z : String} {e' F₀ F : Expression Typ}
+    (hF : Expression.subst x e' F₀ = F) (hzx : z ≠ x) :
+    Expression.subst x e' (F₀.opCall [Expression.var (.var "_") (.free z)])
+      = F.opCall [Expression.var (.var "_") (.free z)] := by
+  simp only [Expression.subst_opCall, List.map_cons, List.map_nil, hF,
+    Expression.subst_var_free_ne hzx]
+
 private theorem evalSubst'_fwd {Ξ : OperatorEnv} {Ω : Model Value} {x : String}
     {e' : Expression Typ} (hΞ : Ξ.WellScoped) (hlc : e'.LC) :
     ∀ {N : Memory Value} {e : Expression Typ} {v : Value}, Eval Ξ Ω N e v →
@@ -3259,11 +3296,7 @@ private theorem evalSubst'_fwd {Ξ : OperatorEnv} {Ω : Model Value} {x : String
   | @mkSeq _ _ F _ _ _ img L _ hto hof ihN ihHimg _ hag hx =>
     refine .mkSeq (ihN (forall_head hag) hx) img (L ∪ e'.freeVars ∪ {x}) (λ z hz w hw ↦ ?_) hto hof
     obtain ⟨hzL, hze, hzx⟩ := freshParts hz
-    have heq : Expression.subst x e' (F.opCall [Expression.var (.var "_") (.free z)])
-        = (Expression.subst x e' F).opCall [Expression.var (.var "_") (.free z)] := by
-      simp only [Expression.subst_opCall, List.map_cons, List.map_nil,
-        Expression.subst_var_free_ne hzx]
-    rw [← heq]
+    rw [← subst_opCall_synthCall (F := Expression.subst x e' F) rfl hzx]
     refine ihHimg z hzL w hw (λ y hy hyx ↦ ?_) (xStep hzx hze hx)
     rcases Expression.mem_freeVars_opCall.mp hy with hyF | ⟨a, ha, hya⟩
     · by_cases hyz : y = z
@@ -3277,11 +3310,7 @@ private theorem evalSubst'_fwd {Ξ : OperatorEnv} {Ω : Model Value} {x : String
     refine .bagOfAll (ihB (forall_snd hag) hx) img (L ∪ e'.freeVars ∪ {x}) hfin
       (λ z hz w hw ↦ ?_) hto hof
     obtain ⟨hzL, hze, hzx⟩ := freshParts hz
-    have heq : Expression.subst x e' (F.opCall [Expression.var (.var "_") (.free z)])
-        = (Expression.subst x e' F).opCall [Expression.var (.var "_") (.free z)] := by
-      simp only [Expression.subst_opCall, List.map_cons, List.map_nil,
-        Expression.subst_var_free_ne hzx]
-    rw [← heq]
+    rw [← subst_opCall_synthCall (F := Expression.subst x e' F) rfl hzx]
     refine ihHimg z hzL w hw (λ y hy hyx ↦ ?_) (xStep hzx hze hx)
     rcases Expression.mem_freeVars_opCall.mp hy with hyF | ⟨a, ha, hya⟩
     · by_cases hyz : y = z
@@ -4178,9 +4207,7 @@ private theorem evalSubst'_bwd {Ξ : OperatorEnv} {Ω : Model Value} {x : String
     refine .mkSeq (ihN hN₀ (forall_head hag) hN'x hev') img (L ∪ e'.freeVars ∪ {x})
       (λ z hz w hw ↦ ?_) hto hof
     obtain ⟨hzL, hze, hzx⟩ := freshParts hz
-    refine ihHimg z hzL w hw
-      (by simp only [Expression.subst_opCall, List.map_cons, List.map_nil, hF₀,
-        Expression.subst_var_free_ne hzx])
+    refine ihHimg z hzL w hw (subst_opCall_synthCall hF₀ hzx)
       (λ y hy hyx ↦ ?_) (xStep hzx hN'x) (evStep hze hev')
     rcases Expression.mem_freeVars_opCall.mp hy with hyF | ⟨a, ha, hya⟩
     · by_cases hyz : y = z
@@ -4195,9 +4222,7 @@ private theorem evalSubst'_bwd {Ξ : OperatorEnv} {Ω : Model Value} {x : String
     refine .bagOfAll (ihB hB₀ (forall_snd hag) hN'x hev') img (L ∪ e'.freeVars ∪ {x}) hfin
       (λ z hz w hw ↦ ?_) hto hof
     obtain ⟨hzL, hze, hzx⟩ := freshParts hz
-    refine ihHimg z hzL w hw
-      (by simp only [Expression.subst_opCall, List.map_cons, List.map_nil, hF₀,
-        Expression.subst_var_free_ne hzx])
+    refine ihHimg z hzL w hw (subst_opCall_synthCall hF₀ hzx)
       (λ y hy hyx ↦ ?_) (xStep hzx hN'x) (evStep hze hev')
     rcases Expression.mem_freeVars_opCall.mp hy with hyF | ⟨a, ha, hya⟩
     · by_cases hyz : y = z
