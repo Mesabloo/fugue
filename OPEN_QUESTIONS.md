@@ -236,7 +236,13 @@ does not settle. Two options, neither committed:
   an operator returning `Nat`).
 - **Track possible-infiniteness with an invariant**: most infinite sets encountered (`Nat`,
   `STRING`, `[Nat -> Nat]`) denote "the universe of all values of some type", possibly
-  summarizable rather than needing general finiteness inference. Possibly not worth it.
+  summarizable rather than needing general finiteness inference. Weaker than it looks, though:
+  a PlusCal `variable` reassigned from `Nat` (or a derived expression) on one branch needs a
+  single static tag covering every value it's ever assigned, across every branch — the
+  conservative join collapses to "possibly infinite" for that variable's entire remaining
+  lifetime, not just at the assignment site. Catches the direct, unmutated case; buys nothing
+  extra once `variables` are involved. Not worth building past the narrow check above for that
+  reason, not merely "possibly."
 
 Revisit once §9.14's recognizer-table shape settles (it determines how cheap a fix is). Less
 urgent than before: the runtime panic is already a real backstop, not a hang.

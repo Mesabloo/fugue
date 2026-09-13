@@ -1248,13 +1248,11 @@ correctness sketch is the chapter's only remaining stub):
   else that must enumerate a `Set` in full — `Cardinality`, `CHOOSE`, `Pick`, `SetMap`,
   `SetProduct`, `SetForall`/`SetExists`, `SetAsFun` — panics outright on the infinite branch:
   not solved, but a real fix over §9.15's original "doesn't terminate" gap. **Representation
-  mostly swappable, not entirely**: nothing outside `runtime/tlaplus/sets.go` and literal
-  emission is *supposed* to depend on `Set`'s internal shape, and the finite branch mostly held
-  to that — except three call sites elsewhere in `runtime/` (`bags.go`'s
-  `SetToBag`/`BagToSet`/`BagUnion`, `comm/multicast.go`'s `Multicast`, `sequences.go`'s
-  `FunAsSeq`) that ranged over, indexed, or type-converted a `Set[T]` directly, which only ever
-  compiled because it used to literally be `[]T`. All three needed fixing alongside the
-  struct change, so the swappability claim held less than advertised until then.
+  swappable, scope wider than `sets.go` alone**: `runtime/tlaplus/sets.go` and literal emission
+  aren't the only code depending on `Set`'s internal shape — `bags.go`'s
+  `SetToBag`/`BagToSet`/`BagUnion`, `comm/multicast.go`'s `Multicast`, and `sequences.go`'s
+  `FunAsSeq` also read `Set`'s fields directly. A future representation change touches all of
+  these, not `sets.go` in isolation.
 - **Functions.** Lazy maps; since Go's `map[T]U` requires `T` `comparable` (which
   dictionary-ordered types aren't), storage is an ordered-map keyed by the domain
   dictionary's `Cmp`: **home-grown persistent `TreeMap[K, V]` in `persistent/treemap/`**
