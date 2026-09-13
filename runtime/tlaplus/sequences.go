@@ -125,12 +125,18 @@ func Append[T any](s Seq[T], e T) Seq[T] {
 // shape the two are the same value and this only materializes the lazy graph
 // into a slice. TLA+ leaves FunAsSeq undefined for any other domain; the
 // compiled form panics there rather than inventing a value, and -Wunsafe warns
-// at every call site.
+// at every call site. An infinite domain (f built over Nat or Int) is one more
+// way to be not-1..n, but it needs its own check ahead of the others: reading
+// its length or indexing into it, below, is only meaningful once it is known to
+// be finite.
 func FunAsSeq[T any](f LazyFunction[Int, T]) Seq[T] {
 	dom := Domain(f)
-	out := make(Seq[T], len(dom)+1)
-	for i := 1; i <= len(dom); i++ {
-		if !IntOrd.Eq(dom[i-1], MkInt(i)) {
+	if dom.pred != nil {
+		panic("FunAsSeq of a function whose domain is not 1..n")
+	}
+	out := make(Seq[T], len(dom.elems)+1)
+	for i := 1; i <= len(dom.elems); i++ {
+		if !IntOrd.Eq(dom.elems[i-1], MkInt(i)) {
 			panic("FunAsSeq of a function whose domain is not 1..n")
 		}
 		out[i] = FnApply(IntOrd, f, MkInt(i))

@@ -67,7 +67,7 @@ func TestStrToSeqOrders(t *testing.T) {
 	if !o.Lt(StrToSeq("ab"), StrToSeq("b")) {
 		t.Errorf("\"ab\" does not precede \"b\" under the sequence ordering")
 	}
-	if got := MkSet(o, StrToSeq("a"), StrToSeq("b"), StrToSeq("a")); len(got) != 2 {
-		t.Errorf("a set of converted strings has %d elements, want 2", len(got))
+	if got := MkSet(o, StrToSeq("a"), StrToSeq("b"), StrToSeq("a")); len(got.elems) != 2 {
+		t.Errorf("a set of converted strings has %d elements, want 2", len(got.elems))
 	}
 }

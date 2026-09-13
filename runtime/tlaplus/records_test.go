@@ -43,12 +43,12 @@ func mes(s Str, n int) message { return message{Mes: s, Num: MkInt(n)} }
 // struct orders it, so a record reaches a set with no named type anywhere.
 func TestAnonymousRecordOrd(t *testing.T) {
 	s := MkSet(messageOrd, mes("req", 2), mes("ack", 1), mes("req", 2))
-	if len(s) != 2 {
-		t.Fatalf("the record set has %d elements, want 2", len(s))
+	if len(s.elems) != 2 {
+		t.Fatalf("the record set has %d elements, want 2", len(s.elems))
 	}
 	// Sorted on the first field, so "ack" precedes "req".
-	if !messageOrd.Eq(s[0], mes("ack", 1)) {
-		t.Errorf("the set's minimum is %v, want the \"ack\" record", s[0])
+	if !messageOrd.Eq(s.elems[0], mes("ack", 1)) {
+		t.Errorf("the set's minimum is %v, want the \"ack\" record", s.elems[0])
 	}
 	if !SetIn(messageOrd, s, mes("req", 2)) {
 		t.Errorf("a record built separately is not found in the set")
@@ -71,8 +71,8 @@ func TestAnonymousRecordNesting(t *testing.T) {
 	a := MkSet(messageOrd, mes("req", 1), mes("ack", 2))
 	b := MkSet(messageOrd, mes("ack", 2), mes("req", 1))
 	outer := MkSet(SetOrd(messageOrd), a, b)
-	if len(outer) != 1 {
-		t.Errorf("a set of two equal record sets has %d elements, want 1", len(outer))
+	if len(outer.elems) != 1 {
+		t.Errorf("a set of two equal record sets has %d elements, want 1", len(outer.elems))
 	}
 	if !setOrd.Eq(a, b) {
 		t.Errorf("two record sets written in different orders are not equal")
@@ -159,8 +159,8 @@ func TestAnonymousTuple(t *testing.T) {
 			t.Errorf("a difference in component %d compared equal", i+1)
 		}
 	}
-	if got := MkSet(o, base, larger[0], base); len(got) != 2 {
-		t.Errorf("a set of tuples has %d elements, want 2", len(got))
+	if got := MkSet(o, base, larger[0], base); len(got.elems) != 2 {
+		t.Errorf("a set of tuples has %d elements, want 2", len(got.elems))
 	}
 }
 

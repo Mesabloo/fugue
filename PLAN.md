@@ -1206,34 +1206,55 @@ correctness sketch is the chapter's only remaining stub):
   bridged once (`comm.Address` → `AddressOrd`; a user's constant type → compiler emits the
   bridge). Only a rigid type variable needs a dictionary *parameter*, threaded into
   polymorphic definitions at call sites. Dictionaries are passed, never stored in the values
-  they order: `Set[T]` stays `[]T`. `persistent/treemap` (`New(cmp func(a, b K) int)`) is
+  they order — true of `Set[T]`'s tagged-struct representation (below, §9.15) exactly as it
+  was when `Set[T]` was a plain `[]T`. `persistent/treemap` (`New(cmp func(a, b K) int)`) is
   the precedent.
 - **Booleans.** `/\`/`\/` → Go's short-circuiting `&&`/`||` (non-action, non-temporal TLA+
-  expressions are pure). `\A x \in S : P`/`\E x \in S : P` → a search over `S` for the first
-  counterexample/witness (De Morgan).
-- **Sets.** `Set(τ)` is `[]τ` under **two** invariants: sorted ascending by the element
-  dictionary's ordering, and duplicate-free. Sortedness is a canonical-representative choice
-  making operations cheap — equality is an elementwise walk not a double subset test,
-  membership a binary search not a scan, `CHOOSE`'s deterministic pick the first satisfying
-  element, dedup falls out of the sort. Cost: an ordering is needed wherever equality alone
-  would do (`SetIn`, hence `FnApply`/`FnOverload`) — free, since `Ord` carries both. Which
-  dictionary a `Set` was built with isn't recorded; every operation must be handed the same
-  one, guaranteed by deriving both from the same `Typ`. `{x \in S : P}`/`{e : x \in S}` →
-  `SetFilter`/`SetMap`, copying the slice (TLA+ data immutable). `SetFilter` copies
-  unconditionally inside the helper (`slices.DeleteFunc` compacts in place, corrupting a set
-  sharing a backing array) and preserves both invariants. `SetMap` preserves neither (a
-  mapping function need be neither monotone nor injective), so it takes the *result* type's
-  dictionary and renormalizes. Set literals `{e₁, …, eₙ}` → `MkSet(ord, e₁, …, eₙ)`, not a
-  bare composite literal (component equality isn't decidable until evaluated, so the literal
-  may be unordered/repeat). **Representation swappable**: nothing outside
-  `runtime/tlaplus/sets.go` and literal emission depends on `Set` being a slice, so a
-  persistent tree-set later changes no generated code. Not planned — access is build-once/
-  iterate/compare, favouring contiguous; the one place copy-on-write mattered (function
-  `EXCEPT`) is served by `persistent/treemap`. `CHOOSE x \in S : P` (deterministic) returns
-  the minimum satisfying element = the first a scan meets on the sorted representation:
-  neither builds the filtered set nor searches for a minimum, needs no dictionary at the
-  call site, panics on empty. Over an uninterpreted constant type the result is
-  implementation-dependent (integrator's order — see `Address`).
+  expressions are pure). `\A x \in S : P`/`\E x \in S : P` → `SetForall`/`SetExists`
+  (`sets.go`), a search over `S` for the first counterexample/witness (De Morgan) — a runtime
+  call rather than an inlined Go loop, since `len`/index no longer compile directly against
+  `Set` once it stopped being literally a slice (§9.15).
+- **Sets.** `Set(τ)` is a small tagged struct, `{elems []τ; pred func(τ) bool}`, exactly one
+  field nil at a time — not purely a finite slice any more (§9.15). `elems` is the finite
+  branch, under **two** invariants: sorted ascending by the element dictionary's ordering, and
+  duplicate-free. Sortedness is a canonical-representative choice making operations cheap —
+  equality is an elementwise walk not a double subset test, membership a binary search not a
+  scan, `CHOOSE`'s deterministic pick the first satisfying element, dedup falls out of the
+  sort. Cost: an ordering is needed wherever equality alone would do (`SetIn`, hence
+  `FnApply`/`FnOverload`) — free, since `Ord` carries both. Which dictionary a `Set` was built
+  with isn't recorded; every operation must be handed the same one, guaranteed by deriving
+  both from the same `Typ`. `{x \in S : P}`/`{e : x \in S}` → `SetFilter`/`SetMap`, copying the
+  slice (TLA+ data immutable). `SetFilter` copies unconditionally inside the helper
+  (`slices.DeleteFunc` compacts in place, corrupting a set sharing a backing array) and
+  preserves both invariants. `SetMap` preserves neither (a mapping function need be neither
+  monotone nor injective), so it takes the *result* type's dictionary and renormalizes. Set
+  literals `{e₁, …, eₙ}` → `MkSet(ord, e₁, …, eₙ)`, not a bare composite literal (component
+  equality isn't decidable until evaluated, so the literal may be unordered/repeat) — `{}`
+  included, unconditionally now: a zero-value struct literal is the one representation `Set`
+  forbids (both fields nil, neither branch marked), so the old special case emitting a raw
+  empty slice for `{}` couldn't carry over. `CHOOSE x \in S : P` (deterministic) returns the
+  minimum satisfying element = the first a scan meets on the sorted representation: neither
+  builds the filtered set nor searches for a minimum, needs no dictionary at the call site,
+  panics on empty (and, now, on an infinite `S`). Over an uninterpreted constant type the
+  result is implementation-dependent (integrator's order — see `Address`).
+
+  `pred` is the infinite branch, added for `Nat`/`Int` (`NatSet`/`IntSet`, `naturals.go`,
+  §9.15): a plain characteristic predicate, no backing slice. Buys `SetIn` outright, plus
+  whatever `SetUnion`/`SetIntersect`/`SetDifference` can decide by enumerating whichever
+  operand is actually finite (`SetIntersect`/`SetDifference` can *demote* to a genuinely finite
+  result this way — `Nat \cap {1,2,3}` is a real finite value, not a panic; `SetUnion` never
+  demotes, since union with a nonempty infinite operand is always infinite) and what
+  `SetFilter` can decide by predicate composition alone, with no enumeration at all. Everything
+  else that must enumerate a `Set` in full — `Cardinality`, `CHOOSE`, `Pick`, `SetMap`,
+  `SetProduct`, `SetForall`/`SetExists`, `SetAsFun` — panics outright on the infinite branch:
+  not solved, but a real fix over §9.15's original "doesn't terminate" gap. **Representation
+  mostly swappable, not entirely**: nothing outside `runtime/tlaplus/sets.go` and literal
+  emission is *supposed* to depend on `Set`'s internal shape, and the finite branch mostly held
+  to that — except three call sites elsewhere in `runtime/` (`bags.go`'s
+  `SetToBag`/`BagToSet`/`BagUnion`, `comm/multicast.go`'s `Multicast`, `sequences.go`'s
+  `FunAsSeq`) that ranged over, indexed, or type-converted a `Set[T]` directly, which only ever
+  compiled because it used to literally be `[]T`. All three needed fixing alongside the
+  struct change, so the swappability claim held less than advertised until then.
 - **Functions.** Lazy maps; since Go's `map[T]U` requires `T` `comparable` (which
   dictionary-ordered types aren't), storage is an ordered-map keyed by the domain
   dictionary's `Cmp`: **home-grown persistent `TreeMap[K, V]` in `persistent/treemap/`**

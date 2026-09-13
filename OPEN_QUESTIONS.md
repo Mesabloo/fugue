@@ -204,26 +204,33 @@ every module; stdlib operators are open-ended declarations in an ordinary (if ha
 point of representing them as ordinary declarations.
 
 ### 9.15 Infinite set used as a quantifier/set-builder domain
-`Nat`/`Int` (reachable builtin infinite sets; `STRING` isn't parseable yet, moot) can be used as
-a bare `forall`/`exists`/`choose` or set-builder (`collect`/`map'`) domain with nothing rejecting
-it — `\A x \in Nat : x >= 0` translates cleanly through `Typed2Computable` today. Real gap given
-§5.7's scheme (§7.2.1.2): `\A x \in S : P`/`\E x \in S : P` compile to a search over `S`, `{x \in
-S : P}`/`{e : x \in S}` copy `S`'s slice, `CHOOSE x \in S : P` filters then takes a minimum — all
-three enumerate `S` at runtime, so an infinite `S` doesn't terminate.
+**Representation half resolved.** `Set[T]` (`runtime/tlaplus/sets.go`) is now a tagged struct —
+finite `elems` slice xor an infinite `pred` predicate, never both — so `Nat`/`Int` compile to a
+real value (`NatSet`/`IntSet`) instead of `compileBuiltinVar` rejecting them outright. `\A x \in
+Nat : P`/`\E x \in Nat : P`/`CHOOSE x \in Nat : P`/`{e : x \in Nat}` still can't run — enumeration
+needs a finite slice, `Nat` has none — but now panic cleanly instead of not terminating: real fix
+over the old framing below, a panic is diagnosable and a hang isn't. `{x \in Nat : P}` is the
+exception — restricting an infinite set never needs enumerating it, so `SetFilter`'s infinite
+branch just works, no panic. Full accounting of what panics vs. what doesn't: `sets.go`'s own doc
+comment, not repeated here.
 
-**Settled, not part of this gap:** a function literal's domain (`[x \in S |-> e]`) may be
-infinite. Functions compile to lazy maps (§5.7), so `[x \in Nat |-> x * x]` is fine and stays
-unrestricted; `Typed2Computable`'s current no-restriction behavior is correct.
+**Was wrong, now fixed:** the "Settled, not part of this gap" paragraph here used to claim
+`Typed2Computable`'s no-restriction behavior on `[x \in Nat |-> x * x]` was already correct as an
+*implementation* fact. It wasn't — `LazyFunction.dom` (`runtime/tlaplus/functions.go`) is typed
+`Set[T]`, and the old finite-only `Set[T]` had no way to hold `Nat`, so this actually failed at
+`Network2Go` (the same `compileBuiltinVar` rejection above), not merely "unrestricted at the
+type-checking layer" as the old wording had it. True now: the predicate branch lets
+`LazyFunction.dom` hold `Nat`/`Int` for real, so `[x \in Nat |-> x * x]` compiles and runs.
 
 **Not affected by the denotational semantics.** `Core/ComputableTLAPlus/Semantics/Interface.lean`
 keeps evaluation abstract (`class ExprSemantics`), so `Core/*/Semantics/Denotational.lean` says
 nothing about quantifier or set-builder domains either way. This stays a `Network2Go`/§5.7
 question, and whichever `ExprSemantics` instance eventually models TLA⁺ inherits it unchanged.
 
-**Open:** whether/how to reject an infinite domain at `forall`/`exists`/`choose`/`collect`/`map'`
-(and PlusCal's `with x \in dom`), and where the check lives (`Typed2Computable`, matching
-`fnSet`/`recordSet`'s precedent, vs. deferred to `Network2Go`/§5.7 where the lazy-map/eager-slice
-distinction is implemented). Two options, neither committed:
+**Still open: admission control.** Whether/how to *reject* an infinite domain at
+`forall`/`exists`/`choose`/`collect`/`map'` (and PlusCal's `with x \in dom`) at compile time, ahead
+of the runtime panic above — a separate, genuinely optional UX question the representation fix
+does not settle. Two options, neither committed:
 - **Narrow syntactic check**: reject a *direct* bare reference to a known-infinite builtin set
   (`Nat`/`Int`) at exactly these positions — misses derived cases (`Nat \ {0}`, `Nat \cup {1}`,
   an operator returning `Nat`).
@@ -231,8 +238,8 @@ distinction is implemented). Two options, neither committed:
   `STRING`, `[Nat -> Nat]`) denote "the universe of all values of some type", possibly
   summarizable rather than needing general finiteness inference. Possibly not worth it.
 
-Revisit before §5.7 needs a real answer for how these compile, and once §9.14's recognizer-table
-shape settles (it determines how cheap a fix is).
+Revisit once §9.14's recognizer-table shape settles (it determines how cheap a fix is). Less
+urgent than before: the runtime panic is already a real backstop, not a hang.
 
 ### 9.17 No proof `subtype` and `Coercion.apply`/`.applyComputable` agree on type
 `Coercion` is real closed data, not an opaque closure, which makes a real theorem statable; none

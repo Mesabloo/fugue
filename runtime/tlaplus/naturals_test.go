@@ -93,7 +93,7 @@ func TestIntRange(t *testing.T) {
 	}
 	for _, c := range cases {
 		got := IntRange(MkInt(c.lo), MkInt(c.hi))
-		if !intsEqual(got, c.want) {
+		if !intsEqual(got.elems, c.want) {
 			t.Errorf("%d..%d = %v, want %v", c.lo, c.hi, got, c.want)
 		}
 	}
@@ -104,10 +104,10 @@ func TestIntRange(t *testing.T) {
 func TestIntRangeSatisfiesSetInvariants(t *testing.T) {
 	r := IntRange(MkInt(-3), MkInt(7))
 
-	if !slices.IsSortedFunc(r, IntOrd.Cmp) {
+	if !slices.IsSortedFunc(r.elems, IntOrd.Cmp) {
 		t.Errorf("IntRange is not sorted: %v", r)
 	}
-	if normalized := MkSet(IntOrd, r...); !intsEqual(r, normalized) {
+	if normalized := MkSet(IntOrd, r.elems...); !intsEqual(r.elems, normalized.elems) {
 		t.Errorf("IntRange needed normalization: %v became %v", r, normalized)
 	}
 	for i := -3; i <= 7; i++ {
@@ -122,5 +122,36 @@ func TestIntRangeSatisfiesSetInvariants(t *testing.T) {
 	}
 	if got := Choose(r, func(x Int) bool { return IntOrd.Gt(x, MkInt(0)) }); !eqInt(got, 1) {
 		t.Errorf("CHOOSE x \\in -3..7 : x > 0 = %v, want 1", got)
+	}
+}
+
+// TestIntRangeEmptyElemsNeverNil checks the same never-nil guarantee MkSet
+// gives {} for the other route to an empty finite Set: a range with hi < lo
+// never runs its build loop, so elems needs its own seed rather than
+// inheriting one from a normalization pass.
+func TestIntRangeEmptyElemsNeverNil(t *testing.T) {
+	if got := IntRange(MkInt(5), MkInt(1)); got.elems == nil {
+		t.Errorf("IntRange(5, 1) has nil elems, want a real empty slice")
+	}
+}
+
+// TestNatSetMembership checks the boundary Nat and Int differ on: Nat
+// excludes negative integers, Int does not.
+func TestNatSetMembership(t *testing.T) {
+	for _, n := range []int{0, 1, 1000} {
+		if !SetIn(IntOrd, NatSet(), MkInt(n)) {
+			t.Errorf("%d \\notin Nat, want true", n)
+		}
+		if !SetIn(IntOrd, IntSet(), MkInt(n)) {
+			t.Errorf("%d \\notin Int, want true", n)
+		}
+	}
+	for _, n := range []int{-1, -1000} {
+		if SetIn(IntOrd, NatSet(), MkInt(n)) {
+			t.Errorf("%d \\in Nat, want false", n)
+		}
+		if !SetIn(IntOrd, IntSet(), MkInt(n)) {
+			t.Errorf("%d \\notin Int, want true", n)
+		}
 	}
 }

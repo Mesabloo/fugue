@@ -164,9 +164,11 @@ partial def compileExpr (e : ComputablePlusCal.Expression) : m ComputableGo.Expr
   -- element of the sorted representation rather than picking at random.
   | .choose x τ dom body, _ =>
     return tlaplusCall "Choose" [← compileExpr dom, ← compilePredicate x τ body]
-  | .set es τ, _ => do
-    if es.isEmpty then return .sliceLit (tlaplusTyp "Set" [← compileTyp τ]) []
-    else return tlaplusCall "MkSet" ((← ordDict τ) :: (← es.mapM compileExpr))
+  -- Always a runtime call, even for `{}`: `tlaplus.Set` is a small tagged struct with an
+  -- invariant a bare composite literal cannot satisfy (`runtime/tlaplus/sets.go`'s doc comment),
+  -- so unlike `Seq`/`Bag` below there is no zero-value shape to special-case here. `MkSet` on zero
+  -- elements is already O(1), so this loses nothing but the one avoided call.
+  | .set es τ, _ => return tlaplusCall "MkSet" ((← ordDict τ) :: (← es.mapM compileExpr))
   | .seq es τ, _ => do
     if es.isEmpty then return .sliceLit (tlaplusTyp "Seq" [← compileTyp τ]) []
     else return tlaplusCall "MkSeq" (← es.mapM compileExpr)
@@ -250,34 +252,16 @@ partial def compilePredicate (x : String) (τ : Typ) (body : ComputablePlusCal.E
   return .funcLit [(binderName x, ← compileTyp τ)] [.bool] [.return [goBool (← compileExpr body)]]
 
 /--
-  `\A x \in S : P` and `\E x \in S : P`: a search of `S` for the first counterexample/witness, the
-  two being De Morgan duals of one another.
-
-  Written as a loop inside an immediately-applied literal rather than as
-  `Cardinality(SetFilter(S, ¬P)) = 0`, because the filter would evaluate `P` at every element even
-  after the answer is settled — visible whenever `P` is undefined somewhere in `S`. `S` becomes the
-  literal's parameter so that it is evaluated exactly once.
+  `\A x \in S : P` and `\E x \in S : P`: delegates the search of `S` for the first
+  counterexample/witness to the runtime, the two quantifiers sharing one implementation
+  (`SetForall`/`SetExists`) the same way `compilePredicate`'s callback shape is shared by every
+  other set operation here (`SetFilter`, `Choose`, `SetMap`, …). `S`'s domain expression is
+  evaluated exactly once either way, since it is passed as an argument rather than inlined.
 -/
 partial def compileQuantifier (isForall : Bool) (x : String) (τ : Typ)
     (dom body : ComputablePlusCal.Expression) : m ComputableGo.Expression := do
-  let elemτ ← compileTyp τ
-  let x := binderName x
-  let s := goIdent (← freshName "set")
-  let i := goIdent (← freshName "i")
-  let body' ← compileExpr body
-  -- `\A` stops at the first element failing `P`, `\E` at the first satisfying it; each then
-  -- returns the opposite of whatever it would have returned had the loop run out.
-  let stop := if isForall then Go.Expression.unary .not body' else body'
-  let early := tlaBool (if isForall then .false else .true)
-  let final := tlaBool (if isForall then .true else .false)
-  return .call (.funcLit [(s, tlaplusTyp "Set" [elemτ])] [tlaplusTyp "Bool"]
-    [ .var i .int,
-      .for (.binary .lt (.var i) (.builtin .len [.var s]))
-        [ .var x elemτ,
-          .assign [.var x] [.index (.var s) (.var i)],
-          .if (goBool stop) [.return [early]] [],
-          .assign [.var i] [.binary .add (.var i) (.nat "1")] ],
-      .return [final] ]) [← compileExpr dom]
+  let fn := if isForall then "SetForall" else "SetExists"
+  return tlaBool (tlaplusCall fn [← compileExpr dom, ← compilePredicate x τ body])
 
 /--
   One `![e] = v` / `!.x = v` override of an `EXCEPT`, following the path down and rebuilding on the
@@ -436,12 +420,13 @@ module, not something to apply. -/
 partial def compileBuiltinVar (pos : SourceSpan) (mod name : String) (τ : Typ) :
     m ComputableGo.Expression :=
   match mod, name with
-  -- Both denote infinite sets, and the representation is a finite sorted slice. Nothing is
-  -- lost by rejecting them: they are only useful as a quantifier's domain, which would not
-  -- terminate either.
-  | "Naturals", "Nat" | "Integers", "Int" =>
-    throw (.unsupported pos name
-      "it denotes an infinite set, and sets are represented by their elements")
+  -- Both denote infinite sets, backed by `tlaplus.Set`'s predicate branch rather than its
+  -- element slice. Anything that would need to enumerate one — `Cardinality`, `CHOOSE`, a
+  -- quantifier, `SetMap`, … — still can't, but now fails with a runtime panic instead of not
+  -- terminating; see `runtime/tlaplus/sets.go`'s doc comment for the full accounting of what
+  -- is and isn't defined on that branch.
+  | "Naturals", "Nat" => return tlaplusCall "NatSet" []
+  | "Integers", "Int" => return tlaplusCall "IntSet" []
   -- `EmptyBag`, like the empty `Set`/`Seq` literal, has nothing to infer a type parameter from,
   -- so it is the one `Bags` value written as a bare composite literal rather than a runtime call —
   -- trivially sorted, nothing to normalize.

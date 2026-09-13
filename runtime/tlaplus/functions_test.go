@@ -77,8 +77,8 @@ func TestFnOverloadOutsideDomain(t *testing.T) {
 	f := FnConstructor(IntOrd, intsUpTo(3), func(x Int) Int { return x })
 	g := FnOverload(IntOrd, f, MkInt(99), MkInt(7))
 
-	if len(Domain(g)) != 3 {
-		t.Errorf("DOMAIN grew to %d after overloading outside it", len(Domain(g)))
+	if len(Domain(g).elems) != 3 {
+		t.Errorf("DOMAIN grew to %d after overloading outside it", len(Domain(g).elems))
 	}
 	defer func() {
 		if recover() == nil {

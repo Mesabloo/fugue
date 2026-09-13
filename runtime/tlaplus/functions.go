@@ -105,17 +105,24 @@ func Domain[T, U any](f LazyFunction[T, U]) Set[T] { return f.dom }
 // SetMap's mapping function does. Apalache leaves the result unspecified when a
 // first component repeats with conflicting second components; the compiled form
 // panics instead, and -Wunsafe warns at every call site.
+//
+// It panics on an infinite s for the same reason SetMap does: reading off a
+// domain and a graph both require walking every pair, and there is no second
+// operand here to enumerate instead.
 func SetAsFun[P, K, V any](ok Ord[K], s Set[P], fst func(P) K, snd func(P) V) LazyFunction[K, V] {
-	dom := make(Set[K], 0, len(s))
-	for _, p := range s {
+	if s.pred != nil {
+		panic("SetAsFun of an infinite set")
+	}
+	dom := make([]K, 0, len(s.elems))
+	for _, p := range s.elems {
 		dom = append(dom, fst(p))
 	}
 	dom = normalize(ok, dom)
-	if len(dom) != len(s) {
+	if len(dom) != len(s.elems) {
 		panic("SetAsFun of a set of pairs whose first components are not unique")
 	}
-	return FnConstructor(ok, dom, func(x K) V {
-		for _, p := range s {
+	return FnConstructor(ok, Set[K]{elems: dom}, func(x K) V {
+		for _, p := range s.elems {
 			if ok.Eq(fst(p), x) {
 				return snd(p)
 			}

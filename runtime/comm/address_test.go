@@ -44,8 +44,8 @@ func TestAddressOrdBridges(t *testing.T) {
 // first example specification.
 func TestAddressReachesContainers(t *testing.T) {
 	addrs := tlaplus.MkSet(AddressOrd, Address(intAddress(3)), Address(intAddress(1)), Address(intAddress(3)))
-	if len(addrs) != 2 {
-		t.Fatalf("the address set has %d elements, want 2", len(addrs))
+	if n := tlaplus.ToInt(tlaplus.Cardinality(addrs)); n != 2 {
+		t.Fatalf("the address set has %d elements, want 2", n)
 	}
 	if !tlaplus.SetIn(AddressOrd, addrs, Address(intAddress(1))) {
 		t.Errorf("an address built separately is not found in the set")

@@ -24,11 +24,18 @@ type Bag[T any] []T
 // SetToBag compiles Bags!SetToBag(s), the bag containing one copy of every
 // element of s.
 //
-// A Set is already sorted and duplicate-free, which is a strictly stronger
-// invariant than Bag's sorted-with-duplicates-allowed — s already satisfies
-// Bag's invariant as-is, so this is a type conversion, not a rebuild.
+// A finite Set is already sorted and duplicate-free, which is a strictly
+// stronger invariant than Bag's sorted-with-duplicates-allowed — s.elems
+// already satisfies Bag's invariant as-is, so this is a type conversion, not a
+// rebuild. It panics on an infinite s: a bag is a concrete multiset with a
+// finite total copy count (BagCardinality), so there is no reading for what an
+// infinite one would even mean, the same enumeration-needed reasoning as
+// SetMap.
 func SetToBag[T any](s Set[T]) Bag[T] {
-	return Bag[T](s)
+	if s.pred != nil {
+		panic("SetToBag of an infinite set")
+	}
+	return Bag[T](s.elems)
 }
 
 // BagToSet compiles Bags!BagToSet(b), the set of elements at least one copy
@@ -38,9 +45,9 @@ func SetToBag[T any](s Set[T]) Bag[T] {
 // is a single compaction pass, not a re-sort. Clones before compacting: b may
 // share a backing array with another bag (BagSum's unconsumed tail, for
 // instance) that the caller still holds, and slices.CompactFunc rewrites in
-// place.
+// place. A Bag is always finite, so the result is always the finite branch.
 func BagToSet[T any](o Ord[T], b Bag[T]) Set[T] {
-	return Set[T](slices.CompactFunc(slices.Clone(b), o.Eq))
+	return Set[T]{elems: slices.CompactFunc(slices.Clone(b), o.Eq)}
 }
 
 // BagIn compiles Bags!BagIn(e, B) by binary search on the sorted
@@ -166,10 +173,15 @@ func BagDiff[T any](o Ord[T], b1, b2 Bag[T]) Bag[T] {
 // S.
 //
 // Multiset sum is associative and commutative, so this is BagSum folded over
-// S's elements — no separate algorithm needed.
+// S's elements — no separate algorithm needed. It panics on an infinite S for
+// the same reason SetMap does: folding needs to visit every element, and
+// nothing else here could stand in for that.
 func BagUnion[T any](o Ord[T], bags Set[Bag[T]]) Bag[T] {
+	if bags.pred != nil {
+		panic("BagUnion of an infinite set")
+	}
 	out := Bag[T]{}
-	for _, b := range bags {
+	for _, b := range bags.elems {
 		out = BagSum(o, out, b)
 	}
 	return out

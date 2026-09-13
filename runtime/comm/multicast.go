@@ -23,12 +23,24 @@ import "github.com/mesabloo/fugue/runtime/tlaplus"
 // specification indexing a function outside its domain, which is undefined in
 // TLA+, so this panics rather than silently dropping the message — the same
 // choice the rest of the runtime makes for an undefined expression.
+//
+// A recipient set is also always finite in practice — a network has finitely
+// many addresses — but the type does not enforce that, and Set keeps its
+// representation private to its own package, so there is no way from here to
+// walk it directly any more. Delivery is phrased instead as the universal
+// statement SetForall already knows how to decide — every recipient received
+// its message — which panics on an infinite to for the same reason it would
+// panic deciding any other universally quantified statement over one. The
+// predicate itself always reports success; what matters is that, unlike
+// SetExists, SetForall does not stop at the first true, so every recipient is
+// actually visited rather than delivery stopping after one.
 func Multicast[T any](ch map[Address]Sender[T], to tlaplus.Set[Address], f func(Address) T) {
-	for _, a := range to {
+	tlaplus.SetForall(to, func(a Address) bool {
 		s, ok := ch[a]
 		if !ok {
 			panic("multicast: no channel endpoint for a recipient in the set")
 		}
 		s.Send(f(a))
-	}
+		return true
+	})
 }

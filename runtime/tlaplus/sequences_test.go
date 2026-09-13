@@ -244,12 +244,12 @@ func TestSeqOrdNests(t *testing.T) {
 	seqOrd := SeqOrd(IntOrd)
 
 	s := MkSet(seqOrd, intSeq(2), intSeq(1, 2), intSeq(2))
-	if len(s) != 2 {
-		t.Fatalf("{<<2>>, <<1,2>>, <<2>>} has %d elements, want 2", len(s))
+	if len(s.elems) != 2 {
+		t.Fatalf("{<<2>>, <<1,2>>, <<2>>} has %d elements, want 2", len(s.elems))
 	}
 	// Sorted lexicographically, so <<1,2>> comes first.
-	if !SeqEq(IntOrd, s[0], intSeq(1, 2)) {
-		t.Errorf("the set's minimum is %v, want <<1,2>>", asInts(s[0]))
+	if !SeqEq(IntOrd, s.elems[0], intSeq(1, 2)) {
+		t.Errorf("the set's minimum is %v, want <<1,2>>", asInts(s.elems[0]))
 	}
 	if !SetIn(seqOrd, s, intSeq(2)) {
 		t.Errorf("<<2>> \\notin {<<1,2>>, <<2>>}")

@@ -43,7 +43,10 @@ func TestFunAsSeqSingleton(t *testing.T) {
 	}
 }
 
-// TestFunAsSeqAdversarialDomains checks every way a domain can fail to be 1..n.
+// TestFunAsSeqAdversarialDomains checks every way a domain can fail to be
+// 1..n, including the one an infinite Set makes reachable: a function over
+// Nat or Int is never 1..n for any n, and FunAsSeq must catch that before
+// ever reading a length off the domain.
 func TestFunAsSeqAdversarialDomains(t *testing.T) {
 	cases := []struct {
 		name string
@@ -55,6 +58,7 @@ func TestFunAsSeqAdversarialDomains(t *testing.T) {
 		{"negative element", intSet(-1, 1, 2, 3)},
 		{"1..n plus an extra", rawIntSet(1, 2, 3, 5)},
 		{"single element, not 1", intSet(7)},
+		{"infinite domain", NatSet()},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -135,7 +139,7 @@ func TestSetAsFunReadsGraph(t *testing.T) {
 func TestSetAsFunEmpty(t *testing.T) {
 	f := SetAsFun(IntOrd, MkSet(pairOrd()), fst, snd)
 
-	if len(Domain(f)) != 0 {
+	if len(Domain(f).elems) != 0 {
 		t.Errorf("DOMAIN SetAsFun({}) = %v, want {}", Domain(f))
 	}
 }
@@ -190,4 +194,17 @@ func TestSetAsFunEqualValuesDistinctPairsPanics(t *testing.T) {
 	if !f() {
 		t.Errorf("SetAsFun of {<<1,10>>, <<1,11>>} did not panic")
 	}
+}
+
+// TestSetAsFunPanicsOnInfiniteInput checks the same enumeration-needed guard
+// SetMap has: reading off a domain and a graph both need visiting every pair,
+// which an infinite input cannot offer.
+func TestSetAsFunPanicsOnInfiniteInput(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Errorf("SetAsFun of an infinite set did not panic")
+		}
+	}()
+	identity := func(x Int) Int { return x }
+	SetAsFun(IntOrd, NatSet(), identity, identity)
 }

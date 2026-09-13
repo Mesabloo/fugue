@@ -90,3 +90,17 @@ func TestMulticastPanicsOnUnknownRecipient(t *testing.T) {
 	to := tlaplus.MkSet(AddressOrd, Address(intAddress(2)))
 	Multicast(ch, to, func(Address) int { return 1 })
 }
+
+// TestMulticastPanicsOnInfiniteRecipientSet: a recipient set is always finite
+// in practice, but Multicast cannot assume that from the type alone, so an
+// infinite one panics rather than sending forever.
+func TestMulticastPanicsOnInfiniteRecipientSet(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Errorf("multicasting to an infinite recipient set did not panic")
+		}
+	}()
+
+	ch, _ := network(1)
+	Multicast(ch, tlaplus.Collect(func(Address) bool { return true }), func(Address) int { return 1 })
+}

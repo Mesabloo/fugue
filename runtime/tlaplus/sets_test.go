@@ -11,14 +11,14 @@ import (
 // wrong corrupts the input rather than merely returning the wrong answer.
 func TestSetFilterDoesNotMutate(t *testing.T) {
 	s := intSet(1, 2, 3, 4, 5)
-	before := slices.Clone(s)
+	before := slices.Clone(s.elems)
 
 	got := SetFilter(s, func(x Int) bool { return IntOrd.Lt(x, MkInt(3)) })
 
-	if !intsEqual(s, before) {
+	if !intsEqual(s.elems, before) {
 		t.Errorf("SetFilter mutated its input: %v, was %v", s, before)
 	}
-	if want := ints(1, 2); !intsEqual(got, want) {
+	if want := ints(1, 2); !intsEqual(got.elems, want) {
 		t.Errorf("SetFilter = %v, want %v", got, want)
 	}
 }
@@ -28,12 +28,12 @@ func TestSetFilterDoesNotMutate(t *testing.T) {
 // have its neighbours clobbered either.
 func TestSetFilterDoesNotMutateSharedBacking(t *testing.T) {
 	backing := intSet(1, 2, 3, 4, 5, 6)
-	s := backing[:3]
-	before := slices.Clone(backing)
+	s := Set[Int]{elems: backing.elems[:3]}
+	before := slices.Clone(backing.elems)
 
 	SetFilter(s, func(x Int) bool { return IntOrd.Eq(x, MkInt(2)) })
 
-	if !intsEqual(backing, before) {
+	if !intsEqual(backing.elems, before) {
 		t.Errorf("SetFilter wrote through a shared backing array: %v, was %v", backing, before)
 	}
 }
@@ -76,14 +76,26 @@ func TestSetInByValue(t *testing.T) {
 // TestMkSet checks that a literal built from arbitrary input comes out sorted
 // and duplicate-free — the two invariants everything else relies on.
 func TestMkSet(t *testing.T) {
-	if got, want := intSet(3, 1, 2, 3, 1), ints(1, 2, 3); !intsEqual(got, want) {
+	if got, want := intSet(3, 1, 2, 3, 1), ints(1, 2, 3); !intsEqual(got.elems, want) {
 		t.Errorf("MkSet(3,1,2,3,1) = %v, want %v", got, want)
 	}
-	if got := intSet(); len(got) != 0 {
+	if got := intSet(); len(got.elems) != 0 {
 		t.Errorf("MkSet() = %v, want empty", got)
 	}
-	if got, want := intSet(7, 7, 7), ints(7); !intsEqual(got, want) {
+	if got, want := intSet(7, 7, 7), ints(7); !intsEqual(got.elems, want) {
 		t.Errorf("MkSet(7,7,7) = %v, want {7}", got)
+	}
+}
+
+// TestMkSetEmptyElemsNeverNil pins the invariant every other function in this
+// file relies on: MkSet({}) must not be the both-nil zero value, since that is
+// indistinguishable from a Set nothing has built yet.
+func TestMkSetEmptyElemsNeverNil(t *testing.T) {
+	if got := MkSet(IntOrd); got.elems == nil {
+		t.Errorf("MkSet() has nil elems, want a real empty slice")
+	}
+	if got := intSet(); got.elems == nil {
+		t.Errorf("intSet() has nil elems, want a real empty slice")
 	}
 }
 
@@ -111,10 +123,10 @@ func TestSetEq(t *testing.T) {
 func TestSetMap(t *testing.T) {
 	s := intSet(1, 2, 3)
 	got := SetMap(IntOrd, s, func(x Int) Int { return Mul(x, MkInt(2)) })
-	if want := ints(2, 4, 6); !intsEqual(got, want) {
+	if want := ints(2, 4, 6); !intsEqual(got.elems, want) {
 		t.Errorf("SetMap = %v, want %v", got, want)
 	}
-	if want := ints(1, 2, 3); !intsEqual(s, want) {
+	if want := ints(1, 2, 3); !intsEqual(s.elems, want) {
 		t.Errorf("SetMap mutated its input: %v", s)
 	}
 }
@@ -130,20 +142,20 @@ func TestSetMapRenormalizes(t *testing.T) {
 		}
 		return MkInt(1)
 	}
-	if got, want := SetMap(IntOrd, intSet(1, 2, 3), clamp), ints(0, 1); !intsEqual(got, want) {
+	if got, want := SetMap(IntOrd, intSet(1, 2, 3), clamp), ints(0, 1); !intsEqual(got.elems, want) {
 		t.Errorf("a non-injective mapping gave %v, want %v", got, want)
 	}
 
 	// Order-reversing, so the mapped elements arrive descending.
 	negated := SetMap(IntOrd, intSet(1, 2, 3), Neg)
-	if want := ints(-3, -2, -1); !intsEqual(negated, want) {
+	if want := ints(-3, -2, -1); !intsEqual(negated.elems, want) {
 		t.Errorf("{-x : x \\in {1,2,3}} = %v, want %v", negated, want)
 	}
 
-	if got := SetMap(StrOrd, intSet(4, 5, 6), func(x Int) Str { return "c" }); len(got) != 1 {
+	if got := SetMap(StrOrd, intSet(4, 5, 6), func(x Int) Str { return "c" }); len(got.elems) != 1 {
 		t.Errorf("a constant mapping gave %v, want a single element", got)
 	}
-	if got := SetMap(IntOrd, Set[Int]{}, func(x Int) Int { return x }); len(got) != 0 {
+	if got := SetMap(IntOrd, Set[Int]{}, func(x Int) Int { return x }); len(got.elems) != 0 {
 		t.Errorf("SetMap over the empty set = %v, want empty", got)
 	}
 }
@@ -257,30 +269,30 @@ func TestSetProduct(t *testing.T) {
 	mk := func(a, b int) pair { return pair{MkInt(a), MkInt(b)} }
 
 	s, other := intSet(1, 2), intSet(3, 4)
-	sBefore, otherBefore := slices.Clone(s), slices.Clone(other)
+	sBefore, otherBefore := slices.Clone(s.elems), slices.Clone(other.elems)
 
 	got := SetProduct(s, other, func(x, y Int) pair { return pair{x, y} })
 	want := []pair{mk(1, 3), mk(1, 4), mk(2, 3), mk(2, 4)}
 
-	if len(got) != len(want) {
+	if len(got.elems) != len(want) {
 		t.Fatalf("SetProduct(%v, %v) = %v, want %v", s, other, got, want)
 	}
 	for i := range want {
-		if !IntOrd.Eq(got[i].Proj1, want[i].Proj1) || !IntOrd.Eq(got[i].Proj2, want[i].Proj2) {
-			t.Errorf("SetProduct(%v, %v)[%d] = %v, want %v", s, other, i, got[i], want[i])
+		if !IntOrd.Eq(got.elems[i].Proj1, want[i].Proj1) || !IntOrd.Eq(got.elems[i].Proj2, want[i].Proj2) {
+			t.Errorf("SetProduct(%v, %v)[%d] = %v, want %v", s, other, i, got.elems[i], want[i])
 		}
 	}
-	if !intsEqual(s, sBefore) {
+	if !intsEqual(s.elems, sBefore) {
 		t.Errorf("SetProduct mutated its left input: %v, was %v", s, sBefore)
 	}
-	if !intsEqual(other, otherBefore) {
+	if !intsEqual(other.elems, otherBefore) {
 		t.Errorf("SetProduct mutated its right input: %v, was %v", other, otherBefore)
 	}
 
-	if got := SetProduct(intSet(), intSet(1, 2), func(x, y Int) pair { return pair{x, y} }); len(got) != 0 {
+	if got := SetProduct(intSet(), intSet(1, 2), func(x, y Int) pair { return pair{x, y} }); len(got.elems) != 0 {
 		t.Errorf("SetProduct with an empty left operand = %v, want empty", got)
 	}
-	if got := SetProduct(intSet(1, 2), intSet(), func(x, y Int) pair { return pair{x, y} }); len(got) != 0 {
+	if got := SetProduct(intSet(1, 2), intSet(), func(x, y Int) pair { return pair{x, y} }); len(got.elems) != 0 {
 		t.Errorf("SetProduct with an empty right operand = %v, want empty", got)
 	}
 }
@@ -305,7 +317,7 @@ func TestSetUnion(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := SetUnion(IntOrd, c.s, c.other); !intsEqual(got, c.want) {
+			if got := SetUnion(IntOrd, c.s, c.other); !intsEqual(got.elems, c.want) {
 				t.Errorf("SetUnion(%v, %v) = %v, want %v", c.s, c.other, got, c.want)
 			}
 		})
@@ -326,7 +338,7 @@ func TestSetIntersect(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := SetIntersect(IntOrd, c.s, c.other); !intsEqual(got, c.want) {
+			if got := SetIntersect(IntOrd, c.s, c.other); !intsEqual(got.elems, c.want) {
 				t.Errorf("SetIntersect(%v, %v) = %v, want %v", c.s, c.other, got, c.want)
 			}
 		})
@@ -348,7 +360,7 @@ func TestSetDifference(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := SetDifference(IntOrd, c.s, c.other); !intsEqual(got, c.want) {
+			if got := SetDifference(IntOrd, c.s, c.other); !intsEqual(got.elems, c.want) {
 				t.Errorf("SetDifference(%v, %v) = %v, want %v", c.s, c.other, got, c.want)
 			}
 		})
@@ -367,18 +379,18 @@ func TestSetOpsDoNotMutate(t *testing.T) {
 	for name, op := range ops {
 		t.Run(name, func(t *testing.T) {
 			s, other := intSet(1, 2, 3), intSet(2, 3, 4)
-			sBefore, otherBefore := slices.Clone(s), slices.Clone(other)
+			sBefore, otherBefore := slices.Clone(s.elems), slices.Clone(other.elems)
 
 			got := op(IntOrd, s, other)
 			// Writing through the result must not reach either operand.
-			for i := range got {
-				got[i] = MkInt(-1)
+			for i := range got.elems {
+				got.elems[i] = MkInt(-1)
 			}
 
-			if !intsEqual(s, sBefore) {
+			if !intsEqual(s.elems, sBefore) {
 				t.Errorf("%s mutated its left operand: %v, was %v", name, s, sBefore)
 			}
-			if !intsEqual(other, otherBefore) {
+			if !intsEqual(other.elems, otherBefore) {
 				t.Errorf("%s mutated its right operand: %v, was %v", name, other, otherBefore)
 			}
 		})
@@ -424,8 +436,8 @@ func TestSetOrdNests(t *testing.T) {
 	setOrd := SetOrd(IntOrd)
 
 	s := MkSet(setOrd, intSet(3, 1), intSet(2), intSet(1, 3))
-	if len(s) != 2 {
-		t.Fatalf("{{3,1}, {2}, {1,3}} has %d elements, want 2: {3,1} and {1,3} are the same set", len(s))
+	if len(s.elems) != 2 {
+		t.Fatalf("{{3,1}, {2}, {1,3}} has %d elements, want 2: {3,1} and {1,3} are the same set", len(s.elems))
 	}
 	if !SetIn(setOrd, s, intSet(1, 3)) {
 		t.Errorf("{1,3} \\notin {{1,3}, {2}}")
@@ -437,8 +449,8 @@ func TestSetOrdNests(t *testing.T) {
 	// And once more round, since nothing about the composition is special-cased
 	// at depth one.
 	deep := MkSet(SetOrd(setOrd), s, MkSet(setOrd, intSet(2), intSet(1, 3)))
-	if len(deep) != 1 {
-		t.Errorf("a set of two equal sets-of-sets has %d elements, want 1", len(deep))
+	if len(deep.elems) != 1 {
+		t.Errorf("a set of two equal sets-of-sets has %d elements, want 1", len(deep.elems))
 	}
 }
 
@@ -524,4 +536,214 @@ func TestPickEmptyPanics(t *testing.T) {
 		}
 	}()
 	Pick(intSet())
+}
+
+// --- Infinite sets (Nat/Int, via the predicate branch) ---------------------
+
+// TestSetInInfinite checks SetIn's predicate branch, alongside the finite
+// branch TestSetIn already covers.
+func TestSetInInfinite(t *testing.T) {
+	if !SetIn(IntOrd, NatSet(), MkInt(0)) {
+		t.Errorf("0 \\notin Nat, want true")
+	}
+	if SetIn(IntOrd, NatSet(), MkInt(-1)) {
+		t.Errorf("-1 \\in Nat, want false")
+	}
+	if !SetIn(IntOrd, IntSet(), MkInt(-1)) {
+		t.Errorf("-1 \\notin Int, want true")
+	}
+}
+
+// TestSetEqInfiniteCases covers the two cases TestSetEq cannot: a finite and
+// an infinite set are never equal, decidable with no enumeration on either
+// side, while two infinite sets are the undecidable case SetEq panics on.
+func TestSetEqInfiniteCases(t *testing.T) {
+	if SetEq(IntOrd, intSet(1, 2, 3), NatSet()) {
+		t.Errorf("a finite set = Nat, want false")
+	}
+	if SetEq(IntOrd, NatSet(), intSet(1, 2, 3)) {
+		t.Errorf("Nat = a finite set, want false")
+	}
+	defer func() {
+		if recover() == nil {
+			t.Errorf("SetEq of two infinite sets did not panic")
+		}
+	}()
+	SetEq(IntOrd, NatSet(), IntSet())
+}
+
+// TestSetCmpInfiniteCases covers SetCmp's finite-before-infinite convention
+// and its both-infinite panic, the same three-way split as SetEq.
+func TestSetCmpInfiniteCases(t *testing.T) {
+	if c := SetCmp(IntOrd, intSet(1, 2, 3), NatSet()); c >= 0 {
+		t.Errorf("SetCmp(finite, Nat) = %d, want negative: finite sorts before infinite", c)
+	}
+	if c := SetCmp(IntOrd, NatSet(), intSet(1, 2, 3)); c <= 0 {
+		t.Errorf("SetCmp(Nat, finite) = %d, want positive: infinite sorts after finite", c)
+	}
+	defer func() {
+		if recover() == nil {
+			t.Errorf("SetCmp of two infinite sets did not panic")
+		}
+	}()
+	SetCmp(IntOrd, NatSet(), IntSet())
+}
+
+// TestSetFilterStaysInfinite checks that restricting an infinite set neither
+// panics nor produces something enumerable: the result is still infinite,
+// queryable only through SetIn.
+func TestSetFilterStaysInfinite(t *testing.T) {
+	even := func(x Int) bool { return IntOrd.Eq(Mod(x, MkInt(2)), MkInt(0)) }
+	evens := SetFilter(NatSet(), even)
+
+	if !SetIn(IntOrd, evens, MkInt(4)) {
+		t.Errorf("4 \\notin {x \\in Nat : x %% 2 = 0}, want true")
+	}
+	if SetIn(IntOrd, evens, MkInt(3)) {
+		t.Errorf("3 \\in {x \\in Nat : x %% 2 = 0}, want false")
+	}
+	if SetIn(IntOrd, evens, MkInt(-2)) {
+		t.Errorf("-2 \\in {x \\in Nat : x %% 2 = 0}, want false: Nat already excludes negatives")
+	}
+
+	// Still infinite, not merely still correct: Cardinality needs enumeration,
+	// which this set does not admit any more than Nat itself did.
+	defer func() {
+		if recover() == nil {
+			t.Errorf("Cardinality of a still-infinite SetFilter result did not panic")
+		}
+	}()
+	Cardinality(evens)
+}
+
+// TestSetIntersectDemotes is SetIntersect's headline claim: combining an
+// infinite operand with a finite one always yields a genuinely finite Set —
+// checked on elems directly, not just on behavior, since a value could
+// behave finite under nil-check dispatch without actually being tagged so.
+func TestSetIntersectDemotes(t *testing.T) {
+	got := SetIntersect(IntOrd, NatSet(), intSet(-2, -1, 0, 1, 2))
+	if got.pred != nil {
+		t.Fatalf("Nat \\cap {-2,-1,0,1,2} is still tagged infinite")
+	}
+	if want := ints(0, 1, 2); !intsEqual(got.elems, want) {
+		t.Errorf("Nat \\cap {-2,-1,0,1,2} = %v, want %v", got.elems, want)
+	}
+
+	// Same, operands the other way round: the demotion does not depend on
+	// which side the finite operand is on.
+	got2 := SetIntersect(IntOrd, intSet(-2, -1, 0, 1, 2), NatSet())
+	if got2.pred != nil {
+		t.Fatalf("{-2,-1,0,1,2} \\cap Nat is still tagged infinite")
+	}
+	if want := ints(0, 1, 2); !intsEqual(got2.elems, want) {
+		t.Errorf("{-2,-1,0,1,2} \\cap Nat = %v, want %v", got2.elems, want)
+	}
+}
+
+// TestSetDifferenceDemotes checks the same claim for SetDifference's finite-
+// minus-anything case.
+func TestSetDifferenceDemotes(t *testing.T) {
+	got := SetDifference(IntOrd, intSet(-2, -1, 0, 1, 2), NatSet())
+	if got.pred != nil {
+		t.Fatalf("{-2,-1,0,1,2} \\ Nat is still tagged infinite")
+	}
+	if want := ints(-2, -1); !intsEqual(got.elems, want) {
+		t.Errorf("{-2,-1,0,1,2} \\ Nat = %v, want %v", got.elems, want)
+	}
+}
+
+// TestSetDifferenceInfiniteMinusFiniteStaysInfinite checks the complementary
+// case: removing finitely many elements from an infinite set cannot make it
+// finite, so the result stays tagged infinite.
+func TestSetDifferenceInfiniteMinusFiniteStaysInfinite(t *testing.T) {
+	got := SetDifference(IntOrd, NatSet(), intSet(0, 1, 2))
+	if got.pred == nil {
+		t.Fatalf("Nat \\ {0,1,2} is tagged finite, want infinite")
+	}
+	if SetIn(IntOrd, got, MkInt(1)) {
+		t.Errorf("1 \\in Nat \\ {0,1,2}, want false")
+	}
+	if !SetIn(IntOrd, got, MkInt(3)) {
+		t.Errorf("3 \\notin Nat \\ {0,1,2}, want true")
+	}
+}
+
+// TestSetUnionWithInfiniteStaysInfinite checks that, unlike SetIntersect and
+// SetDifference, a union never demotes: adding elements to an infinite set
+// cannot make it finite, whatever the other operand is.
+func TestSetUnionWithInfiniteStaysInfinite(t *testing.T) {
+	got := SetUnion(IntOrd, NatSet(), intSet(-5, -10))
+	if got.pred == nil {
+		t.Fatalf("Nat \\cup {-5,-10} is tagged finite, want infinite")
+	}
+	if !SetIn(IntOrd, got, MkInt(-5)) {
+		t.Errorf("-5 \\notin Nat \\cup {-5,-10}, want true")
+	}
+	if !SetIn(IntOrd, got, MkInt(7)) {
+		t.Errorf("7 \\notin Nat \\cup {-5,-10}, want true")
+	}
+	if SetIn(IntOrd, got, MkInt(-3)) {
+		t.Errorf("-3 \\in Nat \\cup {-5,-10}, want false")
+	}
+}
+
+// TestSetProductWithEmptyOperandIsEmpty checks the one case SetProduct can
+// decide with an infinite operand present: paired with a finite, empty set,
+// the product is empty regardless of what the infinite side is.
+func TestSetProductWithEmptyOperandIsEmpty(t *testing.T) {
+	type pair = struct{ Proj1, Proj2 Int }
+	mkPair := func(x, y Int) pair { return pair{x, y} }
+
+	if got := SetProduct(NatSet(), intSet(), mkPair); got.pred != nil || len(got.elems) != 0 {
+		t.Errorf("Nat \\X {} = %v, want a finite empty set", got)
+	}
+	if got := SetProduct(intSet(), NatSet(), mkPair); got.pred != nil || len(got.elems) != 0 {
+		t.Errorf("{} \\X Nat = %v, want a finite empty set", got)
+	}
+}
+
+// TestSetSubseteqAgainstInfinite checks the one infinite-operand shape that
+// does not panic: a finite left operand against an infinite right one falls
+// back to SetIn per element instead of the sorted merge.
+func TestSetSubseteqAgainstInfinite(t *testing.T) {
+	if !SetSubseteq(IntOrd, intSet(1, 2, 3), NatSet()) {
+		t.Errorf("{1,2,3} \\subseteq Nat, want true")
+	}
+	if SetSubseteq(IntOrd, intSet(-1, 2, 3), NatSet()) {
+		t.Errorf("{-1,2,3} \\subseteq Nat, want false")
+	}
+}
+
+// TestPanicsOnInfiniteSet is the single table for every operation that
+// panics outright on an infinite set because there is no second, finite
+// operand to enumerate instead — the same shape as Choose-on-empty and
+// FnApply-outside-domain elsewhere in this package, just for a different
+// undefined case.
+func TestPanicsOnInfiniteSet(t *testing.T) {
+	type pair = struct{ Proj1, Proj2 Int }
+	cases := []struct {
+		name string
+		call func()
+	}{
+		{"Cardinality", func() { Cardinality(NatSet()) }},
+		{"Choose", func() { Choose(NatSet(), func(Int) bool { return true }) }},
+		{"Pick", func() { Pick(NatSet()) }},
+		{"SetMap", func() { SetMap(IntOrd, NatSet(), func(x Int) Int { return x }) }},
+		{"SetSubseteq (infinite left operand)", func() { SetSubseteq(IntOrd, NatSet(), intSet(1, 2)) }},
+		{"SetForall", func() { SetForall(NatSet(), func(Int) bool { return true }) }},
+		{"SetExists", func() { SetExists(NatSet(), func(Int) bool { return true }) }},
+		{"SetProduct (infinite, nonempty)", func() {
+			SetProduct(NatSet(), intSet(1, 2), func(x, y Int) pair { return pair{x, y} })
+		}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Errorf("%s over an infinite set did not panic", c.name)
+				}
+			}()
+			c.call()
+		})
+	}
 }

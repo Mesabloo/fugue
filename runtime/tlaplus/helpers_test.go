@@ -22,7 +22,7 @@ func intSet(ns ...int) Set[Int] { return MkSet(IntOrd, ints(ns...)...) }
 
 // rawIntSet builds a Set from the given elements *without* normalizing, for
 // tests that need to observe what an operation does to an arbitrary slice.
-func rawIntSet(ns ...int) Set[Int] { return Set[Int](ints(ns...)) }
+func rawIntSet(ns ...int) Set[Int] { return Set[Int]{elems: ints(ns...)} }
 
 // intSeq builds a sequence.
 func intSeq(ns ...int) Seq[Int] { return MkSeq(ints(ns...)...) }

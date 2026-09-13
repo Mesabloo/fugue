@@ -20,6 +20,18 @@ func TestSetToBag(t *testing.T) {
 	}
 }
 
+// TestSetToBagPanicsOnInfiniteInput checks the enumeration-needed guard: a
+// Bag is a concrete multiset with a finite total copy count (BagCardinality),
+// which an infinite input has no way to supply.
+func TestSetToBagPanicsOnInfiniteInput(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Errorf("SetToBag of an infinite set did not panic")
+		}
+	}()
+	SetToBag(NatSet())
+}
+
 // TestBagToSet checks it both dedups and doesn't mutate its input, the two
 // properties SetFilter's own tests pin down for the same reason: b may be
 // shared with something else built over the same backing array.
@@ -29,7 +41,7 @@ func TestBagToSet(t *testing.T) {
 
 	got := BagToSet(IntOrd, b)
 
-	if want := intSet(1, 2, 3); !intsEqual(got, want) {
+	if want := intSet(1, 2, 3); !intsEqual(got.elems, want.elems) {
 		t.Errorf("BagToSet(%v) = %v, want %v", b, got, want)
 	}
 	if !bagsEqual(b, before) {
@@ -129,6 +141,18 @@ func TestBagUnion(t *testing.T) {
 	}
 }
 
+// TestBagUnionPanicsOnInfiniteInput checks the same enumeration-needed guard
+// for the set-of-bags argument: folding BagSum over it needs to visit every
+// bag, which an infinite set of bags cannot offer.
+func TestBagUnionPanicsOnInfiniteInput(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Errorf("BagUnion of an infinite set of bags did not panic")
+		}
+	}()
+	BagUnion(IntOrd, Collect(func(Bag[Int]) bool { return true }))
+}
+
 // TestBagSqsubseteq checks both the copy-count comparison and the
 // domain-subset half of the definition: {1,1,2,3} isn't \sqsubseteq {1,2}
 // because of 1's count, and {1,2} isn't \sqsubseteq {1} because 2 is
@@ -226,7 +250,7 @@ func TestBagCardinality(t *testing.T) {
 func TestBagOfAll(t *testing.T) {
 	f := func(x Int) Int { return Mod(x, MkInt(2)) }
 	got := BagOfAll(IntOrd, intBag(1, 1, 2, 3), f)
-	if n := len(Domain(got)); n != 2 {
+	if n := len(Domain(got).elems); n != 2 {
 		t.Fatalf("DOMAIN BagOfAll({1,1,2,3}, x -> x mod 2) has %d elements, want 2", n)
 	}
 	if c := FnApply(IntOrd, got, MkInt(0)); !eqInt(c, 1) {
