@@ -69,7 +69,7 @@ Two other subcommands:
 - `fugue help -d` (also `-f`, `-W`, `-X`) lists the names the matching `compile` flag
   accepts.
 
-Worked example inputs live under `Tests/examples/`: `LamportMutex.tla`,
+Worked example inputs live under `examples/`: `LamportMutex.tla`,
 `TwoPhaseCommit.tla`, `Paxos.tla`, and more.
 
 ### The generated code

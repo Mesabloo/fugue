@@ -225,8 +225,6 @@ Generic proof infrastructure.
 - `Linter/` — one `#guard_msgs` module per `linter.fugue.*` linter, named for the linter.
 - `regression/` — `Accept*.tla`/`Reject*.tla` fixtures with optional `.expect.json` sidecars.
 - `regression/_stubs/AcceptInVariableWithoutParameter.go` — Go definitions a `goBuild` fixture needs.
-- `examples/` — larger worked example specs, not run by `lake test`.
-- `examples/PingPongs.md` — how to compile `PingPongs.tla` to Go and wire it into a runnable system.
 
 ## `runtime/`
 Go, not Lean — the library generated code links against. Every package is a subdirectory.
@@ -260,6 +258,40 @@ Go, not Lean — the library generated code links against. Every package is a su
 - `helpers_test.go`, `int_test.go`, `int_big_test.go`, `functions_test.go`, `naturals_test.go`,
   `bags_test.go`, `records_test.go`, `sequences_test.go`, `sets_test.go`, `str_test.go`,
   `downcasts_test.go` — their tests.
+
+## `examples/`
+Worked Distributed PlusCal specs, plus runnable Go systems built by compiling some of them.
+Root `go.mod` covers the Go subdirectories.
+- `DQueue.tla`, `LamportMutex.tla`, `TwoPhaseCommit.tla` — worked example specs, not run by
+  `lake test`.
+
+### `examples/pingpong/`
+- `PingPongs.tla` — the worked example spec this directory compiles and runs; not run by
+  `lake test`.
+- `PingPongs.md` — how to compile `PingPongs.tla` to Go and wire it into a runnable system; the
+  rest of this directory is exactly what it describes.
+- `pingpong/pingpong.go` — `fugue compile -X go-pkg:pingpong` output for `PingPongs.tla`, an
+  importable package (not `package main`, unlike `examples/paxos/paxos.go`) since two different
+  roles (`ping`, `pong`) both need their own `main` calling into it.
+- `ping/main.go` — the one `Ping` process's `main`: resolves every `Pong` name given on its
+  command line through the name server, then wires and starts `pingpong.Proc_Ping`.
+- `pong/main.go` — one `Pong` process's `main`, run once per `Pong` identity with a different
+  command-line name each time; resolves only `Ping`, then starts `pingpong.Proc_Pong`.
+- `nameserver/main.go` — runs the `runtime/comm/tcp` name server `ping`/`pong` register with and
+  resolve each other through.
+- `run.sh` — starts the name server, one `Ping`, and two `Pong`s (`Pong1`, `Pong2`) locally over
+  TCP, matching `PingPongs.md`'s own "Running" section.
+
+### `examples/paxos/`
+- `Paxos.tla` — the worked example spec this directory compiles and runs; not run by `lake test`.
+- `paxos.go` — `fugue compile` output for `Paxos.tla`; regenerate with `go generate
+  ./examples/paxos` (needs `.lake/build/bin/fugue` built).
+- `main.go` — one node's `main`: CLI flags for identity/bind/name-server address, the CONSTANTS
+  (`N`/`Values`/`Nodes`) `paxos.go` leaves free, and the `runtime/comm/tcp` wiring to reach the
+  other two. All three node identities run this same binary with a different `-name`.
+- `nameserver/main.go` — runs the `runtime/comm/tcp` name server the nodes register with and
+  resolve each other through.
+- `run.sh` — starts the name server and all three nodes locally over TCP.
 
 ## `persistent/`
 Go, not Lean — data structures the runtime needs. Root `go.mod` covers this directory and

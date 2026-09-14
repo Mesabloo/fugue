@@ -12,7 +12,7 @@ output into running processes is integration work, sketched below.
 ## Compile to Go
 
 ```bash
-fugue compile -t go -X go-pkg:pingpong -o pingpong/pingpong.go Tests/examples/PingPongs.tla
+fugue compile -t go -X go-pkg:pingpong -o pingpong/pingpong.go examples/pingpong/PingPongs.tla
 ```
 
 `-X go-pkg:pingpong` puts the output in an importable package rather than
@@ -110,3 +110,9 @@ pong       127.0.0.1:9000 Pong2
 `PingPongs.tla` has no `print`, so a run is silent unless the integrator adds
 observation — for example by wrapping each `Sender` / `Receiver` in a decorator
 that logs before delegating.
+
+## Implementation
+
+`pingpong/pingpong.go` (this everything above describes), `ping/main.go`, `pong/main.go`, and
+`nameserver/main.go` in this directory are exactly this — `ping`/`pong`/`nameserver` above are
+those three commands. `run.sh` builds and starts one of each, matching "Running" above.
