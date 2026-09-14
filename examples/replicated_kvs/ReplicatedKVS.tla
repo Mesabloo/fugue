@@ -245,6 +245,11 @@ EmptyRequestQueue == <<>>
             \* last result observed by this client; bookkeeping only, protocol never reads it
             \* @type: Str;
             outside = "",
+            \* getLoop and putLoop both receive off the one shared clientMailboxes[self]
+            \* queue with no tag telling one reply from the other, so at most one of the
+            \* two may have a request outstanding at a time -- this flag is that mutex.
+            \* @type: Bool;
+            awaitingReply = FALSE,
 
             \* -- Get thread --
             \* @type: {op: Str, key: Str, value: Str, client: Address, timestamp: Int, reply_to: Address};
@@ -272,6 +277,8 @@ EmptyRequestQueue == <<>>
         while (clock # -1) {
         getRequest:
             if (clock # -1) {
+                await ~awaitingReply;
+                awaitingReply := TRUE;
                 clock := clock + 1;
                 getReq := [op |-> GetMessage, key |-> GetKey, value |-> NoValue, client |-> self, timestamp |-> clock, reply_to |-> self];
                 with (dst \in ReplicaSet) {
@@ -283,7 +290,8 @@ EmptyRequestQueue == <<>>
                     receive(clientMailboxes[self], getResp);
                     assert(getResp.type = GetResponse);
                     outside := getResp.result;
-                }
+                };
+                awaitingReply := FALSE;
             }
         }
     }
@@ -292,6 +300,8 @@ EmptyRequestQueue == <<>>
         while (clock # -1) {
         putRequest:
             if (clock # -1) {
+                await ~awaitingReply;
+                awaitingReply := TRUE;
                 clock := clock + 1;
                 putReq := [op |-> PutMessage, key |-> PutKey, value |-> PutValue, client |-> self, timestamp |-> clock, reply_to |-> self];
                 putI := 0;
@@ -302,6 +312,7 @@ EmptyRequestQueue == <<>>
             putResponse:
                 while (putI < Cardinality(ReplicaSet)) {
                     if (clock = -1) {
+                        awaitingReply := FALSE;
                         goto putLoop;
                     } else {
                         receive(clientMailboxes[self], putResp);
@@ -312,6 +323,7 @@ EmptyRequestQueue == <<>>
 
             putComplete:
                 outside := PutResponse;
+                awaitingReply := FALSE;
             }
         }
     }
