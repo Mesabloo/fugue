@@ -79,6 +79,25 @@ var IntOrd = Ord[Int]{
 // String renders the integer in base 10.
 func (n Int) String() string { return n.val().String() }
 
+// GobEncode implements gob.GobEncoder, delegating to math/big.Int's own. The
+// struct wrapper above (val's doc comment explains why it exists) has no
+// exported field for gob's default struct encoding to find, so without this
+// an Int sent over runtime/comm/tcp fails encoding outright with "gob: type
+// tlaplus.Int has no exported fields" -- every message a compiled process
+// sends carrying an Int field (a Lamport clock, an index, ...) would fail
+// every Send and retry forever.
+func (n Int) GobEncode() ([]byte, error) { return n.val().GobEncode() }
+
+// GobDecode implements gob.GobDecoder, the mirror of GobEncode.
+func (n *Int) GobDecode(data []byte) error {
+	v := new(big.Int)
+	if err := v.GobDecode(data); err != nil {
+		return err
+	}
+	n.v = v
+	return nil
+}
+
 // Add compiles x + y.
 func Add(x, y Int) Int { return Int{new(big.Int).Add(x.val(), y.val())} }
 
