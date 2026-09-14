@@ -80,6 +80,10 @@ def goBoolTyp : Go.Typ := .named "bool" []
 def locksCall (name : String) (args : List ComputableGo.Expression) : ComputableGo.Expression :=
   .call (locksVar name) args
 
+/-- `condlocks.f(e₁, …)`. -/
+def condlocksCall (name : String) (args : List ComputableGo.Expression) : ComputableGo.Expression :=
+  .call (condlocksVar name) args
+
 /-! ## Per-process environment -/
 
 /--
@@ -106,6 +110,11 @@ structure ProcEnv where
   net : String
   self : String
   done : String
+  /-- Whether this process compiles under the experimental `-Xgo-cond` backend rather than the
+  default busy-wait one. The two share every field above — lock inference does not care how a
+  lock is represented at runtime — and differ only in which package a lock's type/calls name and
+  in how an atomic block's branches are scheduled. -/
+  condBackend : Bool
 
 /-- The `struct {x τ, …}` a lock carries: one field per variable it guards, in declaration order.
 
@@ -121,9 +130,34 @@ def lockStructTyp (env : ProcEnv) (l : Lock) : m Go.Typ := do
     return (binderName x, ← compileTyp τ)
   return .struct fields
 
-/-- The Go type of one lock: `locks.Lock[struct {x τ, …}]`. -/
-def lockTyp (env : ProcEnv) (l : Lock) : m Go.Typ :=
-  return locksTyp "Lock" [← lockStructTyp env l]
+/-- The Go type of one lock: `locks.Lock[struct {x τ, …}]`, or `condlocks.Lock[struct {x τ, …}]`
+under `-Xgo-cond`. -/
+def lockTyp (env : ProcEnv) (l : Lock) : m Go.Typ := do
+  let τ ← lockStructTyp env l
+  return if env.condBackend then condlocksTyp "Lock" [τ] else locksTyp "Lock" [τ]
+
+/-- `Acquire` respelled for whichever lock representation `env` selects: `locks.Acquire(ℓ)`, a
+free function, by default; `ℓ.Acquire()`, a method, under `-Xgo-cond`, whose `Lock` carries an
+extra change signal `Acquire` itself never touches. -/
+def acquireCall (env : ProcEnv) (l : Lock) : ComputableGo.Expression :=
+  if env.condBackend then .call (.field (.var l.name) "Acquire") []
+  else locksCall "Acquire" [.var l.name]
+
+/-- `Release` respelled the same way — under `-Xgo-cond` this is always the broadcasting release,
+`ℓ.Release(v)`; a guard-false attempt there calls `ReleaseNoBroadcast` directly instead of this. -/
+def releaseCall (env : ProcEnv) (l : Lock) (v : ComputableGo.Expression) : ComputableGo.Expression :=
+  if env.condBackend then .call (.field (.var l.name) "Release") [v]
+  else locksCall "Release" [.var l.name, v]
+
+/-- `MkLock` respelled for whichever package `env` selects. Always a free function in both
+backends — nothing to construct it from yet — so only the package qualifier differs. -/
+def mkLockCall (env : ProcEnv) (v : ComputableGo.Expression) : ComputableGo.Expression :=
+  (if env.condBackend then condlocksCall else locksCall) "MkLock" [v]
+
+/-- `ℓ.ReleaseNoBroadcast(v)` — `-Xgo-cond` only, the guard-false release that leaves the value
+unchanged and returns the change signal to wait on next, snapshotted before the release completes. -/
+def releaseNoBroadcastCall (l : Lock) (v : ComputableGo.Expression) : ComputableGo.Expression :=
+  .call (.field (.var l.name) "ReleaseNoBroadcast") [v]
 
 /-- The lock parameters every generated function takes, in locking order. -/
 def lockParams (env : ProcEnv) : m (List (String × Go.Typ)) :=
@@ -256,7 +290,7 @@ matching release needs. -/
 private def acquireLock (env : ProcEnv) (l : Lock) : m (List ComputableGo.Statement × String) := do
   let st := goIdent (← freshName "st")
   let mut stmts : List ComputableGo.Statement :=
-    [.var st (← lockStructTyp env l), .assign [.var st] [locksCall "Acquire" [.var l.name]]]
+    [.var st (← lockStructTyp env l), .assign [.var st] [acquireCall env l]]
   for x in l.vars do
     let some τ := env.varTyps.lookup x
       | throw (.internalInvariantViolated SourceSpan.placeholder
@@ -271,7 +305,7 @@ mutating. The lock carries the value, so releasing without writing back would di
 branch's whole effect. -/
 private def releaseLock (env : ProcEnv) (l : Lock) : m ComputableGo.Statement := do
   let fields ← l.vars.mapM λ x ↦ return (binderName x, (.var (binderName x) : ComputableGo.Expression))
-  return .expr (locksCall "Release" [.var l.name, .structLit (← lockStructTyp env l) fields])
+  return .expr (releaseCall env l (.structLit (← lockStructTyp env l) fields))
 
 /-! ## Branches, blocks, threads, processes -/
 
@@ -343,6 +377,111 @@ def compileBlock (env : ProcEnv) (B : ComputableNetworkPlusCal.AtomicBlock) :
           .return [unitVal] ] }
   return (branches ++ [scheduler]).map .function
 
+/-! ## Branches and blocks, experimental `-Xgo-cond` backend -/
+
+/--
+  One branch of an atomic block under `-Xgo-cond`, as its own `struct {}`-returning function
+  taking two parameters beyond `commonParams`: `cancel`, closed once by whichever branch of the
+  block resolves it, and `arbiter`, the one-shot arbitration every simultaneously-true branch of
+  the block shares — lock exclusivity alone only serializes branches whose footprints overlap, and
+  says nothing about two branches on disjoint locks that are both true at once.
+
+  Loops, unlike `compileBranch`: a guard-false attempt releases without broadcasting, gets back the
+  change signal `ReleaseNoBroadcast` snapshots before releasing, and sleeps on it — or on `cancel`,
+  which every sibling branch not sharing this one's locks would otherwise never wake for — before
+  retrying. The nonblocking recheck right after the sleep is not redundant: `select` has no
+  priority, so a live change can win the pseudo-random pick over an already-closed `cancel`, and
+  without the recheck this branch could keep retrying a resolved block for as long as *something
+  else* keeps touching its locks.
+
+  A guard-true attempt always returns, win or lose the arbitration — the block is resolved either
+  way, and a loser must release exactly what it acquired, never running its action. -/
+def compileBranchCond (env : ProcEnv) (cancel arbiter : String) (label : String) (i : Nat)
+    (br : ComputableNetworkPlusCal.AtomicBranch) : m ComputableGo.Function := do
+  let guardVar := goIdent (← freshName "guard")
+  let acquired := env.locks.acquiredBy (branchShared br)
+  let held := acquired.filterMap λ j ↦ env.locks.locks[j]?
+  let mut loopBody : List ComputableGo.Statement :=
+    [.var guardVar goBoolTyp, .assign [.var guardVar] [.true]]
+  let mut sts : List (Lock × String) := []
+  for l in held do
+    let (stmts, st) ← acquireLock env l
+    loopBody := loopBody ++ stmts
+    sts := sts ++ [(l, st)]
+  for s in br.precondition.elim [] (λ B ↦ B.begin ++ [B.last]) do
+    loopBody := loopBody ++ (← compileGuard guardVar s)
+
+  let mut action : List ComputableGo.Statement := []
+  for s in br.action.begin do
+    action := action ++ (← compileAction env s)
+  action := action ++ (← compileAction env br.action.last)
+
+  let wonVar := goIdent (← freshName "won")
+  let onWin : List ComputableGo.Statement :=
+    action ++ [.close (.var cancel)] ++ (← sts.mapM λ (l, _) ↦ releaseLock env l)
+      ++ [.assign [.var wonVar] [.true]]
+  let winPath : List ComputableGo.Statement :=
+    [ .var wonVar goBoolTyp, .assign [.var wonVar] [.false],
+      .expr (.call (.field (.var arbiter) "Do") [.funcLit [] [] onWin]),
+      .if (.unary .not (.var wonVar))
+        (sts.map λ (l, st) ↦ .expr (releaseNoBroadcastCall l (.var st))) [],
+      .return [unitVal] ]
+
+  let mut sleepPath : List ComputableGo.Statement := []
+  let mut wakeCases : List (Go.SelectClause ComputableGo.Statement) := []
+  for (l, st) in sts do
+    let ch := goIdent (← freshName "ch")
+    sleepPath := sleepPath
+      ++ [.var ch doneTyp, .assign [.var ch] [releaseNoBroadcastCall l (.var st)]]
+    wakeCases := wakeCases ++ [{ guard := .receive (.var ch) .wildcard none, body := [] }]
+  let cancelCase : Go.SelectClause ComputableGo.Statement :=
+    { guard := .receive (.var cancel) .wildcard none, body := [.return [unitVal]] }
+  sleepPath := sleepPath
+    ++ [.select (wakeCases ++ [cancelCase]) none, .select [cancelCase] (some [])]
+
+  return { name := branchName env.proc label i
+           typeParams := []
+           params := (← commonParams env) ++ [(cancel, doneTyp), (arbiter, condlocksTyp "Arbiter" [])]
+           returnType := [unitTyp]
+           -- Go's "missing return" check only special-cases a condition-less `for {}` as
+           -- terminating; `for true {}` does not qualify even though it is exactly as infinite,
+           -- since the check is syntactic, not semantic. This AST has no condition-less `for`, and
+           -- every real exit from the loop above is an explicit `return`, so this one is dead code
+           -- that exists purely to satisfy that check.
+           body := [.for .true (loopBody ++ [.if (.var guardVar) winPath []] ++ sleepPath),
+                    .return [unitVal]] }
+
+/-- An atomic block under `-Xgo-cond`: its branch functions, spawned as goroutines racing on a
+`cancel`/`arbiter` pair fresh to this block instance, plus the function that spawns them and
+blocks on `<-cancel` until one resolves the block.
+
+Blocking before returning, rather than returning the moment every branch is spawned, is what keeps
+this function's calling convention identical to `compileBlock`'s scheduler: `compileCodeThread`'s
+caller (ultimately `compileProcess`'s `thread_k`, called synchronously) sees the same
+run-to-resolution contract from either backend. -/
+def compileBlockCond (env : ProcEnv) (B : ComputableNetworkPlusCal.AtomicBlock) :
+    m (List ComputableGo.Declaration) := do
+  if B.branches.isEmpty then
+    throw (.internalInvariantViolated SourceSpan.placeholder
+      s!"atomic block '{B.label}' has no branches, which desugaring should have made impossible")
+  let cancel := goIdent (← freshName "cancel")
+  let arbiter := goIdent (← freshName "arbiter")
+  let branches ← B.branches.zipIdx.mapM λ (br, i) ↦
+    compileBranchCond env cancel arbiter B.label (i + 1) br
+  let mut body : List ComputableGo.Statement :=
+    [ .make cancel unitTyp none,
+      .var arbiter (condlocksTyp "Arbiter" []),
+      .assign [.var arbiter] [condlocksCall "MkArbiter" []] ]
+  for F in branches do
+    body := body ++ [.go [dropCall F.name (commonArgs env ++ [.var cancel, .var arbiter])]]
+  body := body ++ [.receive (.var cancel) .wildcard none, .return [unitVal]]
+  let spawner : ComputableGo.Function :=
+    { name := blockName env.proc B.label
+      typeParams := [], params := ← commonParams env
+      returnType := [unitTyp]
+      body }
+  return (branches ++ [spawner]).map .function
+
 /-- A code thread: every block it contains, plus the function that starts the chain by calling the
 first one. Everything after that first block happens through `goto`'s goroutines, so
 this really is all a thread needs.
@@ -353,7 +492,8 @@ into `Thread.rx` — but an ordinary empty thread is legal too, and denotes a pr
 terminates immediately. -/
 def compileCodeThread (env : ProcEnv) (k : Nat) (blocks : List ComputableNetworkPlusCal.AtomicBlock) :
     m (List ComputableGo.Declaration) := do
-  let blockDecls ← blocks.flatMapM (compileBlock env)
+  let compileOneBlock := if env.condBackend then compileBlockCond else compileBlock
+  let blockDecls ← blocks.flatMapM (compileOneBlock env)
   let start := blocks.head?.elim [] λ B ↦ [dropCall (blockName env.proc B.label) (commonArgs env)]
   let thread : ComputableGo.Function :=
     { name := threadName env.proc k
@@ -386,7 +526,7 @@ def compileRxThread (env : ProcEnv) (k : Nat) (τ : Typ) (inbox : String) :
   let some l := env.locks.locks[j]?
     | throw (.internalInvariantViolated SourceSpan.placeholder s!"lock index {j} is out of range")
   let append : List ComputableGo.Statement :=
-    [ .var stVar (← lockStructTyp env l), .assign [.var stVar] [locksCall "Acquire" [.var l.name]],
+    [ .var stVar (← lockStructTyp env l), .assign [.var stVar] [acquireCall env l],
       .assign [.field (.var stVar) (binderName inbox)]
         [tlaplusCall "Append" [.field (.var stVar) (binderName inbox), .var rxVar]],
       ← releaseLockOf env l stVar ]
@@ -410,8 +550,8 @@ def compileRxThread (env : ProcEnv) (k : Nat) (τ : Typ) (inbox : String) :
   where
     /-- `Release(ℓ, st)` — the receiving thread mutates the struct in place rather than projecting
     its fields out, so it writes the whole thing back unchanged apart from `inbox`. -/
-    releaseLockOf (_env : ProcEnv) (l : Lock) (st : String) : m ComputableGo.Statement :=
-      return .expr (locksCall "Release" [.var l.name, .var st])
+    releaseLockOf (env : ProcEnv) (l : Lock) (st : String) : m ComputableGo.Statement :=
+      return .expr (releaseCall env l (.var st))
 
 /--
   Which non-`@parameter` variables need a Go local, in declaration order.
@@ -507,7 +647,7 @@ def initLocks (env : ProcEnv)
       (binderName x, (.var (binderName x) : ComputableGo.Expression))
     stmts := stmts ++
       [.var l.name (← lockTyp env l),
-       .assign [.var l.name] [locksCall "MkLock" [.structLit τ fields]]]
+       .assign [.var l.name] [mkLockCall env (.structLit τ fields)]]
   return stmts
 
 /--
@@ -523,11 +663,11 @@ def initLocks (env : ProcEnv)
   `main` and takes no position on how processes find each other — whoever assembles the system
   supplies a `Receiver` backed by a socket, a queue, or a Go channel.
 -/
-def compileProcess (chanTyps : List (String × Typ)) (p : ComputableNetworkPlusCal.Process) :
-    m (List ComputableGo.Declaration) := do
+def compileProcess (condBackend : Bool) (chanTyps : List (String × Typ))
+    (p : ComputableNetworkPlusCal.Process) : m (List ComputableGo.Declaration) := do
   let locks ← inferLocks p
   let env : ProcEnv :=
-    { proc := p.name, locks, chanTyps
+    { proc := p.name, locks, chanTyps, condBackend
       varTyps := p.localState.variables.map λ (x, τ, _, _) ↦ (x, τ)
       net := goIdent (← freshName "net")
       self := binderName "self"
@@ -612,11 +752,15 @@ they appear in.
 
 Sits outside `namespace Network2Go` so that `algo.toGo` resolves by dot notation, matching
 `Guarded2Network/PlusCal.lean`'s `guarded.toNetwork` — `Driver/Pipeline.lean` calls each pass that
-way. -/
+way.
+
+`condBackend` selects the experimental `-Xgo-cond` scheme for every process of the algorithm — an
+algorithm compiles as a whole under one backend or the other, never a mix, since it is one `.go`
+file and every process there shares the runtime import list `Network2Go.Emit` computes from it. -/
 def ComputableNetworkPlusCal.Algorithm.toGo {m : Type → Type} [Monad m]
-    [MonadDiagnostic Empty N2GError m] [MonadFresh m] (algo : ComputableNetworkPlusCal.Algorithm) :
-    m (List ComputableGo.Declaration) := do
+    [MonadDiagnostic Empty N2GError m] [MonadFresh m] (algo : ComputableNetworkPlusCal.Algorithm)
+    (condBackend : Bool := false) : m (List ComputableGo.Declaration) := do
   let chanTyps := (channelTyps algo).map λ (c, τ, _) ↦ (c, τ)
-  return (← networkTyp algo) :: (← algo.processes.flatMapM (compileProcess chanTyps))
+  return (← networkTyp algo) :: (← algo.processes.flatMapM (compileProcess condBackend chanTyps))
 
 end

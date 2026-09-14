@@ -238,7 +238,7 @@ private def runPostDriver (moduleId : String) (warnings : List PipelineWarning)
   let goStage : DiagT Empty N2GError Base String := do
     let defs ← Network2Go.compileDeclarations SourceSpan.placeholder
       (computable.declarations₁ ++ computable.declarations₂)
-    let algo ← network.toGo
+    let algo ← network.toGo (← FlagsEnv.getTargetFlag "go-cond")
     let package := (← FlagsEnv.getTargetOption "go-pkg").getD "main"
     return Network2Go.emitFile package (defs ++ algo)
   match ← runStage moduleId .go goStage with

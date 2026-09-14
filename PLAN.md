@@ -1444,6 +1444,38 @@ top-level wiring are direct ports of the schemes above.
   struct), and `Statement.expr` for a call evaluated for its effect (`Send`/`Release` return
   nothing).
 
+**Experimental: condition-variable atomic blocks, `-Xgo-cond`.** New work, no thesis
+counterpart — atomic blocks compile to a different scheme entirely when this flag is set,
+selected via `Fugue.lean`'s `targetOptionDocs`. Runtime primitive:
+`runtime/experimental/condlocks.Lock[T]` (`Acquire`, `Release`, `ReleaseNoBroadcast`,
+`Changed`) and `Arbiter` (`MkArbiter`, `Do`). Compiled shape: `Blk_` spawns one goroutine per
+branch (`Brn_`) sharing a fresh `cancel`/`arbiter` pair, then blocks on `<-cancel`. Each
+`Brn_` loops: `Acquire` every lock it needs, evaluate its guard; if true, race `arbiter.Do`
+— the winner runs its action, closes `cancel`, `Release`s with the new values, a loser
+`ReleaseNoBroadcast`s unchanged — and returns either way; if false, `ReleaseNoBroadcast`
+every lock, `select` on the resulting `Changed()` channels and `cancel`, then an
+unconditional nonblocking recheck of `cancel` before looping.
+
+Settled while implementing:
+- **`ProcEnv.condBackend : Bool`**, shared with the default backend — lock inference
+  (`Network2Go/Locks.lean`) is untouched by this flag; only `lockTyp`/`acquireCall`/
+  `releaseCall`/`mkLockCall` branch on it.
+- **Codegen lives in `Network2Go/PlusCal.lean` itself**, not a separate module —
+  `compileCodeThread`'s dispatch and `compileBlockCond` would otherwise import each other in
+  a cycle.
+- **This AST has no pointer type or address-of operator.** `Lock`'s `cond` field and
+  `Arbiter` both hide a primitive that must not be copied (`*atomic.Pointer[chan
+  struct{}]`, `*sync.Once`) behind a value-typed wrapper for exactly that reason — generated
+  code only ever holds and copies the wrapper.
+- **Every `Brn_*` ends with a dead `return` after its `for true { … }`.** Go's
+  missing-return check does not special-case a constant-`true` condition the way it does a
+  bare `for {}`; `go vet` correctly, and unavoidably, calls the trailing `return`
+  unreachable.
+
+Proof-free, same footing as multicast, lock inference, and everything else `Network2Go`
+does — not a new gap. Checked by `runtime/experimental/condlocks/condlocks_test.go` and by
+`Tests/regression/AcceptEitherNestedLabel.expect.json`'s `experimentalBackends: ["cond"]`.
+
 **Worked example, thesis §7.3.** Ping-Pong `Pong` end to end (`Ping` a mirror-image
 exercise) — the reference to check `Network2Go`'s output against. Pins down: lock inference
 merges `tmp2`/`inbox_Pong` under one lock (`inbox_Pong ≻ tmp2`, `self` never locked, being

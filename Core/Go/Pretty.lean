@@ -166,10 +166,15 @@ private def isSkip {α} : Statement α → Bool
   | .skip => true
   | _ => false
 
-/-- Statements, one per line. Go terminates statements with the newline itself, so no `;`. -/
+/-- Statements, one per line, `;`-joined. The `;` looks redundant next to the following `.line` —
+Go terminates a statement with the newline itself — but is not: nothing here wraps this in a
+`.group`, yet `Std.Format`'s renderer can still flatten a short enough stretch to spaces on its
+own, and a compiled multi-statement `funcLit` body used as a call argument (`arbiter.Do(func()
+{ … })`) is exactly such a stretch when short. The `;` is dead weight whenever the line survives
+and load-bearing whenever it does not — either way the output stays valid Go. -/
 private def formatStatements {α} (f : Statement α → Std.Format) (B : List (Statement α)) :
     Std.Format :=
-  .joinSep (f <$> B.filter (!isSkip ·)) .line
+  .joinSep (f <$> B.filter (!isSkip ·)) (";" ++ .line)
 
 private def formatBlock {α} (f : Statement α → Std.Format) (B : List (Statement α)) : Std.Format :=
   if B.all isSkip then "{}" else cblock (formatStatements f B)

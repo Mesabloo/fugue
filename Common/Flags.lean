@@ -105,6 +105,14 @@ def getFeatureFlag (f : Feature) : m Bool := do
 def getTargetOption (name : String) : m (Option String) := do
   return (← readThe FlagsEnv).targetOptions.get? name |>.join
 
+/-- Is `-X<name>` (with or without a value) present? For a valueless option like `go-cond`, this
+is the whole check — `getTargetOption` would answer `none` either way, present or absent. -/
+def hasTargetOption (flags : FlagsEnv) (name : String) : Bool := flags.targetOptions.contains name
+
+/-- Monadic form of `hasTargetOption`. -/
+def getTargetFlag (name : String) : m Bool := do
+  return (← readThe FlagsEnv).hasTargetOption name
+
 /-- The value attached to `-f<name>=<value>`, if any. -/
 def getFeatureOption (f : Feature) : m (Option String) := do
   return (← readThe FlagsEnv).features.get? f.name |>.join

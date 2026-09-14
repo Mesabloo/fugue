@@ -62,6 +62,28 @@ def FixtureStatus.ofName? (s : String) : Option FixtureStatus :=
   else if s == "skip" then some .skip
   else none
 
+/-- An experimental backend a fixture can additionally be compiled and `go build`-checked
+under, beyond the default one everyone gets. One case per `-X` flag such a backend is
+selected with. -/
+inductive ExperimentalBackend : Type
+  /-- `-Xgo-cond`. -/
+  | cond
+  deriving DecidableEq, Repr, Inhabited
+
+/-- How an `ExperimentalBackend` is written in a sidecar. -/
+def ExperimentalBackend.name : ExperimentalBackend → String
+  | .cond => "cond"
+
+instance : ToString ExperimentalBackend := ⟨ExperimentalBackend.name⟩
+
+/-- The backend `s` names, if it names one. -/
+def ExperimentalBackend.ofName? (s : String) : Option ExperimentalBackend :=
+  if s == "cond" then some .cond else none
+
+/-- The `-X<name>` flag that selects this backend. -/
+def ExperimentalBackend.flag : ExperimentalBackend → String
+  | .cond => "go-cond"
+
 /-- A warning a fixture expects, and how many times. -/
 structure WarningExpectation : Type where
   /-- The warning's code. -/
@@ -109,6 +131,11 @@ structure Expectation : Type where
   default: it costs a process spawn, and a fixture declaring a `CONSTANT` emits code that only
   builds once a `<Fixture>.stub.go` supplies the definition Go expects the user to write. -/
   goBuild : Bool := false
+  /-- Experimental backends this fixture is *additionally* compiled and `go build`-checked under,
+  each its own extra compile-and-build pass beyond the default one `goBuild` alone controls. Empty
+  by default. Naming a backend here needs no separate `goBuild` — checking the build is the whole
+  reason to name one. -/
+  experimentalBackends : List ExperimentalBackend := []
   /-- Normal / known-broken / not run. -/
   status : FixtureStatus := .ok
   /-- Why this fixture is `xfail` or `skip`. Shown in the runner's output. -/
@@ -182,6 +209,8 @@ private structure Sidecar : Type where
   searchPath : Option (List String) := none
   /-- Hand the emitted Go to `go build`. -/
   goBuild : Option Bool := none
+  /-- Experimental backends to additionally compile and `go build`-check under, e.g. `["cond"]`. -/
+  experimentalBackends : Option (List String) := none
   /-- `"ok"`, `"xfail"` or `"skip"`. -/
   status : Option String := none
   /-- Why, for a non-`ok` status. -/
@@ -231,7 +260,13 @@ private def Sidecar.applyTo (s : Sidecar) (dir : Option System.FilePath) (base :
     | some entries => entries.map λ entry ↦ match dir with
       | none => (⟨entry⟩ : System.FilePath)
       | some dir => dir / entry
-  return { outcome, status, failsAt, reaches, errorCode, warnings, searchPath
+  let experimentalBackends ← match s.experimentalBackends with
+    | none => pure base.experimentalBackends
+    | some names => names.mapM λ raw ↦ match ExperimentalBackend.ofName? raw with
+      | some b => pure b
+      | none => throw s!"experimentalBackends: '{raw}' is not a known experimental backend \
+(known: \"cond\")"
+  return { outcome, status, failsAt, reaches, errorCode, warnings, searchPath, experimentalBackends
            errorPosition := s.error.bind ErrorSpec.position
            goBuild := s.goBuild.getD base.goBuild
            allowExtraWarnings := s.allowExtraWarnings.getD base.allowExtraWarnings

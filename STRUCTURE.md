@@ -246,9 +246,18 @@ Go, not Lean — the library generated code links against. Every package is a su
   `Receiver`, for wiring a spec with no `print` of its own.
 - `log_test.go` — its tests.
 
+### `runtime/experimental/condlocks/`
+Locks for the experimental `-Xgo-cond` backend: adds a change signal to `runtime/locks`'s scheme.
+Kept under `runtime/experimental/` rather than beside `runtime/locks/` so nothing suggests it backs
+the default compilation scheme.
+- `condlocks.go` — `Lock[T]`, `MkLock`, `Acquire`, `Release`, `ReleaseNoBroadcast`, `Changed`,
+  `Arbiter`, `MkArbiter`.
+- `condlocks_test.go` — its tests.
+
 ### `runtime/locks/`
 - `locks.go` — `Lock[T]`, `MkLock`, `Acquire`, `Release`.
 - `locks_test.go` — its tests.
+
 
 ### `runtime/tlaplus/`
 - `ord.go` — the equality-and-ordering dictionary struct.
@@ -275,11 +284,8 @@ Root `go.mod` covers the Go subdirectories.
   `lake test`.
 - `PingPongs.md` — how to compile `PingPongs.tla` to Go and wire it into a runnable system; the
   rest of this directory is exactly what it describes.
-- `pingpong/pingpong.go` — `fugue compile -X go-pkg:pingpong` output for `PingPongs.tla`, an
-  importable package (not `package main`, unlike `examples/paxos/paxos.go`) since two different
-  roles (`ping`, `pong`) both need their own `main` calling into it.
-- `pingpong/doc.go` — the package doc comment for `pingpong/pingpong.go`, plus the `go generate`
-  directive that regenerates it.
+- `pingpong/doc.go` — the package doc comment for the generated package, plus the `go generate`
+  directive that produces it (gitignored, not part of the tree).
 - `ping/main.go` — the one `Ping` process's `main`: resolves every `Pong` name given on its
   command line through the name server, then wires and starts `pingpong.Proc_Ping`.
 - `pong/main.go` — one `Pong` process's `main`, run once per `Pong` identity with a different
@@ -292,12 +298,8 @@ Root `go.mod` covers the Go subdirectories.
 ### `examples/replicated_kvs/`
 - `ReplicatedKVS.tla` — the worked example spec this directory compiles and runs, a Distributed
   PlusCal translation of the classic MPCal replicated-KV tutorial algorithm; not run by `lake test`.
-- `replicatedkvs/doc.go` — the package doc comment for `replicatedkvs/replicatedkvs.go`, plus the
-  `go generate` directive that regenerates it.
-- `replicatedkvs/replicatedkvs.go` — `fugue compile -X go-pkg:replicatedkvs` output for
-  `ReplicatedKVS.tla`, an importable package (not `package main`, unlike `examples/paxos/paxos.go`)
-  since `replica` and `client` each need their own `main`; not checked in, regenerate with
-  `go generate ./examples/replicated_kvs/replicatedkvs`.
+- `replicatedkvs/doc.go` — the package doc comment for the generated package, plus the
+  `go generate` directive that produces it (gitignored, not part of the tree).
 - `replicatedkvs/constants.go` — hand-written CONSTANTs `ReplicaSet`/`ClientSet` (`r1`–`r3`,
   `c1`–`c2`) the generated file leaves free, shared here rather than duplicated per `main`.
 - `replica/main.go` — one replica's `main`: CLI flags for identity/bind/name-server address and
@@ -313,11 +315,9 @@ Root `go.mod` covers the Go subdirectories.
 
 ### `examples/paxos/`
 - `Paxos.tla` — the worked example spec this directory compiles and runs; not run by `lake test`.
-- `paxos.go` — `fugue compile` output for `Paxos.tla`; regenerate with `go generate
-  ./examples/paxos` (needs `.lake/build/bin/fugue` built).
 - `main.go` — one node's `main`: CLI flags for identity/bind/name-server address, the CONSTANTS
-  (`N`/`Values`/`Nodes`) `paxos.go` leaves free, and the `runtime/comm/tcp` wiring to reach the
-  other two. All three node identities run this same binary with a different `-name`.
+  (`N`/`Values`/`Nodes`) the generated package leaves free, and the `runtime/comm/tcp` wiring to
+  reach the other two. All three node identities run this same binary with a different `-name`.
 - `nameserver/main.go` — runs the `runtime/comm/tcp` name server the nodes register with and
   resolve each other through.
 - `run.sh` — starts the name server and all three nodes locally over TCP.

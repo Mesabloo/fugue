@@ -34,6 +34,15 @@ def commPkg : String := "comm"
 /-- The `runtime/locks` package's qualifier. -/
 def locksPkg : String := "locks"
 
+/-- The `runtime/experimental/condlocks` package's qualifier — the experimental `-Xgo-cond`
+backend's `Lock` (which also carries a change signal) and `Arbiter`. Under `runtime/experimental/`
+rather than beside `runtime/locks`, so nothing suggests it backs the default compilation scheme.
+`Arbiter` is what keeps generated code from ever needing `sync.Once` or a pointer directly: this
+AST has no address-of operator or pointer type, so a primitive that must not be copied has to hide
+behind a value-typed runtime wrapper — `Lock` already does this for its change signal, `Arbiter`
+does it for the one-shot arbitration a block's branches share. -/
+def condlocksPkg : String := "condlocks"
+
 /-- A qualified reference to a name in one of the runtime packages, `pkg.name`. Go's package
 qualifier is an ordinary part of the identifier as far as this AST is concerned — `Go.Typ.named`
 and `Go.Expression.var` both carry it as one string. -/
@@ -52,6 +61,10 @@ def commTyp (name : String) (args : List Go.Typ := []) : Go.Typ :=
 def locksTyp (name : String) (args : List Go.Typ := []) : Go.Typ :=
   .named (qualified locksPkg name) args
 
+/-- A runtime type from `runtime/experimental/condlocks`: `condlocks.Lock[τ]`, `condlocks.Arbiter`. -/
+def condlocksTyp (name : String) (args : List Go.Typ := []) : Go.Typ :=
+  .named (qualified condlocksPkg name) args
+
 /-- A reference to a `runtime/tlaplus` function or type-conversion, as an expression:
 `tlaplus.MkSet`, `tlaplus.Bool`. Applying it is `Go.Expression.call`, which also covers Go's
 conversion syntax — `tlaplus.Bool(true)` is a call as far as this AST is concerned. -/
@@ -62,6 +75,10 @@ def commVar {α} (name : String) : Go.Expression α := .var (qualified commPkg n
 
 /-- A reference to a `runtime/locks` function: `locks.Acquire`, `locks.MkLock`. -/
 def locksVar {α} (name : String) : Go.Expression α := .var (qualified locksPkg name)
+
+/-- A reference to a `runtime/experimental/condlocks` function: `condlocks.MkLock`,
+`condlocks.MkArbiter`. -/
+def condlocksVar {α} (name : String) : Go.Expression α := .var (qualified condlocksPkg name)
 
 /-- `tlaplus.f(e₁, …, eₙ)`. -/
 def tlaplusCall {α} (name : String) (args : List (Go.Expression α)) : Go.Expression α :=

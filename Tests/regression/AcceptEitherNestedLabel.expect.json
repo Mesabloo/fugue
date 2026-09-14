@@ -1,0 +1,5 @@
+{
+  "reaches": "go",
+  "goBuild": true,
+  "experimentalBackends": ["cond"]
+}

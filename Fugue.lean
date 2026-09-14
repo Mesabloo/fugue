@@ -150,10 +150,18 @@ contents depend on a flag parsed in the same pass.
 `go-pkg` names the Go package the emitted file declares, defaulting to `main`. It is not a
 `-f` toggle because it is a property of the *output*, not of how the compiler behaves; and not a
 Go build tag, unlike the integer representation, because the compiler is what writes the
-`package` clause. -/
+`package` clause.
+
+`go-cond` selects an experimental atomic-block compilation scheme: every branch runs as its own
+goroutine and blocks on a lock's change signal instead of the default scheme's busy-wait scheduler.
+An `-X` option rather than `-f`, like `go-pkg`, since it changes what is emitted — a structurally
+different Go program — not how the compiler behaves while emitting it. Takes no value. -/
 private def targetOptionDocs : List OptionDoc :=
   [ { name := "go-pkg", value := "<name>"
-    , description := "The package clause the emitted Go declares. Defaults to `main`." } ]
+    , description := "The package clause the emitted Go declares. Defaults to `main`." },
+    { name := "go-cond"
+    , description := "Experimental: compile atomic blocks to the blocking scheduler instead of \
+                       the busy-wait one." } ]
 
 /-- A flag whose names `fugue help` explains one by one: the four that take a table of names
 rather than a single value. -/
@@ -330,6 +338,10 @@ private def validateFlags (p : Parsed) : IO FlagsEnv := do
 
   match targetOptions.get? "go-pkg" with
   | some none => throw ↑"target option 'go-pkg' requires a name, e.g. -Xgo-pkg:pingpong"
+  | _ => pure ()
+
+  match targetOptions.get? "go-cond" with
+  | some (some _) => throw ↑"target option 'go-cond' takes no value"
   | _ => pure ()
 
   return { debug, features, warnings, targetOptions, output, target, searchPath }

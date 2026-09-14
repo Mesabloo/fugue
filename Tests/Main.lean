@@ -91,14 +91,16 @@ interesting should say so, not inherit it from the harness, which is exactly wha
 `searchPath` is. Colour follows the runner's own setting, since the only place these diagnostics go
 is its failure output. -/
 private def compileFlags (colored : Bool) (searchPath : List System.FilePath := [])
-    (suppressed : List String := []) (goPackage : Bool := false) : FlagsEnv :=
+    (suppressed : List String := []) (goPackage : Bool := false)
+    (backend : Option ExperimentalBackend := none) : FlagsEnv :=
   { features := if colored then {} else Std.HashMap.ofList [(Feature.noColor.name, none)]
     warnings := Std.HashMap.ofList (suppressed.map (·, false))
     -- The one exception to "bare": a fixture that asks for a `go build` is emitted under a
     -- library package rather than `main`, which nothing else asserts on. See `Tests/GoBuild.lean`
-    -- for why `main` would not do.
-    targetOptions :=
-      if goPackage then Std.HashMap.ofList [("go-pkg", some GoBuild.packageName)] else {}
+    -- for why `main` would not do. `backend`'s own flag selects the experimental backend, if any.
+    targetOptions := Std.HashMap.ofList <|
+      (if goPackage then [("go-pkg", some GoBuild.packageName)] else [])
+      ++ backend.elim [] (λ b ↦ [(b.flag, none)])
     searchPath }
 
 /-- How often `withTimeout` looks at the work it is waiting on. Small enough that the poll is
@@ -170,7 +172,21 @@ def runFixture (style : ReportStyle) (timeoutMs : Nat) (repoRoot : System.FilePa
                  detail := s!"the compiler threw under -Wno-{warningName}: {e}" }
       | .ok suppressed => return checkSuppression fx.expectation suppressedFlags warningName suppressed
     let goCheck ← GoBuild.checkGoBuild fx.expectation repoRoot fx.path result
-    let checks := runChecks fx.expectation result ++ suppressionChecks ++ [goCheck]
+    -- One extra compile per experimental backend, each `go build`-checked on its own — naming a
+    -- backend is itself the request to check its build, independent of the default backend's own
+    -- `goBuild`, so the expectation handed to `checkGoBuild` here always turns that on.
+    let backendChecks ← fx.expectation.experimentalBackends.mapM λ backend ↦ do
+      let backendFlags := compileFlags style.colored fx.expectation.searchPath
+                             (goPackage := true) (backend := some backend)
+      match ← (runPipelineIO backendFlags source fx.path.parent fx.name fx.path.fileStem).toBaseIO with
+      | .error e =>
+        return ({ name := s!"go build ({backend})", status := .fail,
+                   detail := s!"the compiler threw under -X{backend.flag}: {e}" } : CheckResult)
+      | .ok backendResult =>
+        let check ← GoBuild.checkGoBuild { fx.expectation with goBuild := true } repoRoot fx.path
+          backendResult
+        return { check with name := s!"go build ({backend})" }
+    let checks := runChecks fx.expectation result ++ suppressionChecks ++ backendChecks ++ [goCheck]
     let lines := source.split (· == '\n') |>.toList
     return { name := fx.name, verdict := .ofChecks fx.expectation.status checks, checks,
              elapsedMs, reason := fx.expectation.reason,
