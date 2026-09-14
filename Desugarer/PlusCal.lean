@@ -426,6 +426,33 @@ private def checkWrite {β} {m : Type → Type} [Monad m]
   `receive`'s `Ref`s (the channel counts as a write too, not just the target). `if`/`either`
   branches are separate control paths, checked independently from the same starting set, with
   their writes unioned into what continues past them.
+
+  `while` is not handled the same way: its body never contributes to what follows it, full
+  stop, not "unless it diverges" the way a naive `if`-shaped treatment might suggest. Every
+  PlusCal `while` iteration is its own atomic step — why a label is required immediately before
+  one (`RejectWhileNonfreshExtraction.tla`/`AcceptWhileFreshReuse.tla`) — so "the loop's body
+  ran" and "control reached the code after the loop" are never part of the same atomic step, no
+  matter what the body contains or how it ends. (This used to propagate the body's writes
+  forward unconditionally, which is what made `E0018` fire on, e.g.,
+  `while (c) { x := 0; l: … }; x := 1;` — flagging two writes that can never coexist on one
+  execution as if they were sequential; `AcceptConflictingAssignAcrossWhileExit.tla` pins the
+  fix.) The body is still checked for conflicts within itself, same as any other block.
+
+  `if`/`either` do *not* get the same "body can leave through a goto, so don't propagate its
+  writes" treatment, even though a branch certainly can end in one. The desugarer
+  (`Thread.desugar`'s `desugarContinuation`, above) requires a real label immediately after any
+  `if`/`either` whose branch needs extraction (contains a `goto` or an internal label) — so
+  whenever a branch's own writes *could* wrongly merge with sibling code in the same block, that
+  sibling code cannot exist: it would already have been rejected as `notFollowedByLabel`, or
+  pulled out to its own labelled block. Equivalently, in the type (`Core/CorePlusCal/Syntax.lean`):
+  a `Block`'s `begin` entries are always `Statement _ _ false`, so an `if`/`either` with more
+  code after it in the same block is thereby `b = false` — and since `if`/`either` share one `b`
+  across all their branches, every branch is `b = false` there too, never diverging. A branch
+  that *is* allowed to diverge only occurs where the `if`/`either` is itself a block's own tail,
+  where there is no "what follows in this block" to propagate into to begin with. Unlike
+  `while`'s body, which is a genuinely separate `Block` with its own independent `b` — nothing
+  ties it to whatever follows the `while` — an `if`/`either` branch's divergence and "is there
+  more in this block" are the same fact, so no extra check is needed here.
 -/
 mutual
   partial def CorePlusCal.Statement.checkAssignConflicts {α β b} {m : Type → Type} [Monad m]
@@ -442,7 +469,9 @@ mutual
       let seen₂ ← CorePlusCal.Block.checkAssignConflicts seen B₂
       pure (seen₁ ++ seen₂)
     | .either branches, _ => CorePlusCal.Branches.checkAssignConflicts seen branches
-    | .while _ B, _ => CorePlusCal.Block.checkAssignConflicts seen B
+    | .while _ B, _ => do
+      let _ ← CorePlusCal.Block.checkAssignConflicts seen B
+      pure seen
     | .with _ _ _ _ B, _ => CorePlusCal.Block.checkAssignConflicts seen B
     | .skip, _ | .goto _, _ | .print _, _ | .await _, _ | .assert _, _
     | .send _ _, _ | .multicast _ _, _ => pure seen
