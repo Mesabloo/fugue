@@ -4,9 +4,9 @@
 \* `CorePlusCal.Statement.with` only ever binds one variable at a time, by construction
 \* (`Core/CorePlusCal/Syntax.lean`'s module doc).
 \*
-\* Every binder is `=`, so that this stays an acceptance end to end: a `\in` binder desugars the
-\* same way but the Go backend refuses it (thesis §7.2.3.1 rejects set-valued `with` outright),
-\* which `RejectWithSetBinderInGo.tla` pins separately.
+\* Every binder is `=` -- unrelated to whether the Go backend accepts a `\in` binder (it does,
+\* `AcceptWithSetBinderInGo.tla`, OPEN_QUESTIONS.md §9.36); this fixture isolates the
+\* multi-binder-desugars-to-a-chain concern from that one.
 
 EXTENDS Naturals
 

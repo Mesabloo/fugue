@@ -429,3 +429,36 @@ prove `Network2Go` sound against it, since no such proof exists for *any* operat
 included — or (b) accept permanently proof-free codegen and record that choice here rather than
 leaving it implicit in the doc comment.
 
+### 9.36 `with x ∈ S` compiles for Go, against the thesis's own call
+
+Deliberate divergence, not a gap. Thesis §7.2.3.1 rejects a set-valued `with` outright: "we
+choose not to support such constructs as they do not necessarily carry much computational
+meaning anyway." `Network2Go/PlusCal.lean`'s `compileGuard` used to match that, throwing
+`E0061` (`Tests/regression/RejectWithSetBinderInGo.tla` pinned it). Compiles now instead,
+through `Pick` (`runtime/tlaplus/sets.go`) — already there, used for a `variable x ∈ S`
+initializer, just not wired to the statement form. `PLAN.md`'s §7 write-up (the "Guards"
+bullet) has the mechanics; `Tests/regression/AcceptWithSetBinderInGo.tla` is the fixture
+(renamed from the reject one).
+
+Why diverge: the thesis's own objection is that no principled deterministic search exists —
+true, and irrelevant here, since nothing about `Pick` searches. It draws once, uniformly,
+from whatever `S` denotes at that attempt; if a guard after the `with` then rejects the
+draw, the branch just fails the way any other unmet `await` does, and the block's retry
+loop (already there for every atomic block, thesis §7.2.3.1's own scheduling model) draws
+again next iteration. Every TLA⁺ behavior the spec allows for a satisfying draw is still
+reachable — just not on every attempt, same as `either`/`or` branch selection already
+isn't.
+
+Cost: no proof obligation crosses this — `Network2Go` is unverified/informal throughout
+(§7.4, §5.7), same footing as multicast, lock inference, and everything else this pass
+does. `AcceptMultiBinderWithDesugarsToChain.tla` still uses only `=` binders; that's
+unrelated now (it isolates multi-binder-desugars-to-a-chain from set-binder Go
+compilation, not a workaround for this).
+
+Still open: whether `Pick`'s uniform distribution is worth documenting as part of the
+compiled program's *meaning* (a spec that happens to depend on a fair distribution over `S`
+— e.g. probabilistic liveness — would silently get one from this compilation, never
+promised by the TLA⁺ source) or should stay an implementation detail nobody should rely on.
+Leaning the latter (TLA⁺'s `with` promises no distribution, only "some" outcome across
+behaviors) but nothing pins it down in writing yet.
+

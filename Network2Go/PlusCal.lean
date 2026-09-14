@@ -153,29 +153,37 @@ def dropCall (f : String) (args : List ComputableGo.Expression) : ComputableGo.S
 
 /-- A branch's guards. `await` conjoins onto `guard` unconditionally — its condition is always
 total, an ordinary TLA⁺ boolean, so evaluating it after `guard` has already gone `false` costs
-nothing but a redundant read. `with x = e` is not total: `e` can be a `CHOOSE`/search with no
-witness, undefined exactly when some guard textually before it already made the branch not fire.
-So only `e`'s own evaluation is gated, by the *current* `guard` at that point — `var x τ` (no
-initializer, nothing to evaluate) sits outside the `if`, the assignment inside it. Nothing else in
-the branch needs to nest: `guard` only ever narrows (`&&`), never recovers, so a later statement
-reading `guard` — the next `with`'s own `if`, another `await`, or the branch's final `if guard {
-action }` — sees the same false once anything upstream has failed, whether or not this `with`
-actually ran. (A later `with`'s `e` may then read `x` at its zero value rather than a real one,
-if `guard` was already `false` here — harmless, since that later `with` is itself gated on the
-same `guard` and so skips its own assignment too, never forcing the zero value through anything
-partial.) One `if` per `with`, each independent — not one nested inside the last. -/
+nothing but a redundant read. A `with` is not total: `with x = e`'s `e` can be a `CHOOSE`/search
+with no witness, and `with x ∈ e`'s `e` can be an empty (or infinite) set — either is undefined
+exactly when some guard textually before it already made the branch not fire. So only the binder's
+own evaluation is gated, by the *current* `guard` at that point — `var x τ` (no initializer,
+nothing to evaluate) sits outside the `if`, the assignment inside it. Nothing else in the branch
+needs to nest: `guard` only ever narrows (`&&`), never recovers, so a later statement reading
+`guard` — the next `with`'s own `if`, another `await`, or the branch's final `if guard { action }`
+— sees the same false once anything upstream has failed, whether or not this `with` actually ran.
+(A later `with`'s `e` may then read `x` at its zero value rather than a real one, if `guard` was
+already `false` here — harmless, since that later `with` is itself gated on the same `guard` and
+so skips its own assignment too, never forcing the zero value through anything partial.) One `if`
+per `with`, each independent — not one nested inside the last.
+
+`with x ∈ e` compiles through `Pick` (`runtime/tlaplus/sets.go`), the same uniform-random draw a
+`variable x ∈ S` initializer already uses (`initLocks` below): pick now, unconditionally on
+whatever `e` denotes at this attempt, and let a guard *after* this `with` reject the draw the
+ordinary way — `guard` goes `false`, the branch function returns `false`, and the block's
+scheduler (this file's top comment) retries with a fresh iteration, which re-enters this `with`
+and draws again. There is deliberately no search for a value satisfying what follows: the
+specification only requires *some* run to reach a satisfying draw, and every failed one is exactly
+as cheap as any other failed guard. -/
 def compileGuard (guardVar : String) :
     ComputableNetworkPlusCal.Statement true false → m (List ComputableGo.Statement)
   | .await e => do
     return [.assign [.var guardVar]
       [.binary .and (.var guardVar) (goBool (← compileExprTop e))]]
-  | s@(.with x ann isEq e) => do
-    if !isEq then
-      throw (.unsupported (posOf s) "with x ∈ S"
-        "picking a value of S that satisfies the branch's remaining guards is a search, not a \
-         computation — the thesis rejects the construct rather than deferring it")
+  | .with x ann isEq e => do
+    let raw ← compileExprTop e
+    let value : ComputableGo.Expression := if isEq then raw else tlaplusCall "Pick" [raw]
     return [.var (binderName x) (← compileTyp ann),
-            .if (.var guardVar) [.assign [.var (binderName x)] [← compileExprTop e]] []]
+            .if (.var guardVar) [.assign [.var (binderName x)] [value]] []]
 
 /-- `net.C[e₁].Send(e₂)`, or `net.C.Send(e₂)` for a channel declared without an index. The channel
 is a field of the `Network` struct named after it, so `send` needs no channel table — the

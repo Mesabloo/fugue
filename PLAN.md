@@ -1354,9 +1354,15 @@ scheduler function `l` plus one function per branch `B_i`, named `l_i`:
   process crashes with a stack trace rather than hanging. Peers then block on a dead
   process, the accepted absence of fault tolerance (§9.6), not a locking defect.
 - **Guards** → `guard = guard && <compiled expression>` (`await e`) or a `var` declaration +
-  assignment (`with x = τ do e`). **`with x ∈ τ do e` (set-valued `with`) is unsupported**:
-  the thesis rejects it outright (no principled way to pick a witness satisfying all
-  subsequent guards without a constraint solver), not merely deferred.
+  assignment, for both `with x = τ do e` and `with x ∈ τ do e`. **Diverges from the thesis
+  here (§9.36):** §7.2.3.1 rejects a set-valued `with` outright ("we choose not to support
+  such constructs as they do not necessarily carry much computational meaning anyway") —
+  no principled way to pick a witness satisfying all subsequent guards without a constraint
+  solver. This project compiles it anyway, through `Pick` (`runtime/tlaplus/sets.go`), the
+  same uniform-random draw a `variable x ∈ S` initializer already used (`initLocks`): pick
+  now, unconditionally, and let a guard after the `with` reject the draw the ordinary way —
+  the branch function returns `false`, the block's scheduler retries, this `with` draws
+  again. No search; a failed draw costs exactly what a failed `await` costs.
 - **Statements**: `skip` no-op; `print e`/`assert e`/assignment compile structurally
   (`assert` panics on failure); `send(c[e1], e2)` → `net.c[e1].Send(e2)` (indexed) or
   `net.c.Send(e2)` (non-indexed); `multicast(c, [y ∈ e1 ↦ e2])` → one call
