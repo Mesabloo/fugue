@@ -9,7 +9,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/mesabloo/fugue/examples/pingpong/pingpong"
+	"github.com/mesabloo/fugue/examples/ping_pong/spec"
 	"github.com/mesabloo/fugue/runtime/comm"
 	"github.com/mesabloo/fugue/runtime/comm/tcp"
 	"github.com/mesabloo/fugue/runtime/debug"
@@ -51,5 +51,5 @@ func main() {
 		log.Printf("Ping: resolved %s at %s", name, peer)
 	}
 
-	<-pingpong.Proc_Ping(pingpong.Net_Network{Pong: pong}, mailbox, self)
+	<-spec.Proc_Ping(spec.Net_Network{Pong: pong}, mailbox, self)
 }

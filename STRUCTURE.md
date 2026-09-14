@@ -5,6 +5,11 @@ Directory map: where each file lives, one line each. `PLAN.md` says what a pass 
 move.
 
 ## Root modules
+- `go.mod` — the root Go module (github.com/mesabloo/fugue), covering `runtime/` and
+  `persistent/`. Each `examples/*` subdirectory is its own separate module (see `examples/`).
+- `go.work` — ties the root module and every `examples/*` module together for local
+  `go build`/`go run`/`go generate`, so no `replace` directive is needed in any of their
+  `go.mod`s.
 - `Fugue.lean` — CLI entry point, the `lean_exe` root.
 - `Common.lean`, `Core.lean`, `Desugarer.lean`, `Driver.lean`, `Elaborator.lean`, `Parser_.lean`,
   `ProgressBar.lean`, `Tests.lean`, `WellFormedness.lean` — per-library re-export roots.
@@ -274,24 +279,26 @@ the default compilation scheme.
   `downcasts_test.go` — their tests.
 
 ## `examples/`
-Worked Distributed PlusCal specs, plus runnable Go systems built by compiling some of them.
-Root `go.mod` covers the Go subdirectories.
-- `DQueue.tla`, `LamportMutex.tla`, `TwoPhaseCommit.tla` — worked example specs, not run by
-  `lake test`.
+Worked Distributed PlusCal specs, plus runnable Go systems built by compiling some of them. Each
+of `ping_pong/`, `replicated_kvs/`, `paxos/`, `lamport_mutex/` is its own Go module (own `go.mod`),
+tied to the root module for `runtime/*` imports by the root `go.work` — see "Root modules".
+- `DQueue.tla`, `TwoPhaseCommit.tla` — worked example specs, not run by `lake test`, with no Go
+  system built from them.
 
-### `examples/pingpong/`
+### `examples/ping_pong/`
 - `PingPongs.tla` — the worked example spec this directory compiles and runs; not run by
   `lake test`.
 - `README.md` — how to compile `PingPongs.tla` to Go and wire it into a runnable system; the
   rest of this directory is exactly what it describes.
-- `pingpong/doc.go` — the package doc comment for the generated package, plus the `go generate`
+- `go.mod` — this example's own Go module.
+- `spec/doc.go` — the package doc comment for the generated package, plus the `go generate`
   directive that produces it (gitignored, not part of the tree).
 - `ping/main.go` — the one `Ping` process's `main`: resolves every `Pong` name given on its
   command line through the name server, wraps each resolved `Pong` endpoint and its own mailbox
-  in `runtime/debug`'s logging `Sender`/`Receiver`, then wires and starts `pingpong.Proc_Ping`.
+  in `runtime/debug`'s logging `Sender`/`Receiver`, then wires and starts `spec.Proc_Ping`.
 - `pong/main.go` — one `Pong` process's `main`, run once per `Pong` identity with a different
   command-line name each time; resolves only `Ping`, wraps its mailbox and the `Ping` endpoint
-  in `runtime/debug`'s logging `Sender`/`Receiver`, then starts `pingpong.Proc_Pong`.
+  in `runtime/debug`'s logging `Sender`/`Receiver`, then starts `spec.Proc_Pong`.
 - `nameserver/main.go` — runs the `runtime/comm/tcp` name server `ping`/`pong` register with and
   resolve each other through.
 - `run.sh` — starts the name server, one `Ping`, and two `Pong`s (`Pong1`, `Pong2`) locally over
@@ -302,9 +309,10 @@ Root `go.mod` covers the Go subdirectories.
   PlusCal translation of the classic MPCal replicated-KV tutorial algorithm; not run by `lake test`.
 - `README.md` — how to compile `ReplicatedKVS.tla` to Go and run it; the rest of this directory is
   exactly what it describes.
-- `replicatedkvs/doc.go` — the package doc comment for the generated package, plus the
+- `go.mod` — this example's own Go module.
+- `spec/doc.go` — the package doc comment for the generated package, plus the
   `go generate` directive that produces it (gitignored, not part of the tree).
-- `replicatedkvs/constants.go` — hand-written CONSTANTs `ReplicaSet`/`ClientSet` (`r1`–`r3`,
+- `spec/constants.go` — hand-written CONSTANTs `ReplicaSet`/`ClientSet` (`r1`–`r3`,
   `c1`–`c2`) the generated file leaves free, shared here rather than duplicated per `main`.
 - `replica/main.go` — one replica's `main`: CLI flags for identity/bind/name-server address,
   `runtime/comm/tcp` wiring to resolve every client's mailbox, and `runtime/debug`'s logging
@@ -324,10 +332,34 @@ Root `go.mod` covers the Go subdirectories.
 - `Paxos.tla` — the worked example spec this directory compiles and runs; not run by `lake test`.
 - `README.md` — how to compile `Paxos.tla` to Go and run it; the rest of this directory is exactly
   what it describes.
-- `main.go` — one node's `main`: CLI flags for identity/bind/name-server address, the CONSTANTS
-  (`N`/`Values`/`Nodes`) the generated package leaves free, `runtime/comm/tcp` wiring to reach the
-  other two, and `runtime/debug`'s logging `Sender`/`Receiver` wrapped around its own mailbox and
-  each peer endpoint. All three node identities run this same binary with a different `-name`.
+- `go.mod` — this example's own Go module.
+- `spec/doc.go` — the package doc comment for the generated package, plus the `go generate`
+  directive that produces it (gitignored, not part of the tree).
+- `spec/constants.go` — hand-written CONSTANTs `Nodes`/`N`/`Values`/`MaxRound` the generated
+  package leaves free, plus `NodeNames`/`ValidNodeName` for `main.go`'s `-name` flag.
+- `main.go` — one node's `main`: CLI flags for identity/bind/name-server address, `runtime/comm/tcp`
+  wiring to reach the other two, and `runtime/debug`'s logging `Sender`/`Receiver` wrapped around
+  its own mailbox and each peer endpoint. All three node identities run this same binary with a
+  different `-name`.
+- `nameserver/main.go` — runs the `runtime/comm/tcp` name server the nodes register with and
+  resolve each other through.
+- `run.sh` — starts the name server and all three nodes locally over TCP.
+
+### `examples/lamport_mutex/`
+- `LamportMutex.tla` — the worked example spec this directory compiles and runs, Lamport's
+  distributed mutual-exclusion algorithm; not run by `lake test`.
+- `README.md` — how to compile `LamportMutex.tla` to Go and run it; the rest of this directory is
+  exactly what it describes.
+- `go.mod` — this example's own Go module.
+- `spec/doc.go` — the package doc comment for the generated package, plus the `go generate`
+  directive that produces it (gitignored, not part of the tree).
+- `spec/constants.go` — hand-written CONSTANT `Nodes` the generated package leaves free, plus
+  `NodeNames`/`ValidNodeName` for `main.go`'s `-name` flag.
+- `main.go` — one node's `main`: CLI flags for identity/bind/name-server address, `runtime/comm/tcp`
+  wiring to reach every node (including itself — the spec's "try" thread multicasts to the full
+  `Nodes` set), and `runtime/debug`'s logging `Sender`/`Receiver` wrapped around its own mailbox
+  and each resolved endpoint. All three node identities run this same binary with a different
+  `-name`.
 - `nameserver/main.go` — runs the `runtime/comm/tcp` name server the nodes register with and
   resolve each other through.
 - `run.sh` — starts the name server and all three nodes locally over TCP.

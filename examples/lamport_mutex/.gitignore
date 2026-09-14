@@ -3,4 +3,4 @@
 *.log
 tmp/
 
-pingpong/pingpong.go
+spec/spec.go

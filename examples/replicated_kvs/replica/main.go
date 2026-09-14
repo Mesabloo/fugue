@@ -1,7 +1,7 @@
 // Command replica runs one replica of ReplicatedKVS.tla as a standalone OS process,
 // reachable by its clients over TCP through the name-server-mediated wiring in
 // runtime/comm/tcp; see ../README.md. -name picks which of
-// replicatedkvs.ReplicaNames this process is.
+// spec.ReplicaNames this process is.
 //
 // Usage: replica -name <r1|r2|r3> [-bind addr] [-ns addr]
 package main
@@ -10,7 +10,7 @@ import (
 	"flag"
 	"log"
 
-	"github.com/mesabloo/fugue/examples/replicated_kvs/replicatedkvs"
+	"github.com/mesabloo/fugue/examples/replicated_kvs/spec"
 	"github.com/mesabloo/fugue/runtime/comm"
 	"github.com/mesabloo/fugue/runtime/comm/tcp"
 	"github.com/mesabloo/fugue/runtime/debug"
@@ -41,8 +41,8 @@ func main() {
 	ns := flag.String("ns", "127.0.0.1:9000", "name server address")
 	flag.Parse()
 
-	if !replicatedkvs.ValidReplicaName(*name) {
-		log.Fatalf("-name must be one of %v, got %q", replicatedkvs.ReplicaNames, *name)
+	if !spec.ValidReplicaName(*name) {
+		log.Fatalf("-name must be one of %v, got %q", spec.ReplicaNames, *name)
 	}
 	self := tcp.Name(*name)
 
@@ -60,7 +60,7 @@ func main() {
 	// client's mailbox resolved up front -- it never sends to another replica, so
 	// ReplicasNetwork is left nil.
 	clientMailboxes := map[comm.Address]comm.Sender[responseMsg]{}
-	for _, c := range replicatedkvs.ClientNames {
+	for _, c := range spec.ClientNames {
 		peer, err := tcp.Lookup(*ns, c)
 		if err != nil {
 			log.Fatalf("lookup client %s: %v", c, err)
@@ -69,6 +69,6 @@ func main() {
 		log.Printf("%s: resolved client %s at %s", *name, c, peer)
 	}
 
-	net := replicatedkvs.Net_Network{ClientMailboxes: clientMailboxes}
-	<-replicatedkvs.Proc_r(net, mailbox, self) // replicaLoop runs forever; this blocks forever too.
+	net := spec.Net_Network{ClientMailboxes: clientMailboxes}
+	<-spec.Proc_r(net, mailbox, self) // replicaLoop runs forever; this blocks forever too.
 }

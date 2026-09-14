@@ -10,7 +10,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/mesabloo/fugue/examples/pingpong/pingpong"
+	"github.com/mesabloo/fugue/examples/ping_pong/spec"
 	"github.com/mesabloo/fugue/runtime/comm"
 	"github.com/mesabloo/fugue/runtime/comm/tcp"
 	"github.com/mesabloo/fugue/runtime/debug"
@@ -48,6 +48,6 @@ func main() {
 	}
 	log.Printf("%s: resolved Ping at %s", name, peer)
 
-	net := pingpong.Net_Network{Ping: debug.LogSender(self, tcp.Name("Ping"), tcp.Dial[pingMsg](peer))}
-	<-pingpong.Proc_Pong(net, mailbox, self)
+	net := spec.Net_Network{Ping: debug.LogSender(self, tcp.Name("Ping"), tcp.Dial[pingMsg](peer))}
+	<-spec.Proc_Pong(net, mailbox, self)
 }

@@ -1,9 +1,8 @@
 // Command client runs one client of ReplicatedKVS.tla as a standalone OS process, running
 // all four of the client's threads (Get-loop, Put-loop, Disconnect, ClockUpdate-loop, see
 // ReplicatedKVS.tla's file header) concurrently and reachable by replicas over TCP through
-// the name-server-mediated wiring in runtime/comm/tcp -- the same wiring
-// examples/pingpong/PingPongs.md's "Wiring a process" section shows, adapted to this
-// example's two roles. -name picks which of replicatedkvs.ClientNames this process is.
+// the name-server-mediated wiring in runtime/comm/tcp; see ../README.md. -name picks which
+// of spec.ClientNames this process is.
 //
 // Usage: client -name <c1|c2> [-bind addr] [-ns addr]
 package main
@@ -12,7 +11,7 @@ import (
 	"flag"
 	"log"
 
-	"github.com/mesabloo/fugue/examples/replicated_kvs/replicatedkvs"
+	"github.com/mesabloo/fugue/examples/replicated_kvs/spec"
 	"github.com/mesabloo/fugue/runtime/comm"
 	"github.com/mesabloo/fugue/runtime/comm/tcp"
 	"github.com/mesabloo/fugue/runtime/debug"
@@ -42,8 +41,8 @@ func main() {
 	ns := flag.String("ns", "127.0.0.1:9000", "name server address")
 	flag.Parse()
 
-	if !replicatedkvs.ValidClientName(*name) {
-		log.Fatalf("-name must be one of %v, got %q", replicatedkvs.ClientNames, *name)
+	if !spec.ValidClientName(*name) {
+		log.Fatalf("-name must be one of %v, got %q", spec.ClientNames, *name)
 	}
 	self := tcp.Name(*name)
 
@@ -59,10 +58,9 @@ func main() {
 
 	// A client only ever sends to replicas (Get picks one, Put/Disconnect/ClockUpdate
 	// multicast to all), so it needs every replica's mailbox resolved up front -- it never
-	// sends to another client, so ClientMailboxes is left nil (mirrors PingPongs.md's
-	// "needs / leaves nil" table).
+	// sends to another client, so ClientMailboxes is left nil.
 	replicasNetwork := map[comm.Address]comm.Sender[requestMsg]{}
-	for _, r := range replicatedkvs.ReplicaNames {
+	for _, r := range spec.ReplicaNames {
 		peer, err := tcp.Lookup(*ns, r)
 		if err != nil {
 			log.Fatalf("lookup replica %s: %v", r, err)
@@ -71,6 +69,6 @@ func main() {
 		log.Printf("%s: resolved replica %s at %s", *name, r, peer)
 	}
 
-	net := replicatedkvs.Net_Network{ReplicasNetwork: replicasNetwork}
-	<-replicatedkvs.Proc_c(net, mailbox, self) // getLoop/putLoop/clockUpdateLoop run forever; this blocks forever too.
+	net := spec.Net_Network{ReplicasNetwork: replicasNetwork}
+	<-spec.Proc_c(net, mailbox, self) // getLoop/putLoop/clockUpdateLoop run forever; this blocks forever too.
 }

@@ -1,10 +1,10 @@
 // constants.go supplies ReplicatedKVS.tla's two free CONSTANTs, ReplicaSet and ClientSet --
-// replicatedkvs.go (generated, not checked in, see doc.go) references them as ordinary
-// package-level identifiers, the same way examples/paxos/main.go's Nodes/N/Values supply
-// Paxos.tla's CONSTANTs there. Fixed here at three replicas and two clients, matching
+// spec.go (generated, not checked in, see doc.go) references them as ordinary
+// package-level identifiers, the same way examples/paxos/spec/constants.go's Nodes/N/Values
+// supply Paxos.tla's CONSTANTs there. Fixed here at three replicas and two clients, matching
 // ../run.sh; changing these values needs no `go generate`, since the generated code depends
 // only on their names and types, not their contents.
-package replicatedkvs
+package spec
 
 import (
 	"slices"

@@ -4,7 +4,7 @@
 // between its start and whatever it was meant to demonstrate.
 //
 // Nothing here is part of what fugue compile emits or requires; it is glue for whoever wires a
-// runnable system together (a main, as examples/pingpong and examples/paxos are), applied at
+// runnable system together (a main, as examples/ping_pong and examples/paxos are), applied at
 // that same site, around the same Sender/Receiver values the wiring already constructs.
 package debug
 
