@@ -151,13 +151,19 @@ def dropCall (f : String) (args : List ComputableGo.Expression) : ComputableGo.S
 
 /-! ## Statements -/
 
-/-- A branch's guards. `await` conjoins onto `guard`; `with x = e` introduces a real Go
-variable, since later guards and the branch body both read it.
-
-A `with` is evaluated even when `guard` is already `false` — Go has no lazy declaration — so an
-expression that would panic on an undefined value can panic in a branch that was never going to
-fire. The thesis's scheme has the same property; making it lazy would mean nesting the rest of
-the branch inside the `if`, one level per `with`. -/
+/-- A branch's guards. `await` conjoins onto `guard` unconditionally — its condition is always
+total, an ordinary TLA⁺ boolean, so evaluating it after `guard` has already gone `false` costs
+nothing but a redundant read. `with x = e` is not total: `e` can be a `CHOOSE`/search with no
+witness, undefined exactly when some guard textually before it already made the branch not fire.
+So only `e`'s own evaluation is gated, by the *current* `guard` at that point — `var x τ` (no
+initializer, nothing to evaluate) sits outside the `if`, the assignment inside it. Nothing else in
+the branch needs to nest: `guard` only ever narrows (`&&`), never recovers, so a later statement
+reading `guard` — the next `with`'s own `if`, another `await`, or the branch's final `if guard {
+action }` — sees the same false once anything upstream has failed, whether or not this `with`
+actually ran. (A later `with`'s `e` may then read `x` at its zero value rather than a real one,
+if `guard` was already `false` here — harmless, since that later `with` is itself gated on the
+same `guard` and so skips its own assignment too, never forcing the zero value through anything
+partial.) One `if` per `with`, each independent — not one nested inside the last. -/
 def compileGuard (guardVar : String) :
     ComputableNetworkPlusCal.Statement true false → m (List ComputableGo.Statement)
   | .await e => do
@@ -168,7 +174,8 @@ def compileGuard (guardVar : String) :
       throw (.unsupported (posOf s) "with x ∈ S"
         "picking a value of S that satisfies the branch's remaining guards is a search, not a \
          computation — the thesis rejects the construct rather than deferring it")
-    return [.var (binderName x) (← compileTyp ann), .assign [.var (binderName x)] [← compileExprTop e]]
+    return [.var (binderName x) (← compileTyp ann),
+            .if (.var guardVar) [.assign [.var (binderName x)] [← compileExprTop e]] []]
 
 /-- `net.C[e₁].Send(e₂)`, or `net.C.Send(e₂)` for a channel declared without an index. The channel
 is a field of the `Network` struct named after it, so `send` needs no channel table — the
@@ -263,8 +270,9 @@ private def releaseLock (env : ProcEnv) (l : Lock) : m ComputableGo.Statement :=
 /-- One branch of an atomic block, as its own `bool`-returning function.
 
 The order is fixed by what depends on what: `guard` first, then the locks (a guard reads locked
-variables), then the guards, then the body under `if guard`, then the releases, then `return
-guard`. The releases sit outside the `if` because the locks were acquired outside it too. -/
+variables), then the guards — each `compileGuard` result appended flat, per its own doc comment —
+then the body under one `if guard`, then the releases, then `return guard`. The releases sit
+outside the `if` because the locks were acquired outside it too. -/
 def compileBranch (env : ProcEnv) (label : String) (i : Nat) (br : ComputableNetworkPlusCal.AtomicBranch) :
     m ComputableGo.Function := do
   let guardVar := goIdent (← freshName "guard")
