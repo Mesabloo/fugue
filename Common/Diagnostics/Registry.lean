@@ -291,6 +291,11 @@ def duplicateProcessName : Entry :=
   { code := e 65, stage := .wellFormedness,
     summary := "Two processes of one algorithm share a name." }
 
+/-- Two blocks of one algorithm carrying the same label. -/
+def duplicateLabel : Entry :=
+  { code := e 66, stage := .wellFormedness,
+    summary := "Two blocks of one algorithm share a label." }
+
 /-! ## `Typed2Computable` -/
 
 /-- A construct with no finite runtime representation. -/
@@ -391,7 +396,7 @@ def entries : List Entry :=
     unknownLabel, redefinedDone, duplicateName, shadowedName, channelInExpression,
     channelTypedVariable, nonEmptyLocalChannels, globalPlusCalVariable, globalTLAPlusVariable,
     bareTemporalOrAction, unboundedQuantifier, receiveChannelMismatch, mailboxNotIndexedBySelf,
-    receiveWithoutMailbox, duplicateProcessName,
+    receiveWithoutMailbox, duplicateProcessName, duplicateLabel,
     notComputable, computableInternalInvariant, guardedInternalInvariant, networkInternalInvariant,
     goInternalInvariant, goUnsupported,
     moduleNameMismatch,

@@ -302,25 +302,6 @@ Cheap adjacent improvement, unclaimed: `TCError.ambiguousType`'s message
 the expected type" would make the workaround discoverable. Both throw sites are inside `lubAll`,
 so no other caller's wording constrains it.
 
-### 9.19 `GuardedPlusCal.Declarations` is a byte-identical copy of `ElaboratedPlusCal.Declarations`
-`Core/GuardedPlusCal/Syntax.lean`'s `Declarations` has the same three fields at the same types as
-`Core/TypedPlusCal/Syntax.lean`'s, plus a `Bifunctor`/`Bitraversable` pair whose bodies match
-field for field. Its docstring says as much ("A fresh copy of `ElaboratedPlusCal.Declarations`'s
-shape"). The cost lands in `Computable2Guarded.lean`'s `Declarations.toGuarded` — a
-field-for-field repackaging its own docstring calls unnecessary — and `NetworkPlusCal` then reuses
-the Guarded copy rather than adding a third.
-
-The split isn't a blanket policy at this layer: the same file *reuses* `ElaboratedPlusCal.Ref` and
-`.MulticastFilter` rather than copying them, precisely so `Computable2Guarded`'s `Ref`
-field-access fix flows through. So `Declarations` is the odd one out, not the rule.
-
-**Open:** collapse it (delete ~30 lines and the no-op conversion, pin `GuardedPlusCal.Declarations
-:= ElaboratedPlusCal.Declarations` the way `Ref` already is), or keep the copy. Keeping it is
-defensible under the standing preference for splitting an AST once a stage genuinely diverges —
-the question is whether `Declarations` is *expected* to diverge at the Guarded stage. It hasn't
-through Network, and no planned pass adds a field to it. If nothing is expected, the copy is
-buying only the option to diverge cheaply later.
-
 ### 9.23 Six fixtures asserted something they did not exercise; one remains parked as `Skip*`
 Found by phase 4's sidecars: every rejection now records the stage and code it must produce, and
 six fixtures produced something else. All six passed `run.sh`, which only ever asked for a nonzero
@@ -415,38 +396,6 @@ instead grow an actual enumeration field (bigger surface, but avoids `Nodup`-as-
 "this is really a set" and the resulting order-nondeterminism in `reducing`'s outcome set).
 Blocks P3, and P6/D4 (whose generic action-statement lemma quantifies over every action
 constructor, `multicast` included) until resolved.
-
-### 9.29 Nothing checks that block labels are unique within a process
-Found during item 7, §D8, building `CodeLabelRefines` from `ProcessRefines`.
-
-`WellFormedness/Labelling.lean` collect a process's labels (`Process.labels`) and check every `goto`
-target resolve (`checkGotoTarget`), rejecting a redefined `"Done"`. It never check the collected list
-is `Nodup`. Nothing else do either — `Nodup` appear only for *declaration* names
-(`WellFormedness/WellScoped/CorePlusCal.lean:45`, `WellScoped/GuardedPlusCal.lean:149`).
-
-**Why it matter.** A `goto l` name a label; two blocks carrying `l` make it ambiguous. The semantics
-do not error — `Process.codeTable` (both languages) define a label to denote the *union* of every
-block carrying it, so duplicates silently become non-deterministic choice between blocks. That is a
-defensible reading of an ill-formed program, but it is not one the source language means, and no
-diagnostic tell the user.
-
-**What it cost the proof.** `CodeLabelRefines` want one branch list per label per side. With
-duplicates possible, `srcBranchesAt`/`tgtBranchesAt` (`Guarded2Network/Lemmas/Process.lean`) are
-*concatenations* over every block at that label, and the two side's lists cannot be paired
-positionally. So `CodeLabelRefines.refines` is `BranchesRefine` (`∀ Br' ∈ brs', ∃ Br ∈ brs, …`) rather
-than `List.Forall₂`. That weakening is free — `blockRefines_step` only ever spent the `Forall₂` via
-`exists_left` — so the proof do not *need* uniqueness. Recorded because the checker gap is real, not
-because item 7 is blocked on it.
-
-**To resolve.** Add a `Nodup` check to `TypedPlusCal.Process.labels` (or beside it) with its own
-`WellFormednessError`/`Diagnostics.Entry` — `duplicateLabel`, positioned at the second block carrying
-the name, same way `redefinedDone` is positioned at `posOf blk.end`. Then decide whether the
-Guarded/Network `WellScoped` structures should carry the fact as a field, so item 7 could strengthen
-`BranchesRefine` back to `List.Forall₂` — cosmetic, and probably not worth it: the weaker form is
-what every consumer wants anyway.
-
-Cross-check when doing it: `§9.13` list two well-formedness checks already unreachable, so confirm a
-new one is actually reachable from the driver before adding a fixture.
 
 ### 9.30 Parser fails before module header
 In TLA+, any text that occurs before the module header, and after the module footer, is gibberish to be 

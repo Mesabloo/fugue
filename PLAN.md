@@ -1756,15 +1756,18 @@ GuardedPlusCal.Process.ownedLabels p`); `label_cases` packages it with the disjo
 disjoint union, matching `procRelatesTo`'s `L₂ = L₁ ∪ rx` / `Disjoint L₁ rx`.
 
 **A label's branches are a concatenation, so `refines` is `BranchesRefine`, not `Forall₂`.**
-`Process.codeTable` lets a label denote the union of every block carrying it, and
-`WellFormedness/Labelling.lean` checks only that `goto` targets exist, never that labels are
-unique. So `srcBranchesAt`/`tgtBranchesAt` concatenate over all blocks at a label with no
-positional pairing. `CodeLabelRefines.refines` is `∀ Br' ∈ brs', ∃ Br ∈ brs, …`, exactly
-what its only consumer (`blockRefines_step`, via `exists_left`) spends; assuming label
-uniqueness would be an unverified precondition since no pass checks it. `BlockRefines` keeps
-its `Forall₂` (per block it is positional). Non-enforcement of uniqueness is a real gap (a
-`goto` naming a duplicated label is silently non-deterministic choice) — **§9.29**; the
-proof doesn't depend on closing it.
+`Process.codeTable` lets a label denote the union of every block carrying it. `srcBranchesAt`/
+`tgtBranchesAt` concatenate over all blocks at a label with no positional pairing, so
+`CodeLabelRefines.refines` is `∀ Br' ∈ brs', ∃ Br ∈ brs, …`, exactly what its only consumer
+(`blockRefines_step`, via `exists_left`) spends. `WellFormedness/Labelling.lean` now rejects a
+duplicate label (`checkNoDuplicateLabels`, `WellFormednessError.duplicateLabel`, algorithm-wide —
+matching the original PlusCal-to-TLA⁺ translator, whose labels each become their own top-level
+definition), but the proof is stated over `Guarded`/`NetworkPlusCal`, past that check's own site,
+with the invariant not threaded down as a hypothesis here — so `CodeLabelRefines.refines` stays
+the weaker `BranchesRefine` shape rather than tightening to `Forall₂`. Not worth threading:
+`BlockRefines` keeps its own `Forall₂` (per block it is positional), and `blockRefines_step` only
+ever spent `BranchesRefine` via `exists_left` anyway, so the proof doesn't need uniqueness even
+now that the checker guarantees it.
 
 **"Receives ⟹ a thread was registered" is a ghost-carrying walk.** `procMailbox` reads the
 mailbox off an `.rx` thread, so the pass owes the forward direction: a receiving source

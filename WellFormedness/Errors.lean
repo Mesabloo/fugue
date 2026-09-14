@@ -65,6 +65,15 @@ inductive WellFormednessError : Type
   share a name — but they are what the semantics dispatches an instance on, so they must be
   distinct among themselves. -/
   | duplicateProcessName (pos : SourceSpan) (name : String)
+  /-- Two blocks of one algorithm carry the same label. Separate from `duplicateName`: labels are
+  their own namespace (`WellFormedness/Labelling.lean`'s `Process.labels`), not a declaration
+  scope, and — matching the original PlusCal-to-TLA⁺ translator, whose labels each become their
+  own top-level TLA⁺ definition — that namespace spans the *whole algorithm*, not just one
+  process. Within one process it is additionally an operational hazard: `Process.codeTable`
+  treats a label as denoting the *union* of every block carrying it, so a duplicate isn't rejected
+  there — it silently becomes a non-deterministic choice between the blocks, which is never what
+  the source program meant when it wrote a `goto` to that name. -/
+  | duplicateLabel (pos : SourceSpan) (label : String)
   deriving Repr, Inhabited, BEq
 
 /-- Renders a direct-vs-transitive `path` breadcrumb (innermost first) as "directly in a
@@ -93,6 +102,7 @@ instance : CompilerDiagnostic WellFormednessError String where
     | .mailboxNotIndexedBySelf .. => Diagnostics.mailboxNotIndexedBySelf.code
     | .receiveWithoutMailbox .. => Diagnostics.receiveWithoutMailbox.code
     | .duplicateProcessName .. => Diagnostics.duplicateProcessName.code
+    | .duplicateLabel .. => Diagnostics.duplicateLabel.code
   posOf
     | .unknownLabel pos _ => pos
     | .redefinedDone pos => pos
@@ -109,6 +119,7 @@ instance : CompilerDiagnostic WellFormednessError String where
     | .mailboxNotIndexedBySelf pos _ _ => pos
     | .receiveWithoutMailbox pos _ _ => pos
     | .duplicateProcessName pos _ => pos
+    | .duplicateLabel pos _ => pos
   msgOf
     | .unknownLabel _ label => s!"`goto {label}` targets a label that doesn't exist in this process."
     | .redefinedDone _ => "`Done` is a reserved label and cannot be redefined."
@@ -132,6 +143,8 @@ instance : CompilerDiagnostic WellFormednessError String where
       s!"Process `{process}` receives from `{channel}` without declaring it — a receiving process must name the channel it listens on in a `@mailbox` annotation on the process itself."
     | .duplicateProcessName _ name =>
       s!"Two processes are named `{name}` — a process instance is identified by its process's name together with its own `self`, so two processes sharing a name cannot be told apart."
+    | .duplicateLabel _ label =>
+      s!"`{label}` labels more than one block in this algorithm — labels are a single namespace shared by every process."
 
 /-- The well-formedness pass's warnings. -/
 inductive WellFormednessWarning : Type
