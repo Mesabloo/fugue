@@ -154,7 +154,7 @@ section
 
   section Mailbox
     private def parseMailbox (pos : SourceSpan) (input : String) : m (Expression (List CommentAnnotation)) := do
-      let tks ← match SurfaceTLAPlus.Lexer.lexModule input with
+      let tks ← match SurfaceTLAPlus.Lexer.lexFragment input with
         | .inl _ => throw <| .expressionParseFailure pos
         | .inr x => pure x
       let expr ← match (SurfaceTLAPlus.Parser.parseExpression.run (TokenStream.ofArray tks)).run [] with

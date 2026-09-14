@@ -252,14 +252,53 @@ namespace SurfaceTLAPlus.Lexer
     string,
   ]
 
-  /-- Lex a full module. -/
-  def lexModule' : TLAPlusLexer (Array (Located (Token (Located SurfacePlusCal.Token)))) := do
-    -- remove any leading comments before actually trying to parse anything
-    let _ ← lexeme (pure ())
-    Prod.fst <$> Parser.takeUntil Parser.endOfInput (lexeme lexToken)
+  /-- Recognizes the module header's opening delimiter without consuming it: a `----` run (at
+  least 4 dashes), whitespace, then `MODULE` not glued to further identifier characters (ruling
+  out `MODULES`/`MODULE2`, which lex as one identifier rather than the keyword). Fails elsewhere,
+  so `lexModule'` can feed it to `Parser.takeUntil` as the stop condition for raw-skipping
+  whatever precedes the header — checked with raw character parsers rather than `lexToken`, since
+  that preceding text need not lex as valid TLA⁺ tokens at all. -/
+  private def atModuleHeader : TLAPlusLexer PUnit :=
+    lookAhead do
+      let _ ← takeManyN 4 (char '-')
+      let _ ← ws
+      let _ ← chars "MODULE"
+      notFollowedBy (Unicode.alpha <|> char '_' <|> (String.front ∘ toString) <$> Unicode.digit)
 
-  def lexModule (s : String) : Unexpected Char ⊕ Array (Located' (Token (Located' SurfacePlusCal.Token))) :=
-    match lexModule'.run ⟨s, ⟨1, 0⟩⟩ with
+  /-- The module footer as its own token: a `====` run of at least 4 equal signs. Used as
+  `Parser.takeUntil`'s stop condition in `lexModule'`, symmetrically with `atModuleHeader`. -/
+  private def moduleFooter : TLAPlusLexer (Located (Token (Located SurfacePlusCal.Token))) :=
+    lexeme <| located <| (Token.moduleEnd ∘ Array.size) <$> takeManyN 4 (char '=')
+
+  /-- Lex a full module: raw-skip anything before the header and after the footer, tokenizing only
+  what lies between them — both are ignorable junk by TLA⁺'s own rules, and need not lex as valid
+  tokens at all (an unterminated string in a license preamble, say). -/
+  def lexModule' : TLAPlusLexer (Array (Located (Token (Located SurfacePlusCal.Token)))) := do
+    let _ ← withErrorMessage "a module header (`---- MODULE <name> ----`)" <|
+      Parser.takeUntil atModuleHeader anyToken
+    let (tokens, footer) ← withErrorMessage "a module footer (`====`)" <|
+      Parser.takeUntil moduleFooter (lexeme lexToken)
+    let _ ← takeMany anyToken
+    let _ ← Parser.endOfInput
+    return tokens.push footer
+
+  @[inline]
+  private def posToLineCol (pos : Stream.Position PositionedSlice) : Cursor := pos.2
+
+  private def mkPosition (seg : Stream.Segment PositionedSlice) : SourceSpan :=
+    ⟨posToLineCol seg.start, posToLineCol seg.stop⟩
+
+  private def errToUnexpected (e : ParseError PositionedSlice Char) : Unexpected Char :=
+    { token := e.unexpected
+      pos := e.posOverride.getD (mkPosition ⟨e.pos, e.pos⟩)
+      hints := e.expectedHints }
+
+  /-- Run a lexer to completion against `s`, translating its result and positions. Shared by
+  `lexModule` and `lexFragment`, which differ only in what `p` requires of the input's overall
+  shape. -/
+  private def runLexer (p : TLAPlusLexer (Array (Located (Token (Located SurfacePlusCal.Token)))))
+      (s : String) : Unexpected Char ⊕ Array (Located' (Token (Located' SurfacePlusCal.Token))) :=
+    match p.run ⟨s, ⟨1, 0⟩⟩ with
     | .error _ e => .inl <| errToUnexpected e
     | .ok str tokens =>
       assert! str.1.isEmpty
@@ -267,17 +306,16 @@ namespace SurfaceTLAPlus.Lexer
       -- The current conversion traverses the whole token list, and overlapping stream parts once
       -- per token.
       .inr <| tokens.map λ ⟨pos, tok⟩ ↦ ⟨mkPosition pos, (λ ⟨pos, tok⟩ ↦ ⟨mkPosition pos, tok⟩) <$> tok⟩
-  where
-    @[inline]
-    posToLineCol (pos : Stream.Position PositionedSlice) : Cursor := pos.2
 
-    mkPosition (seg : Stream.Segment PositionedSlice) : SourceSpan :=
-      ⟨posToLineCol seg.start, posToLineCol seg.stop⟩
+  def lexModule (s : String) : Unexpected Char ⊕ Array (Located' (Token (Located' SurfacePlusCal.Token))) :=
+    runLexer lexModule' s
 
-    errToUnexpected (e : ParseError PositionedSlice Char) : Unexpected Char :=
-      { token := e.unexpected
-        pos := e.posOverride.getD (mkPosition ⟨e.pos, e.pos⟩)
-        hints := e.expectedHints }
+  /-- Lex an arbitrary TLA⁺ fragment with no module header or footer of its own, tokenizing
+  straight through to the end of input. `Parser_/Annotations.lean`'s `parseMailbox` re-lexes a bare
+  expression pulled out of a `@mailbox` comment this way, as opposed to `lexModule`, which expects
+  a real module's `---- MODULE <name> ----` … `====` structure. -/
+  def lexFragment (s : String) : Unexpected Char ⊕ Array (Located' (Token (Located' SurfacePlusCal.Token))) :=
+    runLexer (Prod.fst <$> Parser.takeUntil Parser.endOfInput (lexeme lexToken)) s
 end SurfaceTLAPlus.Lexer
 
 
@@ -1110,7 +1148,6 @@ namespace SurfaceTLAPlus.Parser
 
   /-- Parse a full module. -/
   def parseModule' : TLAPlusParser (Module (SurfacePlusCal.Algorithm (List CommentAnnotation) (Expression (List CommentAnnotation))) (List CommentAnnotation)) := located do
-    -- TODO(module-junk): handle text before the module header and after the module footer.
     let _ ← lexeme <| tokenFilter λ | ⟨_, .moduleStart _⟩ => true | _ => false
     let _ ← lexeme <| token .module
     let name ← lexeme parseIdentifier

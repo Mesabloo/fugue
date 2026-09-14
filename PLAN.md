@@ -266,6 +266,14 @@ outer parser's to express otherwise).
 `\@` is an escaped literal `@` in comments (`tryParseAnnotations'`, `Parser_/TLAPlus.lean`)
 — never starts an annotation, so prose can mention `@type`/`@mailbox`/`@parameter` inertly.
 
+**Junk before module header, after module footer: ignorable, need not lex as valid TLA+ at
+all** (unterminated string, stray symbol, license preamble, anything). Lexer raw-skips to
+first `---- MODULE <name> ----` header via character scan, not token lexing, before
+tokenizing; stops tokenizing at first `.moduleEnd` footer token, drops remainder unread.
+`lexModule` requires header + footer; `lexFragment` (bare token loop to end of input, no
+header/footer) re-lexes a snippet with no module wrapper of its own —
+`Parser_/Annotations.lean`'s `parseMailbox` uses it for a `@mailbox` expression.
+
 Known parser gaps: §9.2.
 
 ### 5.2 Desugaring
@@ -1785,7 +1793,7 @@ monotonicity. `ProcessRefines.threads` ends `∧ (ProcessReceives p → rxs ≠ 
 `procMailbox_eq` (`mb` is *computed* from the compiled algorithm, which the dispatch
 obligations need — they take `mb : ι → Mailbox` as a parameter). The front-end half is
 `MailboxUsed` (`∀ p ∈ algo.processes, ∀ inbox, mbox p.name inbox ≠ .none → ProcessReceives
-p`), established by `checkReceiveChannels` rejecting a receive without a mailbox (§9.30).
+p`), established by `checkReceiveChannels` rejecting a receive without a mailbox.
 
 **No interface layer between dispatch and pass correctness** — no `AlgebraRefines`.
 `algRelatesTo.step_or_stutter`/`.immediateAbort` resolve the instance and dispatch on

@@ -397,10 +397,6 @@ instead grow an actual enumeration field (bigger surface, but avoids `Nodup`-as-
 Blocks P3, and P6/D4 (whose generic action-statement lemma quantifies over every action
 constructor, `multicast` included) until resolved.
 
-### 9.30 Parser fails before module header
-In TLA+, any text that occurs before the module header, and after the module footer, is gibberish to be 
-ignored. Currently, the parser may fail in unexpected ways (e.g. a comment before the header).
-
 ### 9.31 `CorrectInstance` private-import workaround
 `Guarded2Network.lean` imports `Guarded2Network.CorrectInstance` privately (bare `import`) so plain
 `lake build` builds and checks the concrete-`Value` refinement proof (`correct''`,
