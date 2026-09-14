@@ -241,6 +241,11 @@ Go, not Lean — the library generated code links against. Every package is a su
 - `nameserver.go` — the name server and its `Register`/`Lookup` clients.
 - `tcp_test.go` — their tests.
 
+### `runtime/debug/`
+- `log.go` — `LogSender`/`LogReceiver`, decorators that log the values crossing a `Sender`/
+  `Receiver`, for wiring a spec with no `print` of its own.
+- `log_test.go` — its tests.
+
 ### `runtime/locks/`
 - `locks.go` — `Lock[T]`, `MkLock`, `Acquire`, `Release`.
 - `locks_test.go` — its tests.
@@ -273,6 +278,8 @@ Root `go.mod` covers the Go subdirectories.
 - `pingpong/pingpong.go` — `fugue compile -X go-pkg:pingpong` output for `PingPongs.tla`, an
   importable package (not `package main`, unlike `examples/paxos/paxos.go`) since two different
   roles (`ping`, `pong`) both need their own `main` calling into it.
+- `pingpong/doc.go` — the package doc comment for `pingpong/pingpong.go`, plus the `go generate`
+  directive that regenerates it.
 - `ping/main.go` — the one `Ping` process's `main`: resolves every `Pong` name given on its
   command line through the name server, then wires and starts `pingpong.Proc_Ping`.
 - `pong/main.go` — one `Pong` process's `main`, run once per `Pong` identity with a different
@@ -281,6 +288,28 @@ Root `go.mod` covers the Go subdirectories.
   resolve each other through.
 - `run.sh` — starts the name server, one `Ping`, and two `Pong`s (`Pong1`, `Pong2`) locally over
   TCP, matching `PingPongs.md`'s own "Running" section.
+
+### `examples/replicated_kvs/`
+- `ReplicatedKVS.tla` — the worked example spec this directory compiles and runs, a Distributed
+  PlusCal translation of the classic MPCal replicated-KV tutorial algorithm; not run by `lake test`.
+- `replicatedkvs/doc.go` — the package doc comment for `replicatedkvs/replicatedkvs.go`, plus the
+  `go generate` directive that regenerates it.
+- `replicatedkvs/replicatedkvs.go` — `fugue compile -X go-pkg:replicatedkvs` output for
+  `ReplicatedKVS.tla`, an importable package (not `package main`, unlike `examples/paxos/paxos.go`)
+  since `replica` and `client` each need their own `main`; not checked in, regenerate with
+  `go generate ./examples/replicated_kvs/replicatedkvs`.
+- `replicatedkvs/constants.go` — hand-written CONSTANTs `ReplicaSet`/`ClientSet` (`r1`–`r3`,
+  `c1`–`c2`) the generated file leaves free, shared here rather than duplicated per `main`.
+- `replica/main.go` — one replica's `main`: CLI flags for identity/bind/name-server address and
+  `runtime/comm/tcp` wiring to resolve every client's mailbox; all three identities run this same
+  binary with a different `-name`.
+- `client/main.go` — one client's `main`, the mirror of `replica/main.go`: resolves every
+  replica's mailbox and runs all four client threads (`Get`/`Put`/`Disconnect`/`ClockUpdate`)
+  concurrently; both identities run this same binary with a different `-name`.
+- `nameserver/main.go` — runs the `runtime/comm/tcp` name server replicas and clients register
+  with and resolve each other through.
+- `run.sh` — starts the name server, three replicas (`r1`–`r3`), and two clients (`c1`–`c2`)
+  locally over TCP; runs forever, Ctrl-C stops all of them.
 
 ### `examples/paxos/`
 - `Paxos.tla` — the worked example spec this directory compiles and runs; not run by `lake test`.
