@@ -282,32 +282,39 @@ Root `go.mod` covers the Go subdirectories.
 ### `examples/pingpong/`
 - `PingPongs.tla` — the worked example spec this directory compiles and runs; not run by
   `lake test`.
-- `PingPongs.md` — how to compile `PingPongs.tla` to Go and wire it into a runnable system; the
+- `README.md` — how to compile `PingPongs.tla` to Go and wire it into a runnable system; the
   rest of this directory is exactly what it describes.
 - `pingpong/doc.go` — the package doc comment for the generated package, plus the `go generate`
   directive that produces it (gitignored, not part of the tree).
 - `ping/main.go` — the one `Ping` process's `main`: resolves every `Pong` name given on its
-  command line through the name server, then wires and starts `pingpong.Proc_Ping`.
+  command line through the name server, wraps each resolved `Pong` endpoint and its own mailbox
+  in `runtime/debug`'s logging `Sender`/`Receiver`, then wires and starts `pingpong.Proc_Ping`.
 - `pong/main.go` — one `Pong` process's `main`, run once per `Pong` identity with a different
-  command-line name each time; resolves only `Ping`, then starts `pingpong.Proc_Pong`.
+  command-line name each time; resolves only `Ping`, wraps its mailbox and the `Ping` endpoint
+  in `runtime/debug`'s logging `Sender`/`Receiver`, then starts `pingpong.Proc_Pong`.
 - `nameserver/main.go` — runs the `runtime/comm/tcp` name server `ping`/`pong` register with and
   resolve each other through.
 - `run.sh` — starts the name server, one `Ping`, and two `Pong`s (`Pong1`, `Pong2`) locally over
-  TCP, matching `PingPongs.md`'s own "Running" section.
+  TCP, matching `README.md`'s own "Run" section.
 
 ### `examples/replicated_kvs/`
 - `ReplicatedKVS.tla` — the worked example spec this directory compiles and runs, a Distributed
   PlusCal translation of the classic MPCal replicated-KV tutorial algorithm; not run by `lake test`.
+- `README.md` — how to compile `ReplicatedKVS.tla` to Go and run it; the rest of this directory is
+  exactly what it describes.
 - `replicatedkvs/doc.go` — the package doc comment for the generated package, plus the
   `go generate` directive that produces it (gitignored, not part of the tree).
 - `replicatedkvs/constants.go` — hand-written CONSTANTs `ReplicaSet`/`ClientSet` (`r1`–`r3`,
   `c1`–`c2`) the generated file leaves free, shared here rather than duplicated per `main`.
-- `replica/main.go` — one replica's `main`: CLI flags for identity/bind/name-server address and
-  `runtime/comm/tcp` wiring to resolve every client's mailbox; all three identities run this same
-  binary with a different `-name`.
+- `replica/main.go` — one replica's `main`: CLI flags for identity/bind/name-server address,
+  `runtime/comm/tcp` wiring to resolve every client's mailbox, and `runtime/debug`'s logging
+  `Sender`/`Receiver` wrapped around its own mailbox and each resolved client endpoint; all three
+  identities run this same binary with a different `-name`.
 - `client/main.go` — one client's `main`, the mirror of `replica/main.go`: resolves every
-  replica's mailbox and runs all four client threads (`Get`/`Put`/`Disconnect`/`ClockUpdate`)
-  concurrently; both identities run this same binary with a different `-name`.
+  replica's mailbox, wraps its own mailbox and each resolved replica endpoint the same way with
+  `runtime/debug`'s logging wrappers, and runs all four client threads
+  (`Get`/`Put`/`Disconnect`/`ClockUpdate`) concurrently; both identities run this same binary with
+  a different `-name`.
 - `nameserver/main.go` — runs the `runtime/comm/tcp` name server replicas and clients register
   with and resolve each other through.
 - `run.sh` — starts the name server, three replicas (`r1`–`r3`), and two clients (`c1`–`c2`)
@@ -315,9 +322,12 @@ Root `go.mod` covers the Go subdirectories.
 
 ### `examples/paxos/`
 - `Paxos.tla` — the worked example spec this directory compiles and runs; not run by `lake test`.
+- `README.md` — how to compile `Paxos.tla` to Go and run it; the rest of this directory is exactly
+  what it describes.
 - `main.go` — one node's `main`: CLI flags for identity/bind/name-server address, the CONSTANTS
-  (`N`/`Values`/`Nodes`) the generated package leaves free, and the `runtime/comm/tcp` wiring to
-  reach the other two. All three node identities run this same binary with a different `-name`.
+  (`N`/`Values`/`Nodes`) the generated package leaves free, `runtime/comm/tcp` wiring to reach the
+  other two, and `runtime/debug`'s logging `Sender`/`Receiver` wrapped around its own mailbox and
+  each peer endpoint. All three node identities run this same binary with a different `-name`.
 - `nameserver/main.go` — runs the `runtime/comm/tcp` name server the nodes register with and
   resolve each other through.
 - `run.sh` — starts the name server and all three nodes locally over TCP.

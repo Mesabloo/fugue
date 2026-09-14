@@ -1,7 +1,6 @@
 // Command replica runs one replica of ReplicatedKVS.tla as a standalone OS process,
 // reachable by its clients over TCP through the name-server-mediated wiring in
-// runtime/comm/tcp -- the same wiring examples/pingpong/PingPongs.md's "Wiring a process"
-// section shows, adapted to this example's two roles. -name picks which of
+// runtime/comm/tcp; see ../README.md. -name picks which of
 // replicatedkvs.ReplicaNames this process is.
 //
 // Usage: replica -name <r1|r2|r3> [-bind addr] [-ns addr]
@@ -59,7 +58,7 @@ func main() {
 
 	// A replica only ever replies to whichever client sent it a request, so it needs every
 	// client's mailbox resolved up front -- it never sends to another replica, so
-	// ReplicasNetwork is left nil (mirrors PingPongs.md's "needs / leaves nil" table).
+	// ReplicasNetwork is left nil.
 	clientMailboxes := map[comm.Address]comm.Sender[responseMsg]{}
 	for _, c := range replicatedkvs.ClientNames {
 		peer, err := tcp.Lookup(*ns, c)
