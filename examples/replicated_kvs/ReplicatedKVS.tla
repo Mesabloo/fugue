@@ -74,6 +74,7 @@ NoValue == "none"
 \* @type: Seq({op: Str, key: Str, value: Str, client: Address, timestamp: Int, reply_to: Address});
 EmptyRequestQueue == <<>>
 
+(* PlusCal options (-distpcal) *)
 (*--algorithm ReplicatedKVS {
     channels
         \* @type: Address -> Channel({op: Str, key: Str, value: Str, client: Address, timestamp: Int, reply_to: Address});
@@ -135,26 +136,20 @@ EmptyRequestQueue == <<>>
         receiveClientRequest:
             receive(replicasNetwork[self], msg);
 
-        clientDisconnected:
-            if (msg.op = DisconnectMessage) {
+            either {
+                await msg.op = DisconnectMessage;
                 liveClients := liveClients \ {msg.client};
-            };
-
-        replicaGetRequest:
-            if (msg.op = GetMessage) {
+            } or {
+                await msg.op = GetMessage;
                 assert(msg.client \in liveClients);
                 currentClocks[msg.client] := msg.timestamp;
                 pendingRequests[msg.client] := Append(pendingRequests[msg.client], msg);
-            };
-
-        replicaPutRequest:
-            if (msg.op = PutMessage) {
+            } or {
+                await msg.op = PutMessage;
                 currentClocks[msg.client] := msg.timestamp;
                 pendingRequests[msg.client] := Append(pendingRequests[msg.client], msg);
-            };
-
-        replicaNullRequest:
-            if (msg.op = NullMessage) {
+            } or {
+                await msg.op = NullMessage;
                 currentClocks[msg.client] := msg.timestamp;
             };
 
@@ -218,20 +213,19 @@ EmptyRequestQueue == <<>>
                 msg := stableMessages[i];
                 i := i + 1;
 
-            respondStableGet:
-                if (msg.op = GetMessage) {
+            respondStable:
+                either {
+                    await msg.op = GetMessage;
                     key := msg.key;
                     val := kv[key];
                     send(clientMailboxes[msg.reply_to], [type |-> GetResponse, result |-> val]);
-                };
-
-            respondStablePut:
-                if (msg.op = PutMessage) {
+                } or {
+                    await msg.op = PutMessage;
                     key := msg.key;
                     val := msg.value;
                     kv[key] := val;
                     send(clientMailboxes[msg.reply_to], [type |-> PutResponse, result |-> ok]);
-                };
+                }
             }
         }
     }
@@ -251,27 +245,15 @@ EmptyRequestQueue == <<>>
             \* @type: Bool;
             awaitingReply = FALSE,
 
-            \* -- Get thread --
-            \* @type: {op: Str, key: Str, value: Str, client: Address, timestamp: Int, reply_to: Address};
-            getReq,
+            \* getReply/putResponse never overlap -- awaitingReply mutexes the shared
+            \* clientMailboxes[self] receive between the Get and Put threads -- so both
+            \* reuse this one slot instead of two identically-shaped variables.
             \* @type: {type: Str, result: Str};
-            getResp,
+            resp,
 
             \* -- Put thread --
             \* @type: Int;
-            putI,
-            \* @type: {op: Str, key: Str, value: Str, client: Address, timestamp: Int, reply_to: Address};
-            putReq,
-            \* @type: {type: Str, result: Str};
-            putResp,
-
-            \* -- Disconnect thread --
-            \* @type: {op: Str, key: Str, value: Str, client: Address, timestamp: Int, reply_to: Address};
-            discMsg,
-
-            \* -- ClockUpdate thread --
-            \* @type: {op: Str, key: Str, value: Str, client: Address, timestamp: Int, reply_to: Address};
-            clockMsg;
+            putI;
     {
     getLoop:
         while (clock # -1) {
@@ -280,16 +262,15 @@ EmptyRequestQueue == <<>>
                 await ~awaitingReply;
                 awaitingReply := TRUE;
                 clock := clock + 1;
-                getReq := [op |-> GetMessage, key |-> GetKey, value |-> NoValue, client |-> self, timestamp |-> clock, reply_to |-> self];
                 with (dst \in ReplicaSet) {
-                    send(replicasNetwork[dst], getReq);
+                    send(replicasNetwork[dst], [op |-> GetMessage, key |-> GetKey, value |-> NoValue, client |-> self, timestamp |-> clock, reply_to |-> self]);
                 };
 
             getReply:
                 if (clock # -1) {
-                    receive(clientMailboxes[self], getResp);
-                    assert(getResp.type = GetResponse);
-                    outside := getResp.result;
+                    receive(clientMailboxes[self], resp);
+                    assert(resp.type = GetResponse);
+                    outside := resp.result;
                 };
                 awaitingReply := FALSE;
             }
@@ -303,11 +284,8 @@ EmptyRequestQueue == <<>>
                 await ~awaitingReply;
                 awaitingReply := TRUE;
                 clock := clock + 1;
-                putReq := [op |-> PutMessage, key |-> PutKey, value |-> PutValue, client |-> self, timestamp |-> clock, reply_to |-> self];
                 putI := 0;
-
-            putBroadcast:
-                multicast(replicasNetwork, [dst \in ReplicaSet |-> putReq]);
+                multicast(replicasNetwork, [dst \in ReplicaSet |-> [op |-> PutMessage, key |-> PutKey, value |-> PutValue, client |-> self, timestamp |-> clock, reply_to |-> self]]);
 
             putResponse:
                 while (putI < Cardinality(ReplicaSet)) {
@@ -315,8 +293,8 @@ EmptyRequestQueue == <<>>
                         awaitingReply := FALSE;
                         goto putLoop;
                     } else {
-                        receive(clientMailboxes[self], putResp);
-                        assert(putResp.type = PutResponse);
+                        receive(clientMailboxes[self], resp);
+                        assert(resp.type = PutResponse);
                         putI := putI + 1;
                     }
                 };
@@ -335,21 +313,15 @@ EmptyRequestQueue == <<>>
         \* real request. This await is not part of the original algorithm; it only delays
         \* when disconnection becomes eligible, so client c's other threads get to run.
         await clock > 100;
-        discMsg := [op |-> DisconnectMessage, key |-> NoValue, value |-> NoValue, client |-> self, timestamp |-> 0, reply_to |-> self];
         clock := -1;
-
-    disconnectBroadcast:
-        multicast(replicasNetwork, [dst \in ReplicaSet |-> discMsg]);
+        multicast(replicasNetwork, [dst \in ReplicaSet |-> [op |-> DisconnectMessage, key |-> NoValue, value |-> NoValue, client |-> self, timestamp |-> 0, reply_to |-> self]]);
     }
     {
     clockUpdateLoop:
         while (clock # -1) {
             if (clock # -1) {
                 clock := clock + 1;
-                clockMsg := [op |-> NullMessage, key |-> NoValue, value |-> NoValue, client |-> self, timestamp |-> clock, reply_to |-> self];
-
-            nullBroadcast:
-                multicast(replicasNetwork, [dst \in ReplicaSet |-> clockMsg]);
+                multicast(replicasNetwork, [dst \in ReplicaSet |-> [op |-> NullMessage, key |-> NoValue, value |-> NoValue, client |-> self, timestamp |-> clock, reply_to |-> self]]);
             }
         }
     }
