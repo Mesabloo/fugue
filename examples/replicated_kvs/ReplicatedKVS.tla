@@ -82,6 +82,20 @@ OkValue == "ok"
 \* @type: Seq({op: Str, key: Str, value: Str, client: Address, timestamp: Int, reply_to: Address});
 EmptyRequestQueue == <<>>
 
+\* Constructors for replicasNetwork's message shape, one per op -- keeps the six-field
+\* record literal, and which fields are fixed per message kind, out of every send site.
+\* @type: (Address, Int) => {op: Str, key: Str, value: Str, client: Address, timestamp: Int, reply_to: Address};
+Get(c, ts) == [op |-> GetMessage, key |-> GetKey, value |-> NoValue, client |-> c, timestamp |-> ts, reply_to |-> c]
+\* @type: (Address, Int) => {op: Str, key: Str, value: Str, client: Address, timestamp: Int, reply_to: Address};
+Put(c, ts) == [op |-> PutMessage, key |-> PutKey, value |-> PutValue, client |-> c, timestamp |-> ts, reply_to |-> c]
+\* @type: Address => {op: Str, key: Str, value: Str, client: Address, timestamp: Int, reply_to: Address};
+Disconnect(c) == [op |-> DisconnectMessage, key |-> NoValue, value |-> NoValue, client |-> c, timestamp |-> 0, reply_to |-> c]
+\* @type: (Address, Int) => {op: Str, key: Str, value: Str, client: Address, timestamp: Int, reply_to: Address};
+ClockUpdate(c, ts) == [op |-> NullMessage, key |-> NoValue, value |-> NoValue, client |-> c, timestamp |-> ts, reply_to |-> c]
+\* placeholder before a replica has seen any real request -- same NullMessage tag, timestamp 0.
+\* @type: Address => {op: Str, key: Str, value: Str, client: Address, timestamp: Int, reply_to: Address};
+NullRequest(c) == ClockUpdate(c, 0)
+
 (* PlusCal options (-distpcal) *)
 (*--algorithm ReplicatedKVS {
     fifos
@@ -104,7 +118,7 @@ EmptyRequestQueue == <<>>
             \* @type: Int;
             i = 0,
             \* @type: {op: Str, key: Str, value: Str, client: Address, timestamp: Int, reply_to: Address};
-            firstPending = [op |-> NullMessage, key |-> NoValue, value |-> NoValue, client |-> self, timestamp |-> 0, reply_to |-> self],
+            firstPending = NullRequest(self),
             \* @type: Int;
             timestamp = 0,
             \* @type: Address;
@@ -117,7 +131,7 @@ EmptyRequestQueue == <<>>
             \* @type: Address -> Int;
             currentClocks = [c \in ClientSet |-> 0],
             \* @type: Int;
-            minClock = 0,
+            minClock = -1,
             \* @type: Bool;
             continue = FALSE,
             \* @type: Set(Address);
@@ -125,7 +139,7 @@ EmptyRequestQueue == <<>>
             \* @type: Set(Address);
             clientsIter = {},
             \* @type: {op: Str, key: Str, value: Str, client: Address, timestamp: Int, reply_to: Address};
-            msg = [op |-> NullMessage, key |-> NoValue, value |-> NoValue, client |-> self, timestamp |-> 0, reply_to |-> self],
+            msg = NullRequest(self),
             \* this replica's own copy of the database -- private, never shared
             \* @type: Str -> Str;
             kv = [k \in KeySpace |-> NoValue];
@@ -134,8 +148,6 @@ EmptyRequestQueue == <<>>
         while (TRUE) {
             stableMessages := <<>>;
             continue := TRUE;
-
-        receiveClientRequest:
             receive(replicasNetwork[self], msg);
 
             either {
@@ -163,13 +175,12 @@ EmptyRequestQueue == <<>>
                 nextClient := self;
 
                 clientsIter := liveClients;
-                i := 0;
-                minClock := 0;
+                minClock := -1;
 
             findMinClock:
-                while (i < Cardinality(clientsIter)) {
+                while (Cardinality(clientsIter) > 0) {
                     with (client \in clientsIter) {
-                        if (minClock = 0 \/ currentClocks[client] < minClock) {
+                        if (minClock = -1 \/ currentClocks[client] < minClock) {
                             minClock := currentClocks[client];
                         };
                         clientsIter := clientsIter \ {client};
@@ -177,10 +188,9 @@ EmptyRequestQueue == <<>>
                 };
 
                 lowestPending := minClock + 1;
-                i := 0;
 
             findMinClient:
-                while (i < Cardinality(pendingClients)) {
+                while (Cardinality(pendingClients) > 0) {
                     with (client \in pendingClients) {
                         firstPending := Head(pendingRequests[client]);
                         assert(firstPending.op = GetMessage \/ firstPending.op = PutMessage);
@@ -198,7 +208,6 @@ EmptyRequestQueue == <<>>
                     }
                 };
 
-            addStableMessage:
                 if (lowestPending < minClock) {
                     msg := Head(pendingRequests[nextClient]);
                     pendingRequests[nextClient] := Tail(pendingRequests[nextClient]);
@@ -215,7 +224,6 @@ EmptyRequestQueue == <<>>
                 msg := stableMessages[i];
                 i := i + 1;
 
-            respondStable:
                 either {
                     await msg.op = GetMessage;
                     send(clientMailboxes[msg.reply_to], [type |-> GetResponse, result |-> kv[msg.key]]);
@@ -255,52 +263,46 @@ EmptyRequestQueue == <<>>
     {
     getLoop:
         while (clock # -1) {
-        getRequest:
-            if (clock # -1) {
-                await ~awaitingReply;
-                awaitingReply := TRUE;
-                clock := clock + 1;
-                with (dst \in ReplicaSet) {
-                    send(replicasNetwork[dst], [op |-> GetMessage, key |-> GetKey, value |-> NoValue, client |-> self, timestamp |-> clock, reply_to |-> self]);
-                };
+            await ~awaitingReply;
+            awaitingReply := TRUE;
+            clock := clock + 1;
+            with (dst \in ReplicaSet) {
+                send(replicasNetwork[dst], Get(self, clock));
+            };
 
-            getReply:
-                if (clock # -1) {
-                    receive(clientMailboxes[self], resp);
-                    assert(resp.type = GetResponse);
-                    outside := resp.result;
-                };
-                awaitingReply := FALSE;
-            }
+        getReply:
+            if (clock # -1) {
+                receive(clientMailboxes[self], resp);
+                assert(resp.type = GetResponse);
+                outside := resp.result;
+            };
+            awaitingReply := FALSE;
         }
     }
     {
     putLoop:
         while (clock # -1) {
-        putRequest:
-            if (clock # -1) {
-                await ~awaitingReply;
-                awaitingReply := TRUE;
-                clock := clock + 1;
-                putI := 0;
-                multicast(replicasNetwork, [dst \in ReplicaSet |-> [op |-> PutMessage, key |-> PutKey, value |-> PutValue, client |-> self, timestamp |-> clock, reply_to |-> self]]);
+            await ~awaitingReply;
+            awaitingReply := TRUE;
+            clock := clock + 1;
+            putI := 0;
+            multicast(replicasNetwork, [dst \in ReplicaSet |-> Put(self, clock)]);
 
-            putResponse:
-                while (putI < Cardinality(ReplicaSet)) {
-                    if (clock = -1) {
-                        awaitingReply := FALSE;
-                        goto putLoop;
-                    } else {
-                        receive(clientMailboxes[self], resp);
-                        assert(resp.type = PutResponse);
-                        putI := putI + 1;
-                    }
-                };
+        putResponse:
+            while (putI < Cardinality(ReplicaSet)) {
+                if (clock = -1) {
+                    awaitingReply := FALSE;
+                    goto putLoop;
+                } else {
+                    receive(clientMailboxes[self], resp);
+                    assert(resp.type = PutResponse);
+                    putI := putI + 1;
+                }
+            };
 
-            putComplete:
-                outside := PutResponse;
-                awaitingReply := FALSE;
-            }
+        putComplete:
+            outside := PutResponse;
+            awaitingReply := FALSE;
         }
     }
     {
@@ -312,15 +314,13 @@ EmptyRequestQueue == <<>>
         \* when disconnection becomes eligible, so client c's other threads get to run.
         await clock > MaxClock;
         clock := -1;
-        multicast(replicasNetwork, [dst \in ReplicaSet |-> [op |-> DisconnectMessage, key |-> NoValue, value |-> NoValue, client |-> self, timestamp |-> 0, reply_to |-> self]]);
+        multicast(replicasNetwork, [dst \in ReplicaSet |-> Disconnect(self)]);
     }
     {
     clockUpdateLoop:
         while (clock # -1) {
-            if (clock # -1) {
-                clock := clock + 1;
-                multicast(replicasNetwork, [dst \in ReplicaSet |-> [op |-> NullMessage, key |-> NoValue, value |-> NoValue, client |-> self, timestamp |-> clock, reply_to |-> self]]);
-            }
+            clock := clock + 1;
+            multicast(replicasNetwork, [dst \in ReplicaSet |-> ClockUpdate(self, clock)]);
         }
     }
 }*)

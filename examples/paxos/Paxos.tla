@@ -53,7 +53,7 @@ less(b1, b2) ==
 
 (* PlusCal options (-distpcal) *)
 (*--algorithm Paxos {
-    fifos
+    channels
         \* @type: Address -> Channel({type: Str, leader: Address, bal: <<Int, Address>>, val: Str, maxVBal: <<Int, Address>>, maxVal: Str});
         ch[Nodes];
 
