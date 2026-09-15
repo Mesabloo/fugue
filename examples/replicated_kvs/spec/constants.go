@@ -26,6 +26,10 @@ var ReplicaSet = tlaplus.MkSet(comm.AddressOrd, namesToAddresses(ReplicaNames)..
 // ClientSet is ReplicatedKVS.tla's CONSTANT ClientSet.
 var ClientSet = tlaplus.MkSet(comm.AddressOrd, namesToAddresses(ClientNames)...)
 
+// MaxClock is ReplicatedKVS.tla's CONSTANT MaxClock, the upper bound on a client's
+// Lamport clock before it disconnects.
+var MaxClock tlaplus.Int = tlaplus.MkInt(100)
+
 func namesToAddresses(names []string) []comm.Address {
 	addrs := make([]comm.Address, len(names))
 	for i, n := range names {

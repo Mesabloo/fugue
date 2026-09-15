@@ -34,13 +34,19 @@
 \* by the protocol itself. Kept as ordinary per-client local state here (each client remembers
 \* its own last result) rather than invented as a channel, since nothing in the protocol
 \* depends on it being shared.
-EXTENDS Integers, Sequences, FiniteSets, Fugue
+EXTENDS Integers, Sequences, FiniteSets, TLC, Fugue 
 
 CONSTANTS
     \* @type: Set(Address);
-    ReplicaSet,
+    ReplicaSet,    
     \* @type: Set(Address);
-    ClientSet
+    ClientSet,
+    \* upper bound on a client's Lamport clock before it disconnects -- 100 in production,
+    \* kept tiny for TLC (see Paxos.tla's MaxRound for the same pattern)
+    \* @type: Int;
+    MaxClock
+
+ASSUME MaxClock > 0
 
 \* @type: Str;
 DisconnectMessage == "disconnect"
@@ -61,12 +67,14 @@ GetKey == "GET"
 \* @type: Str;
 PutKey == "PUT"
 \* @type: Set(Str);
-KeySpace == {GetKey, PutKey}
+KeySpace == { GetKey, PutKey }
 
 \* @type: Str;
 PutValue == "value1"
 \* @type: Str;
 NoValue == "none"
+\* @type: Str;
+OkValue == "ok"
 
 \* named so its type is fixed at the declaration rather than re-inferred where it's used --
 \* an empty sequence literal used directly as a function-comprehension body doesn't pick up
@@ -76,7 +84,7 @@ EmptyRequestQueue == <<>>
 
 (* PlusCal options (-distpcal) *)
 (*--algorithm ReplicatedKVS {
-    channels
+    fifos
         \* @type: Address -> Channel({op: Str, key: Str, value: Str, client: Address, timestamp: Int, reply_to: Address});
         replicasNetwork[ReplicaSet],
         \* @type: Address -> Channel({type: Str, result: Str});
@@ -94,36 +102,30 @@ EmptyRequestQueue == <<>>
             \* @type: Seq({op: Str, key: Str, value: Str, client: Address, timestamp: Int, reply_to: Address});
             stableMessages = <<>>,
             \* @type: Int;
-            i,
+            i = 0,
             \* @type: {op: Str, key: Str, value: Str, client: Address, timestamp: Int, reply_to: Address};
-            firstPending,
+            firstPending = [op |-> NullMessage, key |-> NoValue, value |-> NoValue, client |-> self, timestamp |-> 0, reply_to |-> self],
             \* @type: Int;
-            timestamp,
+            timestamp = 0,
             \* @type: Address;
-            nextClient,
+            nextClient = self,
             \* @type: Int;
-            lowestPending,
+            lowestPending = 0,
             \* @type: Bool;
-            chooseMessage,
+            chooseMessage = FALSE,
             \* last logical clock seen from each client
             \* @type: Address -> Int;
             currentClocks = [c \in ClientSet |-> 0],
             \* @type: Int;
-            minClock,
+            minClock = 0,
             \* @type: Bool;
-            continue,
+            continue = FALSE,
             \* @type: Set(Address);
-            pendingClients,
+            pendingClients = {},
             \* @type: Set(Address);
-            clientsIter,
+            clientsIter = {},
             \* @type: {op: Str, key: Str, value: Str, client: Address, timestamp: Int, reply_to: Address};
-            msg,
-            \* @type: Str;
-            ok,
-            \* @type: Str;
-            key,
-            \* @type: Str;
-            val,
+            msg = [op |-> NullMessage, key |-> NoValue, value |-> NoValue, client |-> self, timestamp |-> 0, reply_to |-> self],
             \* this replica's own copy of the database -- private, never shared
             \* @type: Str -> Str;
             kv = [k \in KeySpace |-> NoValue];
@@ -216,15 +218,11 @@ EmptyRequestQueue == <<>>
             respondStable:
                 either {
                     await msg.op = GetMessage;
-                    key := msg.key;
-                    val := kv[key];
-                    send(clientMailboxes[msg.reply_to], [type |-> GetResponse, result |-> val]);
+                    send(clientMailboxes[msg.reply_to], [type |-> GetResponse, result |-> kv[msg.key]]);
                 } or {
                     await msg.op = PutMessage;
-                    key := msg.key;
-                    val := msg.value;
-                    kv[key] := val;
-                    send(clientMailboxes[msg.reply_to], [type |-> PutResponse, result |-> ok]);
+                    kv[msg.key] := msg.value;
+                    send(clientMailboxes[msg.reply_to], [type |-> PutResponse, result |-> OkValue]);
                 }
             }
         }
@@ -249,11 +247,11 @@ EmptyRequestQueue == <<>>
             \* clientMailboxes[self] receive between the Get and Put threads -- so both
             \* reuse this one slot instead of two identically-shaped variables.
             \* @type: {type: Str, result: Str};
-            resp,
+            resp = [type |-> "", result |-> ""],
 
             \* -- Put thread --
             \* @type: Int;
-            putI;
+            putI = 0;
     {
     getLoop:
         while (clock # -1) {
@@ -312,7 +310,7 @@ EmptyRequestQueue == <<>>
         \* ClockUpdate's own first send -- a client would disconnect before ever issuing a
         \* real request. This await is not part of the original algorithm; it only delays
         \* when disconnection becomes eligible, so client c's other threads get to run.
-        await clock > 100;
+        await clock > MaxClock;
         clock := -1;
         multicast(replicasNetwork, [dst \in ReplicaSet |-> [op |-> DisconnectMessage, key |-> NoValue, value |-> NoValue, client |-> self, timestamp |-> 0, reply_to |-> self]]);
     }
@@ -326,5 +324,61 @@ EmptyRequestQueue == <<>>
         }
     }
 }*)
+\*BEGIN TRANSLATION
+\*END TRANSLATION
+(*
+\* getRequest/putRequest/clockUpdateLoop keep ticking `clock` regardless of MaxClock --
+\* only sendDisconnectRequest's guard (clock > MaxClock) cares, and nothing forces that
+\* action to actually fire once enabled. So `clock` is genuinely unbounded in the reachable
+\* state graph, not merely large; without this, TLC's BFS never terminates. The +1 slack
+\* lets TLC still reach the state where sendDisconnectRequest's guard just became true
+\* before it prunes further growth on that branch.
+ClockBound == \A cl \in ClientSet: clock[cl] <= MaxClock + 1
 
+
+\* TypeOK below is induced directly from the \@type annotations on the algorithm
+\* above; it is TLC-only bookkeeping, not consumed by `fugue compile`.
+\* Generic Address, needed only for nextClient: its initial value is a replica's
+\* own `self` (see file header), every later value a client's -- the one variable
+\* that isn't provably confined to just ReplicaSet or just ClientSet.
+Address == ReplicaSet \cup ClientSet
+
+\* Mirrors the two `Channel(...)` payload annotations on replicasNetwork/clientMailboxes.
+RequestMessage ==
+  [op:STRING,
+    key:STRING,
+    value:STRING,
+    client:Address,
+    timestamp:Int,
+    reply_to:Address
+  ]
+ResponseMessage == [type:STRING, result:STRING ]
+
+TypeOK ==
+  /\ replicasNetwork \in [ReplicaSet -> Seq(RequestMessage)]
+  /\ clientMailboxes \in [ClientSet -> Seq(ResponseMessage)]
+  /\ liveClients \in [ReplicaSet -> SUBSET ClientSet]
+  /\ pendingRequests \in [ReplicaSet -> [ClientSet -> Seq(RequestMessage)]]
+  /\ stableMessages \in [ReplicaSet -> Seq(RequestMessage)]
+  /\ i \in [ReplicaSet -> Int \cup { defaultInitValue }]
+  /\ firstPending \in [ReplicaSet -> RequestMessage \cup { defaultInitValue }]
+  /\ timestamp \in [ReplicaSet -> Int \cup { defaultInitValue }]
+  /\ nextClient \in [ReplicaSet -> Address \cup { defaultInitValue }]
+  /\ lowestPending \in [ReplicaSet -> Int \cup { defaultInitValue }]
+  /\ chooseMessage \in [ReplicaSet -> BOOLEAN \cup { defaultInitValue }]
+  /\ currentClocks \in [ReplicaSet -> [ClientSet -> Int]]
+  /\ minClock \in [ReplicaSet -> Int \cup { defaultInitValue }]
+  /\ continue \in [ReplicaSet -> BOOLEAN \cup { defaultInitValue }]
+  /\ pendingClients \in
+       [ReplicaSet -> ( SUBSET Address ) \cup { defaultInitValue }]
+  /\ clientsIter \in
+       [ReplicaSet -> ( SUBSET Address ) \cup { defaultInitValue }]
+  /\ msg \in [ReplicaSet -> RequestMessage \cup { defaultInitValue }]
+  /\ kv \in [ReplicaSet -> [KeySpace -> STRING]]
+  /\ clock \in [ClientSet -> Int]
+  /\ outside \in [ClientSet -> STRING]
+  /\ awaitingReply \in [ClientSet -> BOOLEAN]
+  /\ resp \in [ClientSet -> ResponseMessage \cup { defaultInitValue }]
+  /\ putI \in [ClientSet -> Int \cup { defaultInitValue }]
+*)
 ==============================================================================
