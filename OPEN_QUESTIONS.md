@@ -281,8 +281,8 @@ right. The gap is only pairs that do have a least upper bound and get rejected a
 *checking* rules for `IF`/`CASE`, both implemented, make that escape hatch reachable: given an
 expected type, each branch is checked against it directly and picks up its own coercion. The
 example type-checks under an annotation
-(`tests/regression/accept_if_checked_heterogeneous_branches.tla`,
-`accept_case_checked_heterogeneous_branches.tla`). The limitation bites only in annotation-free
+(`Tests/regression/AcceptIfCheckedHeterogeneousBranches.tla`,
+`AcceptCaseCheckedHeterogeneousBranches.tla`). The limitation bites only in annotation-free
 synthesis position.
 
 **Open, quite possibly permanently:** whether to make `lub` a real join. Doing so means a
@@ -307,7 +307,7 @@ so no other caller's wording constrains it.
 it as a yellow `⚠ [1/1] Built <Module>` when the flag is set. `hadWarnings` counts warnings as
 *reported by the pass*, before `-Wno-<name>` filtering, which happens later in
 `PipelineResult.renderWarnings`. So `fugue compile -Wno-duplicate-parameter` on
-`accept_duplicate_parameter_warns.tla` correctly prints no warning, and still marks the module
+`AcceptDuplicateParameterWarns.tla` correctly prints no warning, and still marks the module
 yellow with a warning dingbat for a warning the user asked not to hear about.
 
 Pre-existing; unrelated to the pipeline extraction that surfaced it.
@@ -477,4 +477,143 @@ compiled program's *meaning* (a spec that happens to depend on a fair distributi
 promised by the TLA⁺ source) or should stay an implementation detail nobody should rely on.
 Leaning the latter (TLA⁺'s `with` promises no distribution, only "some" outcome across
 behaviors) but nothing pins it down in writing yet.
+
+### 9.37 `RECURSIVE` operators out of scope — revisit criteria and design not pinned down
+
+`RECURSIVE` out of scope for now, `PLAN.md` §2/§8 (its language-subset-exclusions row) and
+§9's syntax-coverage list. No prior-art checkout (`distpcal-compiler`, `mesabloo/fugue`)
+parses it either, so no existing shape to port. Only `RECURSIVE` *operators* — recursive
+*functions* (`f[x ∈ S] == ...` referencing `f` in its own body) already work via the
+`MkRecFn` tie-the-knot bootstrap, `PLAN.md`'s operator/function-definitions section — a
+different mechanism, unaffected by this entry.
+
+`PLAN.md`'s exclusions row already sketches a fallback if picked up: explicit type
+annotation required on every operator in a `RECURSIVE` group's declaration, `Γ` extended
+with all declared sibling types up front, each body checked against its own annotation
+independently — breaks the circularity a mutually-recursive group creates for a
+bidirectional checker (standard precedent: mutual `def`/`def` in Coq/Agda/Lean always carry
+signatures), near-necessary for decidability under rank-1 polymorphism if any operator in
+the group is polymorphic. That sketch stops at the checker; nothing designs the parser side
+(TLA⁺ syntax lets `RECURSIVE f, g` predeclare a group, then separate `==` definitions bind
+each — needs a two-pass elaboration: collect the group's names/annotations first, check
+bodies after) or either backend (Go: same `MkRecFn`-style bootstrap as recursive functions,
+but for an operator, which compiles to a Go func rather than a `LazyFunction` value —
+ordinary Go function definitions already support mutual recursion natively, so this may be
+free; Join Calculus backend not examined at all).
+
+Open: whether to design and implement this, or leave `RECURSIVE` permanently excluded. No
+known example program in this project's fixtures or thesis chapters needs it yet — revisit
+if one does.
+
+### 9.38 `channels` compile with FIFO (sequence) semantics; thesis wants `Set`/multiset
+
+`reference/thesis.txt:388-391` (§3.1.1): intended encoding is `Set(τ)` for `channels`,
+`Seq(τ)` for `fifos` — kept as one `Channel(τ)` type only because "the distinction is only
+meaningful when emitting code or when describing the semantics" (line 415-417), not at the
+type level. §3.1.5's subtyping rule (line 1054-1056) allows either a multiset/bag or sequence
+encoding for `Channel(τ)` — covariant either way — so the type theory doesn't force the
+choice; codegen does, and codegen hasn't made it.
+
+Compiler picks one encoding for both. `GuardedPlusCal.FIFOs`
+(`Core/GuardedPlusCal/Semantics/Denotational.lean:106`) is `Finmap λ _ : ChanKey V ↦ List V`
+— push-right/pop-left queue — and every `ChanKey` uses it, whether the source declared the
+name under `channels` or `fifos` (`Declarations.channels`/`.fifos`,
+`Core/GuardedPlusCal/Syntax.lean:208-209`: same `String × Typ × List Expr` shape, no tag
+past which field it sits in). `Guarded2Network` (§5.5) compiles a receiving process's mailbox
+to one shared `inbox` sequence fed by per-channel `.rx` threads — same `List`-backed queue,
+so a `channels`-declared mailbox still gets strict FIFO delivery order. `PLAN.md:1642-1643`'s
+own characterization of the state space (`LState = (Var → Value) × (Var → Value*)`) shows the
+operational-semantics side collapses to one sequence-valued component too — the
+`channels`/`fifos` split lives only in the surface syntax and the frontend typing chapter,
+never reaches `GuardedPlusCal`/`Guarded2Network`.
+
+Consequence: a spec whose correctness argument depends on `channels` reordering
+(out-of-order delivery, no FIFO guarantee) compiles to something *stricter* than the source
+permits — fewer reachable behaviors, not more, so nothing unsound, but a real gap between
+what the source declares and what the target guarantees, silently resolved by picking
+sequence order for everyone.
+
+Fix shape: `Guarded2Network`'s inbox for a `channels`-declared `ChanKey` would need a finite
+multiset (bag over `V`) instead of `List V`; `fifos`-declared keys keep `List`. `FIFOs` would
+need that distinction carried per-key — derived once at `Declarations` construction, not
+guessed downstream from naming ([[feedback_derive_dont_let_sites_choose]]'s rule) — likely a
+split into two payload kinds rather than a flag. Needs a pop-any-element rule
+(`Finset.erase`-then-insert or similar) replacing list-append/`Head` for the multiset case,
+and the refinement proof (§6.2) would gain a second delivery-order relation alongside the
+FIFO one it already has.
+
+Open: implement now, or leave documented. No fixture exercises `channels` reordering today —
+process-level `channels`/`fifos` don't even parse yet (§9.13) — so nothing currently breaks
+silently; revisit once one does.
+
+### 9.27 `multicast`'s denotational semantics has no enumeration primitive to fold over
+Guarded→Network's refinement proof (§5.5) re-derives `GuardedPlusCal`/`NetworkPlusCal`'s
+denotational semantics against the fresh `Core/GuardedPlusCal/Syntax.lean` AST — the proof's
+mathematical content transfers from prior art, but `multicast`'s own semantics doesn't: folding
+a `send` over a set value's members needs an enumeration primitive over `Set(τ)`, and neither
+the fresh AST nor prior art supplies a shape for one. Open until Guarded→Network's proof reaches
+the `multicast` case.
+
+### 9.39 Type aliases in annotations (Apalache `@typeAlias`) — Lean representation not picked
+Apalache lets a spec name a type once, reuse it elsewhere in `@type` annotations. Nothing here
+supports this — `Annotation` (`Parser_/Annotations.lean:53`) has only
+`@type`/`@mailbox`/`@parameter`; `Typ` (`Core/SurfaceTLAPlus/Syntax.lean:235`) has no
+alias-reference case.
+
+**Reference syntax settled: `$name`**, Apalache's own sigil. Rejected alternative: reusing a bare
+identifier (same production as `.var`, a rigid type variable) and resolving the alias in a
+post-pass — risks a real type variable silently colliding with an alias of the same name, a
+distinction a future correctness proof would then have to carry rather than one dissolved at
+parse time for free.
+
+**Alias polymorphism settled as an explicit parameter list on the alias**, e.g. `@typeAlias:
+msg(a) = Ok(a) | Err(Str);`, instantiated at each use as `$msg(Int)` — a deliberate divergence
+from Apalache, whose aliases take no parameters and get polymorphism only indirectly, from a free
+`.var` in the body resolved by unification at each use site. Chosen because the call site names
+the intended instance directly instead of relying on unification to recover it. Not implemented
+now — `Typ`/`parseType'` have no alias case at all yet — but the reference syntax above must keep
+this addable without redesign: `$name` extends to `$name(τ₁, …, τₙ)` without ambiguity.
+
+**Settled: a type alias is its own (virtual) TLA⁺ declaration, not a name→`Typ` side table**, and
+may not appear inside a PlusCal algorithm. Falls out by construction once represented this way,
+no separate check needed: `Module` (`Core/Declaration.lean:69-75`) holds `declarations₁`/
+`declarations₂ : List (Declaration E β)` either side of `pcalAlgorithm : Option α` — a field of an
+unrelated type — so a `Declaration`-shaped alias is structurally excluded from the algorithm
+body. "Virtual" because, unlike `.constants`/`.variables`/`.operator`/`.function`
+(`Core/Declaration.lean:22-32`), it carries no real TLA⁺ syntax of its own — synthesized entirely
+from a comment.
+
+**Open: how that declaration case is represented.** A standalone comment block containing only
+`@typeAlias: name(...) = Typ;` with nothing else following is new grammar either way — today
+every annotation decorates a declaration already being parsed for some other reason; nothing
+produces a `Declaration` from a comment alone. Two shapes floated, not decided:
+- A dedicated `Declaration.typeAlias` constructor.
+- A generic `Declaration.annotation (_ : Annotation)` — a declaration that's just a standalone
+  resolved annotation, so any future free-standing annotation reuses the same grammar case
+  instead of earning its own `Declaration` constructor; what a `.annotation` value *means* (alias
+  expansion, or rejected as meaningless anywhere else) is a later pass's job, not the parser's.
+
+Either way, open whether it needs to live in the shared `Core/Declaration.lean` (touching
+`SurfaceTLAPlus`/`CoreTLAPlus`/`TypedTLAPlus` alike, per that file's own doc comment) or can stay
+`SurfaceTLAPlus`-only, fully expanded away by `SurfaceTLAPlus.Module.desugar` before `CoreTLAPlus`
+— matching how §5.2's four surface-only expression transformations already disappear at Core
+(`PLAN.md` §5.2). Aliases are pure notation with no runtime content of their own, so the latter
+looks like the better fit, but not decided.
+
+**Settled, diverging from Apalache: alias scope follows ordinary declaration order.**
+`checkDeclarations` (`Elaborator/Declarations.lean:178-182`) folds `declarations₁ ++
+declarations₂` left to right, extending `Γ` as it goes — each declaration sees only bindings
+from declarations before it. A type alias represented as an ordinary `Declaration` inherits this:
+`$msg` is in scope only for declarations textually after `@typeAlias: msg = …`, no forward
+reference. Apalache itself has no such restriction — every `@typeAlias` comment in the module is
+collected up front, module-wide, order-independent. Deliberate here: matches how every other TLA⁺
+declaration already behaves, rather than carving out an exception for this one kind.
+
+This also resolves the earlier worry about `PLAN.md`'s deferred `ParserWarning.unusedAnnotation`
+(§5.1, lines 249-258): that detection is scoped to annotations inside a PlusCal algorithm body
+(`parseUnlabeledStatement` calling `tryParseAnnotations`), and a type alias can no longer appear
+there at all — so it can never reach that check, no carve-out needed.
+
+Open: `Declaration.typeAlias` vs. generic `Declaration.annotation`, and which stage(s) own the new
+case. Don't start without check-in.
 

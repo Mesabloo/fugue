@@ -1,0 +1,132 @@
+#!/usr/bin/env python3
+"""Tell the model what to audit for instruction compliance.
+
+    scripts/doctor          scoped to files git sees as changed
+    scripts/doctor --full   whole project
+
+Everything this checks is judgment, not grep: whether a cross-reference still resolves, whether
+caveman register actually held, whether a doc comment drifted into narrating history. A script
+can't reliably decide those — so this one doesn't try. It prints a checklist and the current
+set of files each item applies to; the model reads the checklist, does the reading and comparing
+itself, and reports violations as `file:line — reason`. Nothing here modifies anything.
+
+Two checks that genuinely are mechanical are delegated rather than re-implemented:
+`scripts/structure-check` (STRUCTURE.md vs. the tree) and `scripts/facts doctor` (fact database
+vs. sources) already do this properly and already run as hooks. This script tells the model to
+run them and fold their output in, not to redo their work by hand.
+"""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+
+# Docs the register/cross-reference/comment rules are actually written down in. Read these, not
+# memory of them — CLAUDE.md says as much for Lean style, and it holds just as well here.
+RULE_SOURCES = ["CLAUDE.md", "INSTRUCTIONS.md", "LEAN_STYLE.md"]
+
+# Docs that carry cross-references or caveman register and are cheap enough to sweep in full
+# every run, regardless of scope — a stale reference doesn't announce itself by being near a
+# file that changed this session.
+ALWAYS_SWEPT = [
+    "PLAN.md", "OPEN_QUESTIONS.md", "STRUCTURE.md",
+    ".claude/FINDINGS.md",
+]
+ALWAYS_SWEPT_GLOBS = [".claude/tasklist*.md", ".claude/plans/*.md"]
+
+
+def sh(*args: str) -> str:
+    return subprocess.run(args, cwd=ROOT, capture_output=True, text=True).stdout
+
+
+def changed_files() -> list[str]:
+    out = sh("git", "status", "--porcelain", "--", ".")
+    paths = []
+    for line in out.splitlines():
+        if len(line) < 4:
+            continue
+        path = line[3:]
+        if " -> " in path:            # rename: old -> new, both matter
+            paths.extend(p.strip() for p in path.split(" -> "))
+        else:
+            paths.append(path)
+    return sorted(set(paths))
+
+
+def swept_docs() -> list[str]:
+    found = [p for p in ALWAYS_SWEPT if (ROOT / p).exists()]
+    for pat in ALWAYS_SWEPT_GLOBS:
+        found.extend(sorted(p.relative_to(ROOT).as_posix() for p in ROOT.glob(pat)))
+    return found
+
+
+def main(argv: list[str]) -> int:
+    full = "--full" in argv
+    if any(a in ("-h", "--help") for a in argv):
+        print(__doc__)
+        return 0
+
+    docs = swept_docs()
+    scope = ["the whole project"] if full else (changed_files() or ["(nothing changed — run with --full for a whole-project sweep)"])
+
+    print("Project doctor — read each rule source below in full before judging anything")
+    print("against it; don't work from memory, rules change.\n")
+    print("Rule sources:")
+    for f in RULE_SOURCES:
+        if (ROOT / f).exists():
+            print(f"  {f}")
+    print()
+    print("Scope for the comment/register checks:")
+    for f in scope:
+        print(f"  {f}")
+    print()
+    print("Docs swept in full every run (cross-references and register, regardless of scope):")
+    for f in docs:
+        print(f"  {f}")
+    print()
+
+    print("1. Broken references.")
+    print("   For every doc listed above under 'swept in full': every backticked file path —")
+    print("   confirm it exists at that path (or resolves relative to its section heading, per")
+    print("   STRUCTURE.md's own convention). Every `§N.M` in PLAN.md — confirm OPEN_QUESTIONS.md")
+    print("   still has that entry, or that PLAN.md's mention is a settled fact and the entry was")
+    print("   properly deleted (not struck through) per INSTRUCTIONS.md's resolution rule. Every")
+    print("   named Lean declaration — confirm it still exists (`scripts/facts s <name>` or")
+    print("   `lean_local_search`, not grep).\n")
+
+    print("2. Register.")
+    print("   Reread CLAUDE.md's Register section. Each doc under 'swept in full' above must be")
+    print("   caveman — condensed, current-state-only, no filler — except doc comments inside")
+    print("   source files and commit/PR text, which must stay normal prose. `docs/diagnostics/*.md`")
+    print("   is also normal prose, per its own DIAG_STYLE.md §Register — user-facing, not one of")
+    print("   the caveman-mandated files, and out of scope for this check either way. Flag either")
+    print("   direction: caveman leaking into a doc comment, or prose leaking into one of the")
+    print("   caveman-mandated files.\n")
+
+    print("3. Comment rules (INSTRUCTIONS.md §Comments).")
+    print("   For every .lean file in scope: check its doc comments against every rule listed")
+    print("   there. `linter.fugue.comments` already enforces the mechanical half (run it via the")
+    print("   normal build if unsure it's current); this step is the judgment half only — history")
+    print("   language, weak docs, proof narration that isn't mechanically detectable.\n")
+
+    print("4. PLAN.md / OPEN_QUESTIONS.md discipline (INSTRUCTIONS.md, top section).")
+    print("   PLAN.md: does any section read as history rather than settled fact — 'earlier draft")
+    print("   said', 'found bug, corrected to', dates, phase/session markers? OPEN_QUESTIONS.md:")
+    print("   is every entry genuinely still open, and does every entry have a PLAN.md § pointing")
+    print("   back to it?\n")
+
+    print("5. Delegated mechanical checks — run these, don't reimplement them:")
+    print("     scripts/structure-check")
+    print("     scripts/facts doctor")
+    print("   Fold their output into the report below rather than treating it separately.\n")
+
+    print("Report every finding as `file:line — reason`. Do not fix anything without asking")
+    print("first — INSTRUCTIONS.md's check-in-first rule applies to doctor findings too.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

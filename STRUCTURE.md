@@ -386,6 +386,7 @@ here on purpose — see this directory directly for contents.
 - `OrphanCheck.lean` — lists `.lean` modules no library or executable root transitively imports (`lake exe orphanCheck`). Ad-hoc, not hooked.
 - `Lint.lean` — runs Batteries' `simpNF` / `unusedArguments` / `docBlame` environment linters over the package (`lake build` then `lake lint`, its `@[lint_driver]`). Ad-hoc, not hooked.
 - `structure-check` — checks this file against the tree.
+- `doctor` — prints a checklist for instruction-compliance review; does not check anything itself.
 
 ## `.github/`
 - `workflows/ci.yml` — build+test matrix, release publish, documentation deploy.
