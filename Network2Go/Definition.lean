@@ -98,6 +98,45 @@ private def requireMonomorphic (pos : SourceSpan) (what name : String) (τ : Typ
       "it compiles to a package-level Go variable, and Go has no generic variables — only a \
        parametric operator can carry type parameters")
 
+/-- Builds `Set(Typ.tuple τs)` from `n ≥ 2` per-binder domain sets (`doms'`, same order as `τs`),
+by chaining `SetProduct` — binary, Go has no variadic generic — so each step's pairing closure
+destructures the accumulated prefix tuple and repacks a flat, one-field-longer tuple, never a
+nested pair: matches the flat `Typ.tuple τs` domain type checking already assigned the
+definition, and what a multi-index call `f[e₁,…,eₙ]` already indexes with
+(`CoreTLAPlus.Expression.fnCall`'s own doc comment). No new runtime primitive — `SetProduct`
+already builds exactly this flat shape for `n = 2` (`"\X"`'s own codegen,
+`Network2Go/Expression.lean`); this generalizes it to any `n` by feeding its own output back in as
+one side of the next call. -/
+private def buildProductDomain (pos : SourceSpan) :
+    List Typ → List ComputableGo.Expression → m ComputableGo.Expression
+  | τ₁ :: τs, dom₁ :: doms => go [τ₁] dom₁ τs doms
+  | _, _ => throw (.internalInvariantViolated pos
+      "a function definition's domain-tuple types and compiled domains disagreed in length")
+where
+  /-- `pre`: the component types folded into `acc` so far, in binder order. `acc`'s own Go type is
+  `τ₁` bare when `pre.length = 1` (nothing paired yet), the flat `pre`-shaped tuple struct once
+  `pre.length ≥ 2`. -/
+  go (pre : List Typ) (acc : ComputableGo.Expression) :
+      List Typ → List ComputableGo.Expression → m ComputableGo.Expression
+    | [], [] => return acc
+    | τᵢ :: restτ, domᵢ :: restDom => do
+      let p ← goIdent <$> freshName "x"
+      let q ← goIdent <$> freshName "y"
+      let preGoτ ← compileTyp (match pre with | [τ] => τ | _ => .tuple pre)
+      let elemGoτ ← compileTyp τᵢ
+      let pre' := pre ++ [τᵢ]
+      let resultGoτ ← compileTyp (.tuple pre')
+      let preFields :=
+        if pre.length = 1 then [(projName 1, Go.Expression.var p)]
+        else (List.range pre.length).map λ k ↦
+          (projName (k + 1), Go.Expression.field (.var p) (projName (k + 1)))
+      let fields := preFields ++ [(projName (pre.length + 1), Go.Expression.var q)]
+      let pairClosure := Go.Expression.funcLit [(p, preGoτ), (q, elemGoτ)] [resultGoτ]
+        [.return [.structLit resultGoτ fields]]
+      go pre' (tlaplusCall "SetProduct" [acc, domᵢ, pairClosure]) restτ restDom
+    | _, _ => throw (.internalInvariantViolated pos
+        "a function definition's domain-tuple types and compiled domains disagreed in length")
+
 /--
   Compiles one top-level declaration, or nothing for the ones with no computational content.
 -/
@@ -131,33 +170,57 @@ def compileDeclaration (pos : SourceSpan) :
     let .function domτ ranτ := τ
       | throw (.internalInvariantViolated pos
           s!"function '{f}' has type {repr τ}, which type checking should already have rejected")
-    let [(x, dom)] := args
-      | throw (.unsupported pos s!"the function definition '{f}'"
-          "a function of several binders has the Cartesian product of their domains as its own \
-           domain, and the runtime has no product construction to build it with")
-    -- With the same name on both, `MkRecFn`'s generator would take two parameters called `f`.
-    if x == f then
+    -- With the same name as a binder, `MkRecFn`'s generator would take two parameters called `f`.
+    if args.any (·.1 == f) then
       throw (.unsupported pos s!"the function definition '{f}'"
-        "its binder shadows its own name, so a recursive reference could not be told from a \
-         reference to the binder")
+        "one of its binders shadows its own name, so a recursive reference could not be told from \
+         a reference to the binder")
     let goτ ← compileTyp τ
     let dict ← ordDict domτ
-    let dom' ← compileExprTop dom
     let paramτ ← compileTyp domτ
     let retτ ← compileTyp ranτ
+    -- `genParam`/`destructure`: the generator's own Go parameter, plus (arity ≥ 2 only) the local
+    -- `var`/`=` pair that opens its tuple struct back into `x₁,…,xₙ`, each bound under the same
+    -- `binderName` an operator's own parameters already use, so `compileExprTop`'s existing
+    -- per-name resolution below needs no change at all — arity 1's parameter *is* `x`, unchanged.
+    let step : m (String × List ComputableGo.Statement × ComputableGo.Expression) := match args with
+      | [(x, dom)] => do return (binderName x, [], ← compileExprTop dom)
+      | (_, _) :: (_, _) :: _ => do
+        let .tuple τs := domτ
+          | throw (.internalInvariantViolated pos
+              s!"function '{f}' takes {args.length} binders but its domain type is {repr domτ}, \
+                 which type checking should already have rejected")
+        if τs.length ≠ args.length then
+          throw (.internalInvariantViolated pos
+            s!"function '{f}' takes {args.length} binders but its domain type has {τs.length} \
+               components, which type checking should already have rejected")
+        let doms' ← args.mapM λ (_, dom) ↦ compileExprTop dom
+        let dom' ← buildProductDomain pos τs doms'
+        let tupleParam ← goIdent <$> freshName "tuple"
+        let destructure ← (args.zip τs).zipIdx.mapM λ (((x, _), τᵢ), i) ↦ do
+          let xGoτ ← compileTyp τᵢ
+          return [Go.Statement.var (binderName x) xGoτ,
+            Go.Statement.assign [.var (binderName x)] [.field (.var tupleParam) (projName (i + 1))]]
+        return (tupleParam, destructure.flatten, dom')
+      | [] => unreachable!
+    let (genParam, destructure, dom') ← step
     -- The body sees `f` in scope through `Ξ` (`.module`); the recursive knot is tied by `MkRecFn`'s
-    -- generator parameter, an ordinary binder named after `f`, so the self-reference is rewritten to
-    -- that free name. The parameter `x` is a de Bruijn binder, opened to its own name.
-    let body' ← compileExprTop (bindSelf f body) [x]
+    -- generator parameter, an ordinary binder named after `f`, so the self-reference is rewritten
+    -- to that free name. Each `xᵢ` is a de Bruijn binder, opened to its own name — `destructure`
+    -- above gives it a value to resolve to when the generator takes one Go parameter (arity ≥ 2).
+    let body' ← compileExprTop (bindSelf f body) (args.map Prod.fst)
     -- The self-reference compiles to the *original* name, so naming the generator's first parameter
     -- after it is exactly what closes the loop. The top-level `var` is capitalized and so cannot
     -- collide with it.
     let value :=
       if mentionsSelf f body then
         tlaplusCall "MkRecFn"
-          [dict, dom', .funcLit [(binderName f, goτ), (binderName x, paramτ)] [retτ] [.return [body']]]
+          [dict, dom', .funcLit [(binderName f, goτ), (genParam, paramτ)] [retτ]
+            (destructure ++ [Go.Statement.return [body']])]
       else
-        tlaplusCall "FnConstructor" [dict, dom', .funcLit [(binderName x, paramτ)] [retτ] [.return [body']]]
+        tlaplusCall "FnConstructor"
+          [dict, dom',
+            .funcLit [(genParam, paramτ)] [retτ] (destructure ++ [Go.Statement.return [body']])]
     return some (.var (definitionName (isLocal := false) f) goτ (some value))
 
 /-- A whole declaration list, keeping only what compiles to something. Order is preserved: Go

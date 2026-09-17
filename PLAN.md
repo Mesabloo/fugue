@@ -1292,10 +1292,26 @@ correctness sketch is the chapter's only remaining stub):
   function parameter, top-level name capitalized; a binder spelled exactly like its own
   function is rejected). **Only the parametric-operator form can be polymorphic**: a rigid
   type variable becomes a Go type parameter + dictionary parameter; the other three forms
-  are package-level `var`s and Go has no generic `var`. A multi-binder function definition
-  is rejected (its domain is a Cartesian product, not a runtime operation). A generated file
-  is therefore a list of `func`s and `var`s — the only forms emitted, records/tuples needing
-  no type declarations.
+  are package-level `var`s and Go has no generic `var`. **A multi-binder function definition**
+  compiles at any arity: its domain set is built by chaining `SetProduct` — binary, Go has no
+  variadic generic — once per binder beyond the first, each step's pairing closure
+  destructuring the accumulated prefix tuple and repacking a flat, one-field-longer tuple, so
+  the result is always the flat `Typ.tuple` domain type checking assigned the definition,
+  never a nested pair; no new runtime primitive, `SetProduct` already builds exactly this
+  shape for two binders (`"\X"`'s own codegen). The generator itself still takes one Go
+  parameter (`LazyFunction`'s own shape); at arity ≥ 2 its body opens that one tuple-struct
+  parameter back into each binder via a local `var`/`=` pair per binder, ahead of its own
+  compiled expression. A generated file is therefore a list of `func`s and `var`s — the only
+  forms emitted, records/tuples needing no type declarations.
+
+  **Surface-only binder sugar** — `f[x, y \in S] == e` (shared domain) and `f[<<x,y>> \in S]
+  == e` (tuple pattern), the same shapes `\A`/`\E`/set-builders accept — desugars away before
+  reaching this: `SurfaceTLAPlus.Declaration`'s own `.function` (not the `Core`/`Typed`/
+  `Computable` stages' shared one, `Core/Declaration.lean`) carries a full `QuantifierBound`
+  per binder rather than a bare name, and `Desugarer/TLAPlus.lean` flattens each one via
+  `flattenBound` — the same function `\A`/`\E`/set-map/function-literal desugaring already
+  uses for this exact shorthand — before building the flat `CoreTLAPlus.Declaration.function`
+  every later stage sees.
 - **Name spelling: `_` → `__`, `$` → `_`, at every name crossing into Go.** `$` makes
   `freshName` collision-free (§2) and isn't a legal Go identifier character, so the
   guarantee is re-established in Go's alphabet. Escaping both sides keeps the two

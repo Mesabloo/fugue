@@ -120,12 +120,18 @@ check-3 list for forward-compatibility, currently inert.
 All run, all still fail as described, and an unexpected pass is reported as XPASS. They were
 `skip_*` files until phase 4; skipping meant they could quietly start working and nobody would
 know.
-- `AcceptFunctionDefinitionMultiArgTupleDomain.tla` — parser rejects `f[x \in S, y \in T] ==
-  ...` (`unexpected identifier f`). Looks like a `Parser_/TLAPlus.lean` gap, not traced.
-Fix at the root, drop the `xfail` from the sidecar, re-run the suite. Don't patch the fixture
-unless it encodes an unsupported construct (check §8 first).
 
-**Left this list already:** `AcceptFunctionLiteralCartesianProductBinder.tla` — `\X` typed
+**Left this list.** `AcceptFunctionDefinitionMultiArgTupleDomain.tla` — `Parser_/TLAPlus.lean`'s
+`parseDeclaration` had no production for `Declaration.function` at all, so no module-level
+function definition of any arity could be written, whether or not its shape would type-check.
+Fixed by adding `parseFunctionDefinition` (binder list = `sepBy1 comma parseQuantifierBound`,
+reusing the same grammar `\A`/`\E`/set-builders already use rather than a narrower one) and
+dispatching to it from `parseDeclaration` on a `[` peek past the leading identifier. Sidecar
+dropped, fixture passes for real; a companion, `…GoCodegen.tla`, pairs the same definition with a
+process that calls it and asserts `goBuild: true`, since this fixture's own module has no
+algorithm and so never reaches `Network2Go` at all.
+
+**Also left this list already:** `AcceptFunctionLiteralCartesianProductBinder.tla` — `\X` typed
 (`(Set(a), Set(b)) => Set(<<a,b>>)`, `builtinContext`) but had no Go compilation: a product's
 elements are pairs, and a tuple compiles to an *anonymous* struct only the site building it can
 name, so a runtime `SetProduct` could not construct its own elements the way `SetUnion` does.
@@ -318,7 +324,7 @@ point it is built), or the dingbat is deliberately reporting "this module produc
 independently of whether they were displayed, and only the colour is misleading. Matters for the
 regression runner once it asserts on progress lines rather than only on diagnostics.
 
-### 9.23 Six fixtures asserted something they did not exercise; one remains parked as `Skip*`
+### 9.23 Six fixtures asserted something they did not exercise
 Found by phase 4's sidecars: every rejection now records the stage and code it must produce, and
 six fixtures produced something else. All six passed `run.sh`, which only ever asked for a nonzero
 exit.
@@ -335,29 +341,25 @@ produces `E0018` (`conflictingAssignment`) at `desugar`, as its header always sa
 **Three were parked**, renamed from `Reject*` to `Skip*` with a sidecar `reason` the runner prints
 on every run. `Skip` rather than `xfail` because the fault is in the fixture, not the compiler:
 each claims to test a pass it never reaches, and fixing the compiler would not make it start
-testing that pass. **One is still parked; two are back.**
+testing that pass. **All three are back.**
 
-*One dies at parse (`E0002`) before reaching the pass it targets.*
-- `SkipFunctionDefinitionDomainNotTuple` — hits the multi-argument function-definition parser gap,
-  duplicating `AcceptFunctionDefinitionMultiArgTupleDomain` (§9.2, `xfail`) while claiming to test
-  `TCError.notATupleType`.
-
-*Two are un-parked.* `SkipUnboundedChooseSynthesisPosition` was parked for the `CHOOSE` parser gap;
-that gap is closed (§9.2), so `print CHOOSE x : x = x` now reaches the type checker and produces
-the `E0028` (`cannotInferType`) its header always claimed. Back as
-`RejectUnboundedChooseSynthesisPosition`, `status: ok`.
+`SkipUnboundedChooseSynthesisPosition` was parked for the `CHOOSE` parser gap; that gap is closed
+(§9.2), so `print CHOOSE x : x = x` now reaches the type checker and produces the `E0028`
+(`cannotInferType`) its header always claimed. Back as `RejectUnboundedChooseSynthesisPosition`,
+`status: ok`.
 `SkipOperatorParamArityMismatch` was parked because its `@type` annotation died at annotation
 parsing (`E0005`): `Parser_/Annotations.lean`'s `parseType'` could not nest an operator-shaped
 (`=>`) type inside another operator type's argument list. That gap is closed too, so
 `((Int) => Int, Int) => Int` now parses and `Op(F(_,_), x) == x` reaches `checkParamArity`, which
 produces the `E0039` (`paramArityMismatch`) its header always claimed. Back as
 `RejectOperatorParamArityMismatch`, `status: ok`, `failsAt: typecheck`.
+`SkipFunctionDefinitionDomainNotTuple` was parked for the function-definition parser gap (§9.12);
+that gap is closed too, so its 2-binder function definition now reaches the type checker and
+produces the `E0038` (`notATupleType`) its header always claimed. Back as
+`RejectFunctionDefinitionDomainNotTuple`, `status: ok`, `failsAt: typecheck`.
 
-**Open:** how the last one should be rewritten. It duplicates an `xfail` fixture that already
-tracks its parser gap, so it is only worth keeping if rewritten as a genuine type-checker fixture
-once that gap closes. Note the cost of parking it: a skipped fixture does not run, so nothing will
-announce it when the gap closes — the `xfail` pair is what to watch instead. Both un-parkings above
-were noticed by hand, not by the suite, which is the point.
+All three un-parkings were noticed by hand, not by the suite, which is the point of tracking them
+here rather than leaving them silently skipped.
 
 ### 9.33 Reachability walk recurses into builtin-module definition bodies
 `WellFormedness/Reachability.lean`'s `walkReachable`, on a `.var _ (.module m name)` that resolves
