@@ -1,7 +1,6 @@
 module
 
 public import Common.Position
-public import Core.Declaration
 public import Mathlib.Control.Bifunctor
 public import Mathlib.Control.Traversable.Basic
 public import Mathlib.Control.Traversable.Instances
@@ -585,19 +584,92 @@ instance : Traversable Expression where
 instance instTraversableProd {α : Type} : Traversable (Prod α) where
   traverse f x := ({x with snd := ·}) <$> f x.snd
 
-/-- A top-level TLA⁺ declaration. `RECURSIVE` and module `INSTANCE` are not represented. -/
-abbrev Declaration := _root_.Declaration Expression
+/--
+  A top-level TLA⁺ declaration, prior to desugaring. Own type rather than the `Core/Declaration.lean`
+  shared one `CoreTLAPlus`/`TypedTLAPlus` reuse verbatim: a function definition's binder list here
+  may still be shared-domain (`x, y \in S`) or tuple-pattern (`<<x,y>> \in S`) sugar — the same
+  `QuantifierBound` shape `\A`/`\E`/set-builders already accept — which `Desugarer/TLAPlus.lean`
+  flattens down to `CoreTLAPlus.Declaration.function`'s plain per-binder form before anything past
+  desugaring ever sees it. `RECURSIVE` and module `INSTANCE` are not represented.
+-/
+inductive Declaration (α : Type) : Type
+  | constants : List (String × α) → Declaration α
+  | «variables» : List (String × α) → Declaration α
+  | assume : Expression α → Declaration α
+  /--
+    An operator definition, optionally with higher-order arguments. Each parameter's `Nat`
+    is its arity (`0` for `x`, `3` for `F(_, _, _)`, …).
+  -/
+  | operator : α → String → List (String × Nat) → Expression α → Declaration α
+  /-- A function definition. Each binder may itself be a shared-domain or tuple-pattern shorthand
+  (`QuantifierBound`, same shape quantifiers accept). -/
+  | function : α → String → List (QuantifierBound α (Expression α)) → Expression α → Declaration α
+
+/-- Hand-written since `deriving Repr` can't discharge the higher-kinded `Repr (Expression α)`
+obligation. -/
+instance {α} [Repr α] : Repr (Declaration α) where
+  reprPrec d _ := match d with
+    | .constants xs => f!"Declaration.constants {repr xs}"
+    | .variables xs => f!"Declaration.variables {repr xs}"
+    | .assume e => f!"Declaration.assume {repr e}"
+    | .operator a x args e => f!"Declaration.operator {repr a} {repr x} {repr args} {repr e}"
+    | .function a x args e => f!"Declaration.function {repr a} {repr x} {repr args} {repr e}"
+
+instance : Functor Declaration where
+  map f
+    | .constants xs => .constants (Bifunctor.snd f <$> xs)
+    | .variables xs => .variables (Bifunctor.snd f <$> xs)
+    | .assume e => .assume (f <$> e)
+    | .operator a x args e => .operator (f a) x args (f <$> e)
+    | .function a x qs e => .function (f a) x (Bifunctor.bimap f (f <$> ·) <$> qs) (f <$> e)
+
+instance : Traversable Declaration where
+  traverse f
+    | .constants xs => .constants <$> traverse (bitraverse pure f) xs
+    | .variables xs => .variables <$> traverse (bitraverse pure f) xs
+    | .assume e => .assume <$> traverse f e
+    | .operator a x args e => (.operator · x args ·) <$> f a <*> traverse f e
+    | .function a x qs e =>
+      (.function · x · ·) <$> f a <*> traverse (bitraverse f (traverse f)) qs <*> traverse f e
 
 /--
   A parsed TLA⁺ module, `EXTENDS`-list and all, wrapping the embedded (Distributed) PlusCal
   algorithm at whatever `α` the caller instantiates it at — kept abstract to avoid a cyclic
-  import between the two Core ASTs.
+  import between the two Core ASTs. Own type for the same reason `Declaration` above is: its
+  `declarations₁`/`declarations₂` are lists of *this* `Declaration`, not `Core/Declaration.lean`'s
+  shared one.
 -/
-abbrev Module := _root_.Module Expression
+structure Module (α β : Type) : Type where
+  name : String
+  «extends» : List String
+  declarations₁ : List (Declaration β)
+  pcalAlgorithm : Option α
+  declarations₂ : List (Declaration β)
+  deriving Inhabited
 
-namespace Module
-export _root_.Module (mk)
-end Module
+/-- Hand-written, same reason as `Declaration`'s `Repr` instance above. -/
+instance {α β} [Repr α] [Repr β] : Repr (Module α β) where
+  reprPrec m _ :=
+    f!"\{ name := {repr m.name}, extends := {repr m.extends}, declarations₁ := {repr m.declarations₁}, " ++
+    f!"pcalAlgorithm := {repr m.pcalAlgorithm}, declarations₂ := {repr m.declarations₂} }"
+
+/-- `@@ posOf m`, for the same reason `SurfacePlusCal.Process`/`.Algorithm`'s instances carry it:
+mapping a module rebuilds the structure, and a rebuilt node that isn't re-registered has no
+position of its own — `posOf` then answers for it with whatever unrelated value last occupied
+that address (`Common/Position.lean`). -/
+instance : Bifunctor Module where
+  bimap f g m := { m with
+    declarations₁ := (g <$> ·) <$> m.declarations₁
+    pcalAlgorithm := f <$> m.pcalAlgorithm
+    declarations₂ := (g <$> ·) <$> m.declarations₂
+  } @@ posOf m
+
+instance : Bitraversable Module where
+  bitraverse f g m :=
+    ({m with declarations₁ := ·, pcalAlgorithm := ·, declarations₂ := · } @@ posOf m)
+      <$> traverse (traverse g) m.declarations₁
+      <*> traverse f m.pcalAlgorithm
+      <*> traverse (traverse g) m.declarations₂
 
 end SurfaceTLAPlus
 

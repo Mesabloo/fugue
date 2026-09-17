@@ -1110,9 +1110,30 @@ namespace SurfaceTLAPlus.Parser
     let expr ← parseExpression
     return ⟨ann, var, args.elim [] Array.toList, expr⟩
 
+  /-- A module-level function definition `f[x \in S, …] == e`. Each binder is a full
+  `QuantifierBound` — plain (`x \in S`), shared-domain (`x, y \in S`), or tuple-pattern
+  (`<<x,y>> \in S`) — the same shape `\A`/`\E`/set-builders already accept; `Desugarer/TLAPlus.lean`
+  flattens whatever shape was written down to `CoreTLAPlus.Declaration.function`'s plain per-binder
+  form. Same atomic-probe discipline as `parseOperator` above, same reason. -/
+  private def parseFunctionDefinition : TLAPlusParser (List CommentAnnotation × String ×
+      List (QuantifierBound (List CommentAnnotation) (Expression (List CommentAnnotation))) ×
+      Expression (List CommentAnnotation)) := debug "function def" do
+    let ⟨ann, var, binders⟩ ← withBacktracking do
+      let ann ← tryParseAnnotations
+      let var ← parseIdentifier
+      let binders ← lexeme <| brackets <| sepBy1 comma (parseQuantifierBound (pure ()) (parseExpression ·))
+      let _ ← lexeme <| token (.eqeq false)
+      pure (⟨ann, var, binders⟩ : _ × _ × _)
+    let expr ← parseExpression
+    return ⟨ann, var, binders.toList, expr⟩
+
   /-- One module-body declaration, chosen by the keyword that follows any leading comment run.
-    A comment or identifier (the default) is an operator definition — whose own probe up to `==`
-    is atomic, since a comment run can equally precede the PlusCal block or the module footer, in
+    A comment or identifier (the default) is an operator or function definition — telling them
+    apart needs peeking past the shared `<annotations> <identifier>` prefix both start with, to
+    the token right after it (`(` — or bare `==` — for an operator, `[` for a function): probed via
+    `lookAhead`, exactly like the keyword peek just above it, then re-parsed for real by whichever
+    of `parseOperator`/`parseFunctionDefinition` applies — each is independently atomic up to its
+    own `==`, since a comment run can equally precede the PlusCal block or the module footer, in
     which case it belongs to neither and must stay unconsumed. `----` ends the declaration run. -/
   private def parseDeclaration : TLAPlusParser (Option (Declaration (List CommentAnnotation))) := located do
     match ← lookAhead (lexeme (pure ()) *> peek) with
@@ -1121,7 +1142,10 @@ namespace SurfaceTLAPlus.Parser
     | ⟨_, .variable⟩ | ⟨_, .variables⟩ => (.some ∘ .variables) <$> (lexeme (pure ()) *> parseVariables)
     | ⟨_, .moduleStart _⟩ =>
       .none <$ (lexeme (pure ()) *> tokenFilter λ | ⟨_, .moduleStart _⟩ => true | _ => false)
-    | _ => (λ ⟨a, b, c, d⟩ ↦ .some <| .operator a b c d) <$> parseOperator
+    | _ =>
+      match ← lookAhead (tryParseAnnotations *> parseIdentifier *> (lexeme (pure ()) *> peek)) with
+      | ⟨_, .bracket true⟩ => (λ ⟨a, b, c, d⟩ ↦ .some <| .function a b c d) <$> parseFunctionDefinition
+      | _ => (λ ⟨a, b, c, d⟩ ↦ .some <| .operator a b c d) <$> parseOperator
 
   private def parsePlusCalAlgorithm : TLAPlusParser (SurfacePlusCal.Algorithm (List CommentAnnotation) (Expression (List CommentAnnotation))) := do
     let ⟨pos, .pcal tks⟩ ← withBacktracking <| tokenFilter λ | ⟨_, .pcal _⟩ => true | _ => false

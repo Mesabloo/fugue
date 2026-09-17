@@ -100,8 +100,8 @@ instance {α} [Std.ToFormat α] : Std.ToFormat (Declaration α) where
       Std.format ann ++ f!" {x}" ++ .paren (.joinSep (ps.map λ (p, n) ↦
         p ++ if n > 0 then Std.Format.paren (.joinSep (List.replicate n "_") ", ") else Std.Format.nil) ",") ++
       " == " ++ Std.format e
-    | .function ann x ps e =>
-      Std.format ann ++ f!" {x}" ++ .sbracket (.joinSep (ps.map λ (x, e) ↦ f!"{x} \\in " ++ Std.format e) ", ") ++ " == " ++ Std.format e
+    | .function ann x qs e =>
+      Std.format ann ++ f!" {x}" ++ .sbracket (.joinSep (qs.map λ q ↦ q.pretty Expression.pretty) ", ") ++ " == " ++ Std.format e
 
 instance {α β} [Std.ToFormat α] [Std.ToFormat β] : Std.ToFormat (Module α β) where
   format mod :=

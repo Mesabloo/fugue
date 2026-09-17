@@ -288,8 +288,16 @@ namespace SurfaceTLAPlus
     | .variables vs => pure <| .variables vs
     | .assume e => .assume <$> e.desugar
     | .operator ann x ps e => .operator ann x ps <$> e.desugar
-    | .function ann x ps e =>
-      .function ann x <$> traverse (bitraverse pure Expression.desugar) ps <*> e.desugar
+    | .function ann x qs e => do
+      let e ← e.desugar
+      -- `posOf e`, the body's own position, captured once — `Declaration` carries no position of
+      -- its own (`Elaborator/Declarations.lean`'s `[Function definition]` rule uses the same
+      -- substitute), same idiom `bforall`/`bexists`/`map'`/`fn` use their own expression's position.
+      let pos := posOf e
+      let (bindings, e) ← qs.foldrM (init := ([], e)) λ qb (bindings, e) ↦ do
+        let (bs, e) ← flattenBound pos (← bitraverse pure Expression.desugar qb) e
+        return (bs ++ bindings, e)
+      return .function ann x (bindings.map λ (x, _ann, dom) ↦ (x, dom)) e
 
   def Module.desugar (mod : Module (SurfacePlusCal.Algorithm α (Expression α)) α) :
       m (CoreTLAPlus.Module (SurfacePlusCal.Algorithm α (CoreTLAPlus.Expression α)) α) :=
