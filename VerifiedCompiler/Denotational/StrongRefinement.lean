@@ -974,6 +974,21 @@ namespace StrongRefinement
     rintro ⟨t₁, a₁, d₁, b₁⟩ ⟨t₂, a₂, d₂, b₂⟩
     exact ⟨Terminating.Comp t₁ t₂, Aborting.Comp a₁ a₂ t₁, Diverging.Comp d₁ d₂ t₁, Blocking.Comp b₁ b₂ t₁⟩
 
+  /-- Union of two full refinements that already share their abort sets `semₛ'`/`semₜ'` (as the two
+  branches of a `match`/`if` would): reduces, diverges and blocks via the union of each side's
+  respective sets, built from `Terminating.union`, `Aborting.union`, `Diverging.union` and
+  `Blocking.union`. -/
+  protected theorem union [T : Trace εₛ εₜ]
+    {semₛ semᵤ : Set (α × εₛ × α)} {semₛ' : Set (α × εₛ)} {semₛ'' semᵤ'' semₛb semᵤb : Set (α × εₛ)}
+    {semₜ semᵥ : Set (β × εₜ × β)} {semₜ' : Set (β × εₜ)} {semₜ'' semᵥ'' semₜb semᵥb : Set (β × εₜ)} :
+      StrongRefinement R T.Rτ semₛ semₛ' semₛ'' semₜ semₜ' semₜ'' semₛb semₜb →
+      StrongRefinement R T.Rτ semᵤ semₛ' semᵤ'' semᵥ semₜ' semᵥ'' semᵤb semᵥb →
+      StrongRefinement R T.Rτ (semₛ ∪ semᵤ) semₛ' (semₛ'' ∪ semᵤ'') (semₜ ∪ semᵥ) semₜ' (semₜ'' ∪ semᵥ'')
+        (semₛb ∪ semᵤb) (semₜb ∪ semᵥb) := by
+    rintro ⟨t₁, a₁, d₁, b₁⟩ ⟨t₂, a₂, d₂, b₂⟩
+    exact ⟨Terminating.union t₁ t₂, by simpa using Aborting.union a₁ a₂, Diverging.union d₁ d₂,
+      Blocking.union b₁ b₂⟩
+
   /-- A full refinement from just the terminating and aborting components, with the target
   diverging and blocking sets empty. -/
   protected theorem ofNonDiverging [T : Trace εₛ εₜ] {semₛ : Set (α × εₛ × α)} {semₛ' semₛ'' semₛ''' : Set (α × εₛ)} {semₜ : Set (β × εₜ × β)} {semₜ' : Set (β × εₜ)}

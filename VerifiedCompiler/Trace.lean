@@ -62,9 +62,11 @@ theorem Relation.MulClosed.rmul_le {α β : Type _} [Monoid α] [Monoid β] {R :
   rintro _ _ ⟨a₁, a₂, b₁, b₂, rfl, rfl, h₁, h₂⟩
   exact cl _ _ _ _ h₁ h₂
 
-/-- What `StrongRefinement.Comp`'s trace relation collapses to when both operands run at the same
-one: `Rτ₁ ⊔ Rτ₁ ⊗ᵣ Rτ₂` with `Rτ₁ = Rτ₂ = R`. Only `rmul_le` is needed — `R ≤ R ⊔ _` is free, so no
-unit law about `R 1 1` enters. -/
+/-- What `Diverging.Comp`/`Aborting.Comp` produce: `Rτ ⊔ Rτ ⊗ᵣ Rτ`, a single `Rτ` throughout — not
+two relations that happen to coincide, since both operands share one `[Trace εₛ εₜ]` instance
+argument. Contrast `*.Trans`, which composes across a language boundary and so genuinely has two
+different relations (`Rτ₁ ∘ᵣ Rτ₂`, via `Trace.scPrefix_rcomp`). Only `rmul_le` is needed here —
+`R ≤ R ⊔ _` is free, so no unit law about `R 1 1` enters. -/
 theorem Relation.MulClosed.sup_rmul_self {α β : Type _} [Monoid α] [Monoid β] {R : Rel α β}
     (cl : Relation.MulClosed R) : R ⊔ R ⊗ᵣ R = R :=
   sup_eq_left.mpr cl.rmul_le
@@ -78,10 +80,11 @@ theorem Relation.right_extend {α β : Type _} [Monoid α] [Monoid β] {R : Rel 
   obtain ⟨z', hz'⟩ := tot z
   exact ⟨z', cl _ _ _ _ h hz'⟩
 
-/-- The *default* relation between two trace alphabets: exact correspondence. A pass that needs no
-relaxation instantiates `StrongRefinement`'s relations at `Trace.Rτ`; a pass that reorders traces —
-`Guarded2Network` does, moving message reception across the pass — threads its own `Rτ` through
-those relations explicitly instead, and never touches this class.
+/-- The trace-relation obligation a pass's `Rτ` must satisfy: left-total, closed under
+concatenation, and `Rτ 1 1`. Nothing here forces `Rτ := Eq` — that is the choice `Trace.instList`/
+`Trace.instSeq` make below, registered `scoped` where a pass wants it, the way `Guarded2Network`
+does (`Guarded2Network/Lemmas/Trace.lean`): its traces happen to agree exactly, since reception is
+not an observable event, so it opts into the equality instance rather than needing a different one.
 
 `Rτ` occurs only positively in a refinement (inside the existential in `Terminating`'s conclusion),
 never as a hypothesis, so there is no degenerate instantiation to exclude and no reflexivity or
@@ -125,10 +128,16 @@ def Trace.comp {εₛ εₜ εᵤ} [Monoid εₛ] [Monoid εₜ] [Monoid εᵤ] 
 /-!
 # Relating traces across languages
 
-A pass need not preserve a trace exactly. `Guarded2Network` moves a reception from the consumption
-site to the `T_rx` step, so source and target traces agree only up to a reordering that keeps every
-send before its matching reception. Refinement is therefore stated against a *relation* between
-traces rather than equality, with the source trace existentially quantified.
+`Rτ` stays a relation between source and target traces, not a fixed equality, so a pass whose
+traces genuinely diverge has somewhere to put that relation without changing this framework.
+`Guarded2Network` does not need it: reception is not an observable event (`Behavior` is
+`print | send`, the `.rx` thread is silent), so its traces agree exactly and it registers
+`Rτ := Eq` (`Trace.instSeq`, `Guarded2Network/Lemmas/Trace.lean`). A relation relaxed to
+happens-before consistency would in fact be *unsound* for reception, not merely unneeded: a source
+block whose guard never holds can emit nothing while the target still consumes from a channel — the
+mismatch is in the *multiset* of events, not their order, so no reordering relation relates the two
+traces. Refinement is therefore stated against a *relation* between traces rather than equality,
+with the source trace existentially quantified.
 
 The relation is a parameter, not a fixed choice, and each composition lemma computes the relation
 its conclusion carries: `Relation.rmul` (`⊗ᵣ`) when two executions are sequenced, since the traces
