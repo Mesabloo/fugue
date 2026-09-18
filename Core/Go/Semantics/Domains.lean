@@ -1612,7 +1612,7 @@ noncomputable section Domain
       -- map
       ⊕ (Restriction 𝕍 unitInterval.half →ᵤ Option ℍ) × Bool
       -- func
-      ⊕ (String →ᵤ Option ℍ) × (List (Restriction 𝕍 unitInterval.half) × List Γ × (String → Option Γ) →ᵤ Domain «Σ» Γ (Send𝕍 ℍ Typ) PUnit.{x + 1})
+      ⊕ (List ℍ × List Γ →ᵤ Domain «Σ» Γ (Send𝕍 ℍ Typ) PUnit.{x + 1})
       -- tuples
       ⊕ List (Restriction 𝕍 unitInterval.half)
 
@@ -1685,8 +1685,8 @@ noncomputable section Domain
     def 𝕍.map (maps : (𝕍 «Σ» Γ ℍ Typ).type →ᵤ Option ℍ) (isNil : Bool) : (𝕍 «Σ» Γ ℍ Typ).type :=
       𝕍_iso.symm (.inr <| .inr <| .inr <| .inr <| .inr <| .inr <| .inr <| .inl ⟨maps ∘ Restriction.val, isNil⟩)
 
-    def 𝕍.func (closure : String →ᵤ Option ℍ) (call : List (𝕍 «Σ» Γ ℍ Typ).type × List Γ × (String → Option Γ) →ᵤ Domain «Σ» Γ (Send𝕍 ℍ Typ) PUnit) : (𝕍 «Σ» Γ ℍ Typ).type :=
-      𝕍_iso.symm (.inr <| .inr <| .inr <| .inr <| .inr <| .inr <| .inr <| .inr <| .inl ⟨closure, λ ⟨vs, ξ, ς⟩ ↦ call ⟨vs.map Restriction.val, ξ, ς⟩⟩)
+    def 𝕍.func (call : List ℍ × List Γ →ᵤ Domain «Σ» Γ (Send𝕍 ℍ Typ) PUnit) : (𝕍 «Σ» Γ ℍ Typ).type :=
+      𝕍_iso.symm (.inr <| .inr <| .inr <| .inr <| .inr <| .inr <| .inr <| .inr <| .inl (λ ⟨vs, ξ⟩ ↦ call ⟨vs, ξ⟩))
 
     def 𝕍.tuple (vs : List (𝕍 «Σ» Γ ℍ Typ).type) : (𝕍 «Σ» Γ ℍ Typ).type :=
       𝕍_iso.symm (.inr <| .inr <| .inr <| .inr <| .inr <| .inr <| .inr <| .inr <| .inr vs)
@@ -1705,7 +1705,7 @@ noncomputable section Domain
       (struct : ∀ fields, motive (𝕍.struct fields))
       (array : ∀ len indices, motive (𝕍.array len indices))
       (map : ∀ maps isNil, motive (𝕍.map maps isNil))
-      (func : ∀ closure call, motive (𝕍.func closure call))
+      (func : ∀ call, motive (𝕍.func call))
       (tuple : ∀ vs, motive (𝕍.tuple vs))
       (v : (𝕍 «Σ» Γ ℍ Typ).type) :
         motive v :=
@@ -1750,15 +1750,12 @@ noncomputable section Domain
           apply_fun 𝕍_iso.symm at h
           rwa [IsometryEquiv.symm_apply_apply] at h
         h' ▸ map (maps ∘ Restriction.mk) isNil
-      | .inr (.inr (.inr (.inr (.inr (.inr (.inr (.inr (.inl ⟨closure, call⟩)))))))) =>
-        have h' : v = 𝕍.func closure (λ ⟨vs, ξ, ς⟩ ↦ call ⟨vs.map Restriction.mk, ξ, ς⟩) := by
+      | .inr (.inr (.inr (.inr (.inr (.inr (.inr (.inr (.inl call)))))))) =>
+        have h' : v = 𝕍.func (λ ⟨vs, ξ⟩ ↦ call ⟨vs, ξ⟩) := by
           apply_fun 𝕍_iso.symm at h
           rw [IsometryEquiv.symm_apply_apply] at h
           rw [h, 𝕍.func]
-          dsimp
-          congr 11 with ⟨vs, ξ, ς⟩ : 1
-          rw [List.map_map, Restriction.mk_comp_val_eq_id, List.map_id]
-        h' ▸ func closure (λ ⟨vs, ξ, ς⟩ ↦ call ⟨vs.map Restriction.mk, ξ, ς⟩)
+        h' ▸ func (λ ⟨vs, ξ⟩ ↦ call ⟨vs, ξ⟩)
       | .inr (.inr (.inr (.inr (.inr (.inr (.inr (.inr (.inr vs)))))))) =>
         have h' : v = 𝕍.tuple (List.map Restriction.val vs) := by
           apply_fun 𝕍_iso.symm at h
