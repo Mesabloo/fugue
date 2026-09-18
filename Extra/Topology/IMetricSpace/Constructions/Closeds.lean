@@ -1,11 +1,15 @@
-import Extra.Topology.IMetricSpace
-import Mathlib.Topology.Sets.Closeds
-import Mathlib.Topology.UniformSpace.Closeds
-import Mathlib.Analysis.SpecificLimits.Basic
-import Mathlib.Order.Filter.AtTopBot.Basic
+module
+public import Extra.Topology.IMetricSpace
+public import Mathlib.Topology.Sets.Closeds
+public import Mathlib.Topology.UniformSpace.Closeds
+public import Mathlib.Analysis.SpecificLimits.Basic
+public import Mathlib.Order.Filter.AtTopBot.Basic
+public import Mathlib.Order.CompleteLattice.Defs
 -- import Mathlib.Topology.MetricSpace.Closeds
 -- import Extra.Topology.ClosedEmbedding.Tactic
-import Extra.Topology.ClosedEmbedding
+public import Extra.Topology.ClosedEmbedding
+
+@[expose] public section
 
 open TopologicalSpace (Closeds)
 
@@ -32,10 +36,13 @@ namespace IMetric
     unfold hausdorffIDist
     erw [max_comm]
 
-  -- Helper: biInf_lt_iff for infIDist
+  -- Mathlib has no bounded-infimum comparison lemma at this shape; built from `iInf_subtype`/`iInf_lt_iff`.
   lemma lt_hausdorffInfIDist_iff {α : Type*} [PseudoIMetricSpace α] (x : α) (s : Set α) (r : unitInterval) :
       IMetric.hausdorffInfIDist x s < r ↔ ∃ y ∈ s, idist x y < r := by
-    exact biInf_lt_iff
+    unfold IMetric.hausdorffInfIDist
+    rw [show (⨅ y ∈ s, idist x y) = ⨅ y : s, idist x y.1 from
+      (iInf_subtype (f := fun y : s => idist x y.1)).symm, iInf_lt_iff]
+    simp only [Subtype.exists, exists_prop]
 
   -- Empty set gives infIDist = 1 (as real)
   lemma hausdorffInfIDist_empty {α : Type*} [PseudoIMetricSpace α] (x : α) :
@@ -935,3 +942,5 @@ theorem Closeds.map_comp {α β γ} [IMetricSpace α] [IMetricSpace β] [IMetric
 
 -- macro_rules | `(tactic| is_closed_embedding_step) => `(tactic| apply Topology.IsClosedEmbedding.Closeds.map)
 -- macro_rules | `(tactic| is_closed_embedding_step) => `(tactic| apply Topology.IsClosedEmbedding.Closeds.closed_map)
+
+end

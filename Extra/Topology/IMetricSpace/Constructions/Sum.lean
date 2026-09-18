@@ -1,5 +1,8 @@
-import Extra.Topology.IMetricSpace
-import Mathlib.Topology.MetricSpace.Gluing
+module
+public import Extra.Topology.IMetricSpace
+public import Mathlib.Topology.MetricSpace.Gluing
+
+public section
 
 instance {α β} [IDist α] [IDist β] : IDist (α ⊕ β) where
   idist
@@ -24,11 +27,11 @@ theorem Sum.mem_uniformity {X Y} [PseudoIMetricSpace X] [PseudoIMetricSpace Y] (
 
 instance Sum.instPseudoIMetricSpace {α β} [PseudoIMetricSpace α] [PseudoIMetricSpace β] : PseudoIMetricSpace (α ⊕ β) where
   idist_self x := by
-    cases x <;> dsimp <;> erw [idist_self] <;> rfl
+    cases x <;> apply idist_self
   idist_comm x y := by
     cases x <;> cases y <;> first
       | rfl
-      | erw [idist_comm]; rfl
+      | (erw [idist_comm]; try rfl)
   idist_triangle x y z := by
     cases x <;> cases y <;> cases z
     · apply idist_triangle
@@ -52,7 +55,7 @@ instance Sum.instPseudoIMetricSpace {α β} [PseudoIMetricSpace α] [PseudoIMetr
 
 instance Sum.instIMetricSpace {α β} [IMetricSpace α] [IMetricSpace β] : IMetricSpace (α ⊕ β) where
   eq_of_idist_eq_zero x y h := by
-    cases x <;> cases y <;> dsimp at h
+    cases x <;> cases y
     · apply eq_of_idist_eq_zero at h
       rw [h]
     · change 1 = 0 at h
@@ -89,10 +92,10 @@ theorem Isometry.sumMap' {W X Y Z} {f : W → X} {g : Y → Z} [PseudoIMetricSpa
     ∀ x y, idist (Sum.map f g x) (Sum.map f g y) = idist x y := by
   intros x y
   rcases x, y with ⟨x|x, y|y⟩
-  · erw [hf]; rfl
+  · erw [hf]; try rfl
   · rfl
   · rfl
-  · erw [hg]; rfl
+  · erw [hg]; try rfl
 
 theorem Isometry.sumMap {W X Y Z} {f : W → X} {g : Y → Z} [PseudoIMetricSpace W] [PseudoIMetricSpace X] [PseudoIMetricSpace Y] [PseudoIMetricSpace Z]
   (hf : Isometry f) (hg : Isometry g) :
@@ -194,3 +197,5 @@ instance Sigma.completeSpace {ι} {E : ι → _} [DecidableEq ι] [∀ i, IMetri
   refine completeSpace_of_isComplete_univ ?_
   convert isComplete_iUnion_separated hc (IMetric.idist_mem_uniformity zero_lt_one) hd
   simp only [s, ← Set.preimage_iUnion, Set.iUnion_of_singleton, Set.preimage_univ]
+
+end

@@ -1,8 +1,11 @@
-import Extra.Topology.IMetricSpace
-import Extra.Topology.IMetricSpace.Constructions.Function
-import Mathlib.Topology.EMetricSpace.Lipschitz
+module
+public import Extra.Topology.IMetricSpace
+public import Extra.Topology.IMetricSpace.Constructions.Function
+public import Mathlib.Topology.EMetricSpace.Lipschitz
 
 open scoped UniformConvergence
+
+@[expose] public section
 
 structure LipschitzMap (α β : Type _) [PseudoIMetricSpace α] [PseudoIMetricSpace β] (K : NNReal) where
   toFun : α →ᵤ β
@@ -20,7 +23,7 @@ instance {α β K} [PseudoIMetricSpace α] [PseudoIMetricSpace β] : CoeHead (α
 
 instance {α β K} [PseudoIMetricSpace α] [PseudoIMetricSpace β] : FunLike (α →ₗ[K] β) α β where
   coe := LipschitzMap.toFun
-  coe_injective' := LipschitzMap.toFun_injective
+  coe_injective := LipschitzMap.toFun_injective
 
 noncomputable instance {α β K} [PseudoIMetricSpace α] [PseudoIMetricSpace β] : PseudoIMetricSpace (α →ₗ[K] β) :=
   .induced LipschitzMap.toFun inferInstance
@@ -115,3 +118,12 @@ theorem LipschitzMap.lipschitz_apply {β γ δ} [IMetricSpace β] [IMetricSpace 
   apply LipschitzWith.of_idist_le λ g g' ↦ ?_
   erw [one_mul, Subtype.coe_le_coe, UniformFun.idist_eq_iSup]
   apply le_iSup (f := λ x ↦ idist (g x) (g' x))
+
+def LipschitzMap.comp' {α β γ} [PseudoIMetricSpace α] [PseudoIMetricSpace β] [PseudoIMetricSpace γ] {K₁ K₂} :
+    (β →ₗ[K₂] γ) →ᵤ (α →ₗ[K₁] β) →ₗ[K₂] (α →ₗ[K₂ * K₁] γ) := λ f ↦
+  {
+    toFun g := f.comp g
+    lipschitz := LipschitzMap.lipschitz_comp_right
+  }
+
+end

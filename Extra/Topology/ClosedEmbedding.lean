@@ -1,6 +1,11 @@
+module
+public import Mathlib.Topology.Defs.Basic
 import Mathlib.Topology.Defs.Induced
 import Mathlib.Topology.Maps.Basic
-import Extra.Topology.ClosedEmbedding.Tactic
+import Mathlib.CategoryTheory.Category.Basic
+public import Extra.Topology.ClosedEmbedding.Tactic
+
+public section
 
 structure ClosedEmbedding (α β) [TopologicalSpace α] [TopologicalSpace β] where
   toFun : α → β
@@ -11,7 +16,7 @@ macro_rules | `(tactic| is_closed_embedding_step) => `(tactic| exact ClosedEmbed
 
 instance {α β} [TopologicalSpace α] [TopologicalSpace β] : FunLike (α ↪c β) α β where
   coe := ClosedEmbedding.toFun
-  coe_injective' := by rintro ⟨⟩ ⟨⟩ ⟨⟩; rfl
+  coe_injective := by rintro ⟨⟩ ⟨⟩ ⟨⟩; rfl
 
 theorem ClosedEmbedding.injective_toFun {α β} [TopologicalSpace α] [TopologicalSpace β] :
     Function.Injective (ClosedEmbedding.toFun (α := α) (β := β)) := by
@@ -31,3 +36,5 @@ def ClosedEmbedding.comp {α β γ} [TopologicalSpace α] [TopologicalSpace β] 
     ClosedEmbedding α γ where
   toFun := g.toFun ∘ f.toFun
   isClosedEmbedding := g.isClosedEmbedding.comp f.isClosedEmbedding
+
+end

@@ -1,22 +1,14 @@
-import Mathlib.Topology.Constructions.SumProd
-import Mathlib.Topology.Constructions
-import Extra.Topology.ClosedEmbedding
-import Extra.Topology.UniformContinuousMap
-import Extra.Topology.IMetricSpace.Constructions.Sum
+module
+public import Mathlib.Topology.Constructions.SumProd
+public import Mathlib.Topology.Constructions
+public import Extra.Topology.ClosedEmbedding
+public import Extra.Topology.UniformContinuousMap
+public import Extra.Topology.IMetricSpace.Constructions.Sum
+
+public section
 
 namespace Topology
   variable {W X Y Z} [TopologicalSpace W] [TopologicalSpace X] [TopologicalSpace Y] [TopologicalSpace Z]
-
-  theorem IsClosedEmbedding.prodMap {f : W → X} {g : Y → Z} (hf : IsClosedEmbedding f) (hg : IsClosedEmbedding g) :
-      IsClosedEmbedding (Prod.map f g) where
-    eq_induced := (hf.toIsEmbedding.prodMap hg.toIsEmbedding).eq_induced
-    injective := by
-      apply Function.Injective.prodMap
-      · exact hf.injective
-      · exact hg.injective
-    isClosed_range := by
-      rw [Set.range_prodMap]
-      exact hf.isClosed_range.prod hg.isClosed_range
 
   theorem IsClosedEmbedding.sumMap {f : W → X} {g : Y → Z} (hf : IsClosedEmbedding f) (hg : IsClosedEmbedding g) :
       IsClosedEmbedding (Sum.map f g) := by
@@ -84,4 +76,5 @@ theorem LipschitzWith.prodSwap {α β} [PseudoEMetricSpace α] [PseudoEMetricSpa
   change edist x2 y2 ⊔ edist x1 y1 ≤ 1 * (edist x1 y1 ⊔ edist x2 y2)
   conv_lhs => apply max_comm
   rw [one_mul]
-  apply le_refl
+
+end

@@ -1,4 +1,10 @@
-import Extra.Topology.IMetricSpace
+module
+public import Extra.Topology.IMetricSpace
+public import Mathlib.Data.Set.Defs
+public import Mathlib.Topology.Defs.Basic
+public import Mathlib.Data.Real.Basic
+
+public section
 
 namespace Bool
   open unitInterval
@@ -29,9 +35,7 @@ namespace Bool
       intros y hy
       by_contra hyx
       have heq : Bool.idist x y = ⊤ := by
-        simp [Bool.idist]
-        intro h
-        exact absurd h (by grind)
+        simp only [Bool.idist, if_neg (show x ≠ y by grind)]
       rw [heq, unitInterval.top_eq] at hy
       absurd hy
       apply lt_irrefl
@@ -49,3 +53,5 @@ namespace Bool
     .ofIDistTopology Bool.idist Bool.idist_self Bool.idist_comm Bool.idist_triangle
       Bool.isOpen_iff Bool.eq_of_idist_eq_zero
 end Bool
+
+end

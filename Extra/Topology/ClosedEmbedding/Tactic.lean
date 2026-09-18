@@ -1,5 +1,9 @@
+module
 import CustomPrelude
-import Mathlib.Topology.Maps.Basic
+public import Mathlib.Topology.Maps.Basic
+public import Lean.Elab.Tactic.Basic
+
+public section
 
 -- register_label_attr is_closed_embedding
 
@@ -24,3 +28,5 @@ elab_rules : tactic
 
 
   -- `(tactic| apply_rules (config := {symm := false, exfalso := false}) using is_closed_embedding)
+
+end

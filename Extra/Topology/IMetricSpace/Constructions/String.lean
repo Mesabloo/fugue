@@ -1,4 +1,7 @@
-import Extra.Topology.IMetricSpace
+module
+public import Extra.Topology.IMetricSpace
+
+public section
 
 open scoped unitInterval
 
@@ -32,3 +35,5 @@ lemma String.discreteTopology : DiscreteTopology String :=
 constant, hence converges. -/
 instance : CompleteSpace String :=
   DiscreteIMetricSpace.completeSpace
+
+end

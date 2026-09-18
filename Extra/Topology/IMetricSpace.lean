@@ -1,7 +1,25 @@
-import CustomPrelude
-import Mathlib.Topology.UnitInterval
-import Mathlib.Topology.MetricSpace.Isometry
-import Mathlib.Order.Hom.CompleteLattice
+module
+public import CustomPrelude
+public import Mathlib.Tactic.Bound
+public import Mathlib.Topology.UnitInterval
+public import Mathlib.Topology.MetricSpace.Isometry
+public import Mathlib.Order.Hom.CompleteLattice
+public import Mathlib.Order.Notation
+public import Mathlib.Order.SetNotation
+public import Mathlib.Topology.Algebra.Monoid.Defs
+public import Mathlib.Topology.MetricSpace.Pseudo.Defs
+public import Mathlib.Topology.MetricSpace.Defs
+public import Mathlib.Topology.EMetricSpace.Defs
+public import Mathlib.Topology.UniformSpace.Defs
+public import Mathlib.Data.Real.Basic
+public import Mathlib.Data.Set.Defs
+
+-- `Set.Icc.mk_zero`/`Set.Icc.mk_one` are `@[simp]` in the pinned Mathlib and rewrite
+-- `⟨0, h⟩ = 0`/`⟨1, h⟩ = 1` — the exact reverse of this file's own `zero_eq`/`top_eq`
+-- (also `@[simp]`), so leaving both enabled loops `simp` between the two normal forms.
+attribute [-simp] Set.Icc.mk_zero Set.Icc.mk_one
+
+@[expose] public section
 
 namespace unitInterval
   @[simp] theorem top_eq : (⊤ : I) = 1 := rfl
@@ -68,7 +86,7 @@ namespace unitInterval
       (iSup f).val ≤ a := by
     cases isEmpty_or_nonempty ι with
     | inl _ =>
-      simpa only [iSup_of_empty] using ha
+      simpa only [iSup_of_empty, bot_eq, coe_zero_eq] using ha
     | inr _ =>
       rw [iSup, Set.Icc.coe_sSup (by norm_num) (Set.range_nonempty f), ← Set.range_comp]
       exact ciSup_le h
@@ -216,7 +234,7 @@ def IMetricSpace.of_metric_space_of_dist_le_one {α} [inst : MetricSpace α]
     exact eq_of_dist_eq_zero eq
 
 theorem edist_nonneg {α} [PseudoEMetricSpace α] {x y : α} : 0 ≤ edist x y := by
-  exact zero_le (edist x y)
+  exact zero_le
 
 @[instance_reducible]
 def PseudoIMetricSpace.of_emetric_space_of_dist_le_one {α} [inst : PseudoEMetricSpace α]
@@ -698,6 +716,7 @@ class IsUltrametricIDist (α : Type _) [IDist α] where
   idist_triangle_max : ∀ x y z : α, idist x z ≤ idist x y ⊔ idist y z
 export IsUltrametricIDist (idist_triangle_max)
 
+set_option linter.fugue.seqSolveBracket false in
 instance (priority := low) {α} [DecidableEq α] [DiscreteIMetricSpace α] : IsUltrametricIDist α where
   idist_triangle_max x y z := by
     repeat rw [idist_discrete]
@@ -706,3 +725,5 @@ instance (priority := low) {α} [DecidableEq α] [DiscreteIMetricSpace α] : IsU
       | subst_vars
         contradiction
       | simp
+
+end

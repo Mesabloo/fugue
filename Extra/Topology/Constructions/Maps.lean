@@ -1,10 +1,13 @@
-import Mathlib.Topology.Maps.Basic
-import Mathlib.Topology.Separation.Basic
-import Extra.Topology.ClosedEmbedding
-import Extra.Topology.IMetricSpace
-import Extra.Topology.IMetricSpace.Constructions.Function
+module
+public import Mathlib.Topology.Maps.Basic
+public import Mathlib.Topology.Separation.Basic
+public import Extra.Topology.ClosedEmbedding
+public import Extra.Topology.IMetricSpace
+public import Extra.Topology.IMetricSpace.Constructions.Function
 
 attribute [-instance] UniformFun.instPseudoEMetricSpace UniformFun.instEMetricSpace
+
+public section
 
 lemma Set.range_const' {α β} [Nonempty α] {v : β} : Set.range (Function.const α v) = {v} := by
   unfold Set.range
@@ -28,10 +31,13 @@ open scoped UniformConvergence
 @[ext]
 theorem UniformFun.ext {α β} {f g : α →ᵤ β} (h : ∀ x, f x = g x) : f = g := funext h
 
+@[expose]
 def UniformFun.map {α β γ} (g : β → γ) (f : α →ᵤ β) : α →ᵤ γ := g ∘ f
 
-def UniformFun.map_apply {α β γ} {g : β → γ} {f : α →ᵤ β} {x : α} :
-    UniformFun.map g f x = g (f x) := rfl
+theorem UniformFun.map_apply {α β γ} {g : β → γ} {f : α →ᵤ β} {x : α} :
+    UniformFun.map g f x = g (f x) := by
+  unfold UniformFun.map
+  rfl
 
 protected theorem UniformFun.map_isometry' {α β γ} [PseudoIMetricSpace β] [PseudoIMetricSpace γ]
   {g : β → γ} (hg : ∀ x y, idist (g x) (g y) = idist x y) :
@@ -84,3 +90,5 @@ theorem Pi.uniformContinuous_map_const {ι α β} {f : α →ᵤ β} [UniformSpa
   apply UniformContinuous.comp
   · exact hf
   · apply uniformContinuous_proj
+
+end

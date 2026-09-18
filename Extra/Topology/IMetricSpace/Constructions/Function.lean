@@ -1,19 +1,22 @@
-import Extra.Topology.IMetricSpace
-import Mathlib.Topology.MetricSpace.UniformConvergence
-import Mathlib.Topology.UniformSpace.UniformConvergenceTopology
+module
+public import Extra.Topology.IMetricSpace
+public import Mathlib.Topology.MetricSpace.UniformConvergence
+public import Mathlib.Topology.UniformSpace.UniformConvergenceTopology
+
+public section
 
 open scoped Uniformity Filter UniformConvergence
 
 universe u v
 
-private lemma uniformFun_edist_le_one {α : Type u} {β : Type v} [PseudoIMetricSpace β]
+lemma uniformFun_edist_le_one {α : Type u} {β : Type v} [PseudoIMetricSpace β]
     (f g : α →ᵤ β) : edist f g ≤ 1 := by
   rw [UniformFun.edist_def]
   apply iSup_le λ x ↦ ?_
   rw [edist_dist]
   exact ENNReal.ofReal_le_one.mpr unitInterval.le_one'
 
-private lemma uniformFun_edist_ne_top {α : Type u} {β : Type v} [PseudoIMetricSpace β]
+lemma uniformFun_edist_ne_top {α : Type u} {β : Type v} [PseudoIMetricSpace β]
     (f g : α →ᵤ β) : edist f g ≠ ⊤ :=
   ne_of_lt ((uniformFun_edist_le_one f g).trans_lt ENNReal.one_lt_top)
 
@@ -98,3 +101,12 @@ theorem UniformFun.continuous_iff {α β} [PseudoIMetricSpace α] [PseudoIMetric
   rfl
 
 @[inherit_doc] infixr:90 " ∘ᵤ "  => UniformFun.comp
+
+def UniformFun.apply {α β} (f : α →ᵤ β) (x : α) : β := f x
+
+@[simp]
+theorem UniformFun.apply_apply {α β} {f : α →ᵤ β} {x} :
+    f.apply x = f x := by
+  rfl
+
+end

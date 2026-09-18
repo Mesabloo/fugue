@@ -1,4 +1,9 @@
-import Extra.Topology.IMetricSpace
+module
+public import Extra.Topology.IMetricSpace
+public import Mathlib.Topology.Order
+public import Mathlib.Topology.UniformSpace.Cauchy
+
+public section
 
 open scoped unitInterval
 
@@ -37,3 +42,5 @@ lemma List.discreteTopology {α} [DecidableEq α] : DiscreteTopology (List α) :
 constant, hence converges. -/
 instance instCompleteSpaceList {α} [DecidableEq α] : CompleteSpace (List α) :=
   DiscreteIMetricSpace.completeSpace
+
+end

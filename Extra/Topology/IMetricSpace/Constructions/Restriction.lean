@@ -1,6 +1,9 @@
-import Extra.Topology.IMetricSpace
+module
+public import Extra.Topology.IMetricSpace
 import CustomPrelude
-import Extra.Topology.ClosedEmbedding
+public import Extra.Topology.ClosedEmbedding
+
+public section
 
 @[unbox]
 structure Restriction (α : Type _) (ε : unitInterval) (h : ε > 0 := by bound) where
@@ -181,3 +184,5 @@ theorem Restriction.uniformContinuous_map {α β ε h} [UniformSpace α] [Unifor
   (hf : UniformContinuous f) :
     UniformContinuous (@Restriction.map _ _ ε h f) :=
   uniformContinuous_comap' (hf.comp Restriction.val_uniformContinuous)
+
+end

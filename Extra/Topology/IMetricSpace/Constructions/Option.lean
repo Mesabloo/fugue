@@ -1,4 +1,7 @@
-import Extra.Topology.IMetricSpace
+module
+public import Extra.Topology.IMetricSpace
+
+public section
 
 instance {α} [IMetricSpace α] : IMetricSpace (Option α) where
   idist
@@ -14,3 +17,5 @@ instance {α} [IMetricSpace α] : IMetricSpace (Option α) where
         unitInterval.top_eq, idist_triangle]
   eq_of_idist_eq_zero {x y} h := by
     split at h <;> grind only [eq_of_idist_eq_zero, unitInterval.coe_ne_one, unitInterval.coe_ne_zero, unitInterval.top_eq]
+
+end

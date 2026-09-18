@@ -33,6 +33,8 @@ namespace Nat
 
   theorem le_of_lt_non_null {m n : Nat} : m ≠ 0 → m - 1 < n → m ≤ n := by omega
 
+  theorem le_pred_of_succ_le {m n : Nat} (h : m + 1 ≤ n) : m ≤ n - 1 := by grind only
+
   theorem le_max_iff {m n o : Nat} : m ≤ max n o ↔ m ≤ n ∨ m ≤ o := by omega
 
   def induction_from_one {P : Nat → Prop} (one : P 1) (more : (n : Nat) → n > 0 → P n → P (n + 1)) {n : Nat} (n_not_zero : n > 0) : P n := match (generalizing := true) n with

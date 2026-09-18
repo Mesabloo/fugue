@@ -1,4 +1,7 @@
-import Extra.Topology.IMetricSpace
+module
+public import Extra.Topology.IMetricSpace
+
+public section
 
 instance Prod.instPseudoIMetricSpace {α β} [PseudoIMetricSpace α] [PseudoIMetricSpace β] : PseudoIMetricSpace (α × β) :=
   .of_metric_space_of_dist_le_one (inst := Prod.pseudoMetricSpaceMax) λ x y ↦ by
@@ -37,3 +40,5 @@ theorem Isometry.prodMap' {α β γ δ} [PseudoIMetricSpace α] [PseudoIMetricSp
     assumption
   · apply Isometry.of_idist_eq
     assumption
+
+end
