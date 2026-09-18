@@ -1,0 +1,39 @@
+import Extra.Topology.IMetricSpace
+
+instance Prod.instPseudoIMetricSpace {α β} [PseudoIMetricSpace α] [PseudoIMetricSpace β] : PseudoIMetricSpace (α × β) :=
+  .of_metric_space_of_dist_le_one (inst := Prod.pseudoMetricSpaceMax) λ x y ↦ by
+    change max (idist x.1 y.1) (idist x.2 y.2) ≤ 1
+    apply max_le
+    · exact unitInterval.le_one'
+    · exact unitInterval.le_one'
+
+instance {α β} [PseudoIMetricSpace α] [PseudoIMetricSpace β] [IsUltrametricIDist α] [IsUltrametricIDist β] : IsUltrametricIDist (α × β) where
+  idist_triangle_max x y z := by
+    let ⟨x₁, x₂⟩ := x; let ⟨y₁, y₂⟩ := y; let ⟨z₁, z₂⟩ := z
+    ac_change idist x₁ z₁ ⊔ idist x₂ z₂ ≤ (idist x₁ y₁ ⊔ idist y₁ z₁) ⊔ (idist x₂ y₂ ⊔ idist y₂ z₂)
+    · change (_ ⊔ _) ⊔ (_ ⊔ _) = _
+      ac_rfl
+    · apply max_le_max
+      · apply idist_triangle_max
+      · apply idist_triangle_max
+
+theorem Prod.idist_eq {α β} [PseudoIMetricSpace α] [PseudoIMetricSpace β] {x y : α × β} :
+    idist x y = idist x.1 y.1 ⊔ idist x.2 y.2 := by
+  rfl
+
+instance Prod.instIMetricSpace {α β} [IMetricSpace α] [IMetricSpace β] : IMetricSpace (α × β) :=
+  .of_metric_space_of_dist_le_one (inst := Prod.metricSpaceMax) λ x y ↦ by
+    change max (idist x.1 y.1) (idist x.2 y.2) ≤ 1
+    apply max_le
+    · exact unitInterval.le_one'
+    · exact unitInterval.le_one'
+
+theorem Isometry.prodMap' {α β γ δ} [PseudoIMetricSpace α] [PseudoIMetricSpace β] [PseudoIMetricSpace γ] [PseudoIMetricSpace δ]
+  {f : α → β} {g : γ → δ} (hf : ∀ x y, idist (f x) (f y) = idist x y) (hg : ∀ x y, idist (g x) (g y) = idist x y) :
+    ∀ x y, idist (Prod.map f g x) (Prod.map f g y) = idist x y := by
+  apply Isometry.to_idist_eq
+  apply Isometry.prodMap
+  · apply Isometry.of_idist_eq
+    assumption
+  · apply Isometry.of_idist_eq
+    assumption
