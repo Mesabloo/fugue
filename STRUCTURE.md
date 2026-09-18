@@ -66,7 +66,30 @@ Generic data-structure lemmas and instances.
 - `Rel.lean` — relation composition, iteration and the `OmegaProd` class.
 - `Seq.lean` — `Stream'.Seq` as the trace monoid, plus infinite products.
 - `Do.lean` — `Std.Do` spec lemmas the toolchain does not ship.
+- `Sigma.lean` — `Sigma.map_id_id`/`Sigma.map_map`.
 - `Mathlib/Tactic/DeriveTraversable.lean` — vendored `Traversable` derivation.
+
+## `Extra/Topology/`
+Ultrametric-space (`IMetricSpace`) infrastructure.
+- `IMetricSpace.lean` — `IDist`/`PseudoIMetricSpace`/`IMetricSpace` classes over `unitInterval`.
+- `IMetricSpace/Constructions.lean` — aggregator importing every instance below.
+- `IMetricSpace/Constructions/Bool.lean` — `IMetricSpace Bool`.
+- `IMetricSpace/Constructions/Int.lean` — `IMetricSpace Int`.
+- `IMetricSpace/Constructions/Option.lean` — `IMetricSpace` on `Option`.
+- `IMetricSpace/Constructions/Product.lean` — `IMetricSpace` on products.
+- `IMetricSpace/Constructions/String.lean` — `IMetricSpace String`.
+- `IMetricSpace/Constructions/Sum.lean` — `IMetricSpace` on sums, via metric gluing.
+- `IMetricSpace/Constructions/List.lean` — `IMetricSpace`/`CompleteSpace` on `List`.
+- `IMetricSpace/Constructions/Function.lean` — `IMetricSpace` on `α →ᵤ β` (uniform convergence).
+- `IMetricSpace/Constructions/Closeds.lean` — `IMetricSpace`/`CompleteSpace` on `Closeds α`.
+- `IMetricSpace/Constructions/Restriction.lean` — `Restriction`, the shrunk-distance subtype.
+- `ClosedEmbedding.lean` — the `ClosedEmbedding`/`α ↪c β` bundled-map structure.
+- `ClosedEmbedding/Tactic.lean` — `is_closed_embedding`, discharging its default proof field.
+- `Constructions/Maps.lean` — `UniformFun.map` and closed-embedding/`IMetricSpace` map lemmas.
+- `Constructions/SumProd.lean` — closed embeddings and uniform continuity across sums/products.
+- `IsometricEmbedding.lean` — `IsometricEmbedding`/`α ↪c₁ β`, extending `ClosedEmbedding`.
+- `LipschitzMap.lean` — the `LipschitzMap`/`α →ₗ[K] β` bundled structure.
+- `UniformContinuousMap.lean` — the `UniformContinuousMap`/`UC(α, β)` bundled structure.
 
 ## `ProgressBar/`
 - `Spinner.lean`, `SpinnerData.lean`, `Spinners.lean` — CLI spinner rendering and frame data.
@@ -152,6 +175,10 @@ Generic data-structure lemmas and instances.
 ## `Core/Go/`
 - `Syntax.lean` — the Go AST this compiler targets.
 - `Pretty.lean` — the code generator: what the shipped `.go` file is printed by.
+- `Semantics/Domains.lean` — the domain core (`Object`/`Branch`/`IterativeDomain`/`DomainUnion`/
+  `Domain`, the `Domain ≅ F(Domain)` iso `φ`) and `Value`/`𝕍` (axiomatized, unconstructed).
+- `Semantics/Operations.lean` — `Domain`'s `.map`/`.ap`/`.bind`/`.seq'`/`.syncClose`/`.choice`/
+  `.hide`/`.parallel` combinators and their proofs.
 
 ## `Typed2Computable/`
 - `Typed2Computable.lean` — entry point.

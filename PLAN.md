@@ -2081,15 +2081,20 @@ fact, lighter than the behavioral correctness deferred here — the first slice 
 `Computable2Guarded`'s eventual correctness work, landing early because Guarded→Network's
 proof needs it as a precondition.
 
-### 6.4 Go's denotational semantics — not started here
+### 6.4 Go's denotational semantics — porting in progress (`.claude/plans/go-semantics-port.md`)
 The `go-semantics` branch's domain-theoretic account of Go (thesis ch. 6: solving `P ≅
 F(P)` over a complete ultrametric space, via ~20 files from-scratch topology — `IMetricSpace`,
-Lipschitz maps, uniform continuity, closed embeddings, Banach fixpoints) is real,
-substantial, unfinished. Not near-term scope: verification is scoped to Guarded→Network only
+Lipschitz maps, uniform continuity, closed embeddings, Banach fixpoints) is real, substantial.
+`Extra/Topology/*`, `Core/Go/Semantics/Domains.lean`, `Core/Go/Semantics/Operations.lean` ported
+and `lake build` clean as of 2026-09-18 (branch `claude/go-semantics-port-phase-1`) — `Value`/`𝕍`
+carries forward as 8 axioms, unconstructed, per the source's own admission, not a gap introduced
+here. Both files still orphans, nothing imports them yet (deliberate — see the plan's phase
+order). Remaining: wire `Value.𝕍`'s `Typ` param to native `Go.Typ`, then `Defs.lean` (fresh
+`Expression.denotation`, `Statement.denotation` re-derived over the native `Go.Statement`
+constructors). None of this changes near-term verification scope: still Guarded→Network only
 (§2), and `Network2Go` (§5.7), once anyone proves it, is expected to reach correctness by
-relating its lock-protected execution model back to `NetworkPlusCal`'s semantics directly,
-not through a standalone Go domain model. Revisit once `Network2Go` exists and there's
-appetite to prove it.
+relating its lock-protected execution model back to `NetworkPlusCal`'s semantics directly, not
+through this Go domain model. Revisit proving it once `Network2Go`'s own correctness work starts.
 
 ### 6.5 Verification method during development
 
