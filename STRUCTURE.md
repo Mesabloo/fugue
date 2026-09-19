@@ -179,6 +179,10 @@ Ultrametric-space (`IMetricSpace`) infrastructure.
   `Domain`, the `Domain ≅ F(Domain)` iso `φ`) and `Value`/`𝕍` (axiomatized, unconstructed).
 - `Semantics/Operations.lean` — `Domain`'s `.map`/`.ap`/`.bind`/`.seq'`/`.syncClose`/`.choice`/
   `.hide`/`.parallel` combinators and their proofs.
+- `Semantics/Defs.lean` — Go-specific semantics: `Value.𝕍`'s `Typ` param wired to `Go.Typ`;
+  `Address`/`Channel`/`Store` (axiom pile); `Expression.denotation` (stub, unwritten upstream
+  too); `Statement.denotation` over native `Go.Statement` (`panic return print if for go send`
+  real, rest `sorry`, `for_seq`/`for_seq_F` Banach-fixpoint machinery for `for`).
 
 ## `Typed2Computable/`
 - `Typed2Computable.lean` — entry point.

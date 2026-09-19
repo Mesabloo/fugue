@@ -2085,13 +2085,18 @@ proof needs it as a precondition.
 The `go-semantics` branch's domain-theoretic account of Go (thesis ch. 6: solving `P ≅
 F(P)` over a complete ultrametric space, via ~20 files from-scratch topology — `IMetricSpace`,
 Lipschitz maps, uniform continuity, closed embeddings, Banach fixpoints) is real, substantial.
-`Extra/Topology/*`, `Core/Go/Semantics/Domains.lean`, `Core/Go/Semantics/Operations.lean` ported
-and `lake build` clean as of 2026-09-18 (branch `claude/go-semantics-port-phase-1`) — `Value`/`𝕍`
-carries forward as 8 axioms, unconstructed, per the source's own admission, not a gap introduced
-here. Both files still orphans, nothing imports them yet (deliberate — see the plan's phase
-order). Remaining: wire `Value.𝕍`'s `Typ` param to native `Go.Typ`, then `Defs.lean` (fresh
-`Expression.denotation`, `Statement.denotation` re-derived over the native `Go.Statement`
-constructors). None of this changes near-term verification scope: still Guarded→Network only
+`Extra/Topology/*`, `Core/Go/Semantics/Domains.lean`, `Core/Go/Semantics/Operations.lean`
+ported, `Value.𝕍`'s `Typ` parameter wired to native `Go.Typ`, and `Core/Go/Semantics/Defs.lean`
+now carries the full Go-specific layer: `Store`/`Address`/`Channel` (axiom pile, `Store`/`𝕍`
+mutual-recursion gap flagged not solved), `Expression.denotation` (stub, `sorry` — unwritten
+upstream too, nothing to port), `Statement.denotation` re-derived over native `Go.Statement`
+(`panic return print if for go send` real, matching upstream's handled subset renamed/reshaped
+to the new constructors — `while`→`for`, `for_seq`/`for_seq_F` Banach-fixpoint machinery renamed
+to match; rest of the constructor set `sorry`, same as upstream) — all `lake build` clean as of
+2026-09-19 (branch `claude/go-semantics-port-phase-1`). `Value`/`𝕍` itself carries forward as 8
+axioms, unconstructed, per the source's own admission, not a gap introduced here. All three
+files still orphans, nothing imports them yet (deliberate — see the plan's phase order). None of
+this changes near-term verification scope: still Guarded→Network only
 (§2), and `Network2Go` (§5.7), once anyone proves it, is expected to reach correctness by
 relating its lock-protected execution model back to `NetworkPlusCal`'s semantics directly, not
 through this Go domain model. Revisit proving it once `Network2Go`'s own correctness work starts.
