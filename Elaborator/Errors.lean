@@ -55,6 +55,9 @@ inductive TCError : Type
   /-- A metavariable left over at the end of a declaration's checking had no pending upper bound
   recorded on it at all — it was never actually constrained by anything during checking. -/
   | unconstrainedMetavariable (pos : SourceSpan)
+  /-- A declaration's name is already bound in `Γ` — a `CONSTANT`/`VARIABLE`/operator/function
+  declared more than once, or colliding with an intrinsic/builtin-module name. -/
+  | alreadyDeclared (pos : SourceSpan) (name : String)
   deriving Repr, Inhabited, BEq
 
 instance : CompilerDiagnostic TCError String where
@@ -80,6 +83,7 @@ instance : CompilerDiagnostic TCError String where
   | .notShowable .. => Diagnostics.notShowable.code
   | .notSendable .. => Diagnostics.notSendable.code
   | .unconstrainedMetavariable _ => Diagnostics.unconstrainedMetavariable.code
+  | .alreadyDeclared .. => Diagnostics.alreadyDeclared.code
   posOf
     | .todo pos _ => pos
     | .unboundVariable pos _ => pos
@@ -101,6 +105,7 @@ instance : CompilerDiagnostic TCError String where
     | .notShowable pos _ => pos
     | .notSendable pos _ => pos
     | .unconstrainedMetavariable pos => pos
+    | .alreadyDeclared pos _ => pos
   msgOf
     | .todo _ msg => msg
     | .unboundVariable _ name => s!"Unbound variable `{name}`."
@@ -128,6 +133,7 @@ instance : CompilerDiagnostic TCError String where
     | .notSendable _ got => s!"`{got}` is not a sendable type — it cannot be a channel's element type."
     | .unconstrainedMetavariable _ =>
       "A metavariable was left unconstrained at the end of checking — an explicit type annotation is needed here."
+    | .alreadyDeclared _ name => s!"`{name}` is already declared in this module."
 
 /-- The type checker's non-fatal diagnostics, collected out-of-band. `todo` is a placeholder. -/
 inductive TCWarning : Type

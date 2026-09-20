@@ -1,6 +1,7 @@
 module
 
 public import Elaborator.Expressions
+public import Core.TypedTLAPlus.Builtins
 
 public section
 
@@ -86,6 +87,23 @@ private def checkParamArity (pos : SourceSpan) (param : String) (arity : Nat) (�
       else throw (.paramArityMismatch pos param arity σs.length)
     | _ => throw (.notAnOperatorType pos τ)
 
+/-- Names the language itself permanently reserves, whether or not `builtinContext` currently
+binds one — `TypedTLAPlus.reservedTemporalActionNames`'s temporal/action names, plus `SUBSET`/
+`UNION` (core set-theory primitives, not temporal/action, so kept local here rather than folded
+into that list). -/
+private def reservedNames : List String :=
+  TypedTLAPlus.reservedTemporalActionNames ++ ["SUBSET", "UNION"]
+
+/-- `x ∉ Γ` — every declaration rule's own freshness premise. Also rejects a name the language
+permanently reserves even where nothing currently binds it (e.g. `SUBSET`, `^+`) —
+`builtinContext` being incomplete must not make a reserved name look free. -/
+private def requireFresh (pos : SourceSpan) (x : String) : m Unit :=
+  if reservedNames.contains x then throw (.alreadyDeclared pos x)
+  else do
+    match (← readThe Context).lookup x with
+    | some _ => throw (.alreadyDeclared pos x)
+    | none => pure ()
+
 /-- `Γ ⊢ D ⊣ Γ'` — checks one declaration, returning its elaborated form alongside the bindings
 `Γ'` adds over `Γ` (`[]` for `ASSUME`, which adds none). A `CONSTANT`/`VARIABLE` binding is never
 a scheme (`Binding.isScheme := false`, even if its annotation mentions a `Typ.var`): a `CONSTANT`
@@ -97,12 +115,13 @@ def checkDeclaration (moduleName : String) (d : SrcDecl) : m (Decl × List (Stri
     ───────────────────────────────────────────────────── [Constants]
      Γ ⊢ CONSTANTS x₁ : τ₁, …, xₙ : τₙ ⊣ Γ, x₁ : τ₁, …, xₙ : τₙ
 
-    (`xᵢ ∉ Γ` deferred to the well-scopedness pass, not checked here. A `CONSTANT` may itself be
-    operator-shaped — `F(_, _)` — in which case its written arity is checked against its
-    annotation's own arity, the same `checkParamArity` an operator's higher-order parameters use.)
+    (A `CONSTANT` may itself be operator-shaped — `F(_, _)` — in which case its written arity is
+    checked against its annotation's own arity, the same `checkParamArity` an operator's
+    higher-order parameters use.)
   -/
   | .constants xs => do
     let xs' ← xs.mapM λ (x, arity, ann) ↦ do
+      requireFresh SourceSpan.placeholder x
       let τ ← requireAnnotation SourceSpan.placeholder s!"CONSTANT `{x}`" ann
       checkParamArity SourceSpan.placeholder x arity τ
       return (x, τ)
@@ -111,7 +130,9 @@ def checkDeclaration (moduleName : String) (d : SrcDecl) : m (Decl × List (Stri
     Same shape as [Constants].
   -/
   | .variables xs => do
-    let xs' ← xs.mapM λ (x, ann) ↦ return (x, ← requireAnnotation SourceSpan.placeholder s!"VARIABLE `{x}`" ann)
+    let xs' ← xs.mapM λ (x, ann) ↦ do
+      requireFresh SourceSpan.placeholder x
+      return (x, ← requireAnnotation SourceSpan.placeholder s!"VARIABLE `{x}`" ann)
     return (.variables xs', xs'.map λ (x, τ) ↦ (x, { type := τ, origin := .module moduleName x }))
   /-
      Γ ⊢ e ⇓ Bool
@@ -136,6 +157,7 @@ def checkDeclaration (moduleName : String) (d : SrcDecl) : m (Decl × List (Stri
     bare name, never called like `Nodes()`.)
   -/
   | .operator ann f args body => do
+    requireFresh (posOf body) f
     let τ ← requireAnnotation (posOf body) s!"operator `{f}`" ann
     match args, τ with
     | [], retTy => do
@@ -161,6 +183,7 @@ def checkDeclaration (moduleName : String) (d : SrcDecl) : m (Decl × List (Stri
     self-recursion for free, unlike operator definitions above.)
   -/
   | .function ann f args body => do
+    requireFresh (posOf body) f
     let τ ← requireAnnotation (posOf body) s!"function `{f}`" ann
     match τ with
     | .function domTy retTy => do

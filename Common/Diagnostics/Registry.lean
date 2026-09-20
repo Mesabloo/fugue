@@ -225,6 +225,10 @@ def notSendable : Entry :=
 def unconstrainedMetavariable : Entry :=
   { code := e 43, stage := .typeCheck, summary := "A type was left undetermined at the end of checking." }
 
+/-- A declaration whose name is already bound. -/
+def alreadyDeclared : Entry :=
+  { code := e 74, stage := .typeCheck, summary := "A declaration's name is already bound in this module." }
+
 /-! ## Well-formedness -/
 
 /-- A `goto` to a label no process defines. -/
@@ -423,7 +427,7 @@ def entries : List Entry :=
     typeCheckTodo, unboundVariable, typeMismatch, missingTypeAnnotation, cannotInferType,
     notASetType, notARecordType, notIndexable, unknownField, invalidTupleIndex, notAnOperatorType,
     arityMismatch, ambiguousType, notAFunctionType, notATupleType, paramArityMismatch,
-    notAChannelType, notShowable, notSendable, unconstrainedMetavariable,
+    notAChannelType, notShowable, notSendable, unconstrainedMetavariable, alreadyDeclared,
     unknownLabel, redefinedDone, duplicateName, shadowedName, channelInExpression,
     channelTypedVariable, nonEmptyLocalChannels, globalPlusCalVariable, globalTLAPlusVariable,
     bareTemporalOrAction, unboundedQuantifier, receiveChannelMismatch, mailboxNotIndexedBySelf,
