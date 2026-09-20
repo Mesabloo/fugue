@@ -139,7 +139,8 @@ namespace SurfaceTLAPlus.Lexer
         ("<=>", .infix .«<=>»), ("<=", .infix .«<=»), ("<<", .langle), ("<>", .prefix .«<>»),
         ("<:", .infix .«<:»), ("<", .infix .«<»),
         (">>_", .«>>_»), (">>", .rangle), (">=", .infix .«>=»), (">", .infix .«>»),
-        ("->", .«->»), ("-+->", .infix .«-+->»), ("--", .infix .«--»), ("-", .infix .«-»),
+        ("->", .«->»), ("-+->", .infix .«-+->»), ("--", .infix .«--»), ("-.", .«-.»),
+        ("-", .infix .«-»),
         ("|->", .«|->»), ("|-", .infix .«|-»), ("||", .infix .«||»), ("|=", .infix .«|=»),
         ("|", .infix .«|»),
         ("{", .lbrace), ("}", .rbrace),
@@ -1076,17 +1077,43 @@ namespace SurfaceTLAPlus.Parser
     let _ ← token .assume
     parseExpression
 
-  /-- A `CONSTANT` may be an ordinary value or operator-shaped (`F(_, _)`, an uninterpreted
-  higher-order constant) — same arity-parens shape `parseOperator`'s higher-order-parameter
-  parsing already uses below. -/
-  private def parseConstants : TLAPlusParser (List (String × Nat × List CommentAnnotation)) := debug "constant" do
+  /-- `OpDecl` — a `CONSTANT`'s own name: a plain identifier, optionally operator-shaped
+  (`F(_, _)`, an uninterpreted higher-order constant — the arity-parens shape
+  `parseOperator`'s higher-order-parameter parsing also uses below), or one of the fixed
+  prefix/infix/postfix operator symbols (`_+_`, `_'`). Unary minus's own spelling here is `-.`,
+  never bare `-` — `-. _` disambiguates a prefix declaration from `_-_`'s infix one missing its
+  leading `_`, which a bare `- _` alone can't. -/
+  private def parseOpDecl : TLAPlusParser (OpName × Nat) := debug "op decl" do
+    match ← lookAhead (lexeme (pure ()) *> peek) with
+    | ⟨_, .underscore⟩ =>
+      let _ ← lexeme (pure ()) *> token .underscore
+      match ← lookAhead (lexeme (pure ()) *> peek) with
+      | ⟨_, .infix _⟩ =>
+        let op ← lexeme (pure ()) *> parseInfixOperator (pure ())
+        let _ ← lexeme (pure ()) *> token .underscore
+        return (.infix op, 2)
+      | ⟨_, .postfix _⟩ => (.postfix ·, 1) <$> (lexeme (pure ()) *> parsePostfixOperator)
+      | tk => throwExpected (some tk) ["infix operator", "postfix operator"]
+    | ⟨_, .«-.»⟩ =>
+      let _ ← lexeme (pure ()) *> token .«-.»
+      let _ ← lexeme (pure ()) *> token .underscore
+      return (.prefix .«-», 1)
+    | ⟨_, .prefix _⟩ =>
+      let op ← lexeme (pure ()) *> parsePrefixOperator
+      let _ ← lexeme (pure ()) *> token .underscore
+      return (.prefix op, 1)
+    | _ =>
+      let var ← lexeme (pure ()) *> parseIdentifier
+      let argCount ← eoption <| parens <| Array.size <$> sepBy1 comma underscore
+      return (.plain var, argCount.getD 0)
+
+  private def parseConstants : TLAPlusParser (List (OpName × Nat × List CommentAnnotation)) := debug "constant" do
     let _ ← token .constant <||> token .constants
 
     let vars ← sepBy1 comma do
       let ann ← tryParseAnnotations
-      let var ← parseIdentifier
-      let argCount ← eoption <| parens <| Array.size <$> sepBy1 comma underscore
-      return ⟨var, argCount.getD 0, ann⟩
+      let (name, arity) ← parseOpDecl
+      return ⟨name, arity, ann⟩
     return vars.toList
 
   private def parseVariables : TLAPlusParser (List (String × List CommentAnnotation)) := debug "variables" do
@@ -1098,21 +1125,48 @@ namespace SurfaceTLAPlus.Parser
       return ⟨var, ann⟩
     return vars.toList
 
-  private def parseOperator : TLAPlusParser (List CommentAnnotation × String × List (String × Nat) × Expression (List CommentAnnotation)) := debug "operator def" do
+  /-- An operator definition — plain (`f(x, …) == e`), or symbolic: prefix (`-. x == e`, `SUBSET
+  x == e`), infix (`x + y == e`), or postfix (`x' == e`). The three symbolic shapes each take
+  exactly the parameters their arity demands, none higher-order — matching how `parseOpDecl`'s
+  own arity for each is fixed, not user-written. -/
+  private def parseOperator : TLAPlusParser (List CommentAnnotation × OpName × List (String × Nat) × Expression (List CommentAnnotation)) := debug "operator def" do
     -- `tryParseAnnotations` eats leading comments before it is known whether an operator
     -- definition even follows (a comment can equally precede the PlusCal block or the module
     -- footer), so the probe up to `==` is atomic; past `==` the rule commits.
-    let ⟨ann, var, args⟩ ← withBacktracking do
+    let ⟨ann, name, args⟩ ← withBacktracking do
       let ann ← tryParseAnnotations
-      let var ← parseIdentifier
-      let args ← eoption <| lexeme <| parens <| sepBy comma do
+      match ← lookAhead (lexeme (pure ()) *> peek) with
+      | ⟨_, .«-.»⟩ =>
+        let _ ← lexeme (pure ()) *> token .«-.»
         let var ← parseIdentifier
-        let argCount ← eoption <| parens <| Array.size <$> sepBy1 comma underscore
-        return ⟨var, argCount.getD 0⟩
-      let _ ← lexeme <| token (.eqeq false)
-      pure (⟨ann, var, args⟩ : _ × _ × _)
+        let _ ← lexeme <| token (.eqeq false)
+        pure (⟨ann, .prefix .«-», [⟨var, 0⟩]⟩ : _ × _ × _)
+      | ⟨_, .prefix _⟩ =>
+        let op ← lexeme (pure ()) *> parsePrefixOperator
+        let var ← parseIdentifier
+        let _ ← lexeme <| token (.eqeq false)
+        pure (⟨ann, .prefix op, [⟨var, 0⟩]⟩ : _ × _ × _)
+      | _ =>
+        let var ← parseIdentifier
+        match ← lookAhead (lexeme (pure ()) *> peek) with
+        | ⟨_, .infix _⟩ =>
+          let op ← lexeme (pure ()) *> parseInfixOperator (pure ())
+          let var2 ← parseIdentifier
+          let _ ← lexeme <| token (.eqeq false)
+          pure (⟨ann, .infix op, [⟨var, 0⟩, ⟨var2, 0⟩]⟩ : _ × _ × _)
+        | ⟨_, .postfix _⟩ =>
+          let op ← lexeme (pure ()) *> parsePostfixOperator
+          let _ ← lexeme <| token (.eqeq false)
+          pure (⟨ann, .postfix op, [⟨var, 0⟩]⟩ : _ × _ × _)
+        | _ =>
+          let args ← eoption <| lexeme <| parens <| sepBy comma do
+            let var ← parseIdentifier
+            let argCount ← eoption <| parens <| Array.size <$> sepBy1 comma underscore
+            return ⟨var, argCount.getD 0⟩
+          let _ ← lexeme <| token (.eqeq false)
+          pure (⟨ann, .plain var, args.elim [] Array.toList⟩ : _ × _ × _)
     let expr ← parseExpression
-    return ⟨ann, var, args.elim [] Array.toList, expr⟩
+    return ⟨ann, name, args, expr⟩
 
   /-- A module-level function definition `f[x \in S, …] == e`. Each binder is a full
   `QuantifierBound` — plain (`x \in S`), shared-domain (`x, y \in S`), or tuple-pattern
@@ -1132,13 +1186,17 @@ namespace SurfaceTLAPlus.Parser
     return ⟨ann, var, binders.toList, expr⟩
 
   /-- One module-body declaration, chosen by the keyword that follows any leading comment run.
-    A comment or identifier (the default) is an operator or function definition — telling them
-    apart needs peeking past the shared `<annotations> <identifier>` prefix both start with, to
-    the token right after it (`(` — or bare `==` — for an operator, `[` for a function): probed via
-    `lookAhead`, exactly like the keyword peek just above it, then re-parsed for real by whichever
-    of `parseOperator`/`parseFunctionDefinition` applies — each is independently atomic up to its
-    own `==`, since a comment run can equally precede the PlusCal block or the module footer, in
-    which case it belongs to neither and must stay unconsumed. `----` ends the declaration run. -/
+    A comment, identifier, or symbolic-operator token (the default) is an operator or function
+    definition — telling them apart needs peeking past any leading annotations to the first real
+    token: a prefix-operator token (or `-.`) commits straight to `parseOperator` (a symbolic
+    prefix definition, which never starts with an identifier); otherwise, past the shared
+    `<annotations> <identifier>` prefix both a plain operator and a function definition share, to
+    the token right after it (`(` — or an infix/postfix operator, or bare `==` — for an operator,
+    `[` for a function): probed via `lookAhead`, exactly like the keyword peek just above it, then
+    re-parsed for real by whichever of `parseOperator`/`parseFunctionDefinition` applies — each is
+    independently atomic up to its own `==`, since a comment run can equally precede the PlusCal
+    block or the module footer, in which case it belongs to neither and must stay unconsumed.
+    `----` ends the declaration run. -/
   private def parseDeclaration : TLAPlusParser (Option (Declaration (List CommentAnnotation))) := located do
     match ← lookAhead (lexeme (pure ()) *> peek) with
     | ⟨_, .assume⟩ => (.some ∘ .assume) <$> (lexeme (pure ()) *> parseAssume)
@@ -1147,9 +1205,12 @@ namespace SurfaceTLAPlus.Parser
     | ⟨_, .moduleStart _⟩ =>
       .none <$ (lexeme (pure ()) *> tokenFilter λ | ⟨_, .moduleStart _⟩ => true | _ => false)
     | _ =>
-      match ← lookAhead (tryParseAnnotations *> parseIdentifier *> (lexeme (pure ()) *> peek)) with
-      | ⟨_, .bracket true⟩ => (λ ⟨a, b, c, d⟩ ↦ .some <| .function a b c d) <$> parseFunctionDefinition
-      | _ => (λ ⟨a, b, c, d⟩ ↦ .some <| .operator a b c d) <$> parseOperator
+      match ← lookAhead (tryParseAnnotations *> (lexeme (pure ()) *> peek)) with
+      | ⟨_, .«-.»⟩ | ⟨_, .prefix _⟩ => (λ ⟨a, b, c, d⟩ ↦ .some <| .operator a b c d) <$> parseOperator
+      | _ =>
+        match ← lookAhead (tryParseAnnotations *> parseIdentifier *> (lexeme (pure ()) *> peek)) with
+        | ⟨_, .bracket true⟩ => (λ ⟨a, b, c, d⟩ ↦ .some <| .function a b c d) <$> parseFunctionDefinition
+        | _ => (λ ⟨a, b, c, d⟩ ↦ .some <| .operator a b c d) <$> parseOperator
 
   private def parsePlusCalAlgorithm : TLAPlusParser (SurfacePlusCal.Algorithm (List CommentAnnotation) (Expression (List CommentAnnotation))) := do
     let ⟨pos, .pcal tks⟩ ← withBacktracking <| tokenFilter λ | ⟨_, .pcal _⟩ => true | _ => false

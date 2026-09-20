@@ -63,6 +63,13 @@ namespace SurfaceTLAPlus
     | .«\doteq» => "\\doteq" | .«\wr» => "\\wr" | .«\sqsupset» => "\\sqsupset"
     | .«\notin» => "\\notin" | .«\» => "\\"
 
+  /-- The canonical name a `CONSTANT`/`RECURSIVE`/symbolic-`==`-definition `OpName` becomes. -/
+  def OpName.canonicalName : OpName → String
+    | .plain s => s
+    | .prefix op => op.canonicalName
+    | .infix op => op.canonicalName
+    | .postfix op => op.canonicalName
+
   /-- Cartesian product, used to collapse a multi-binder function literal/set-map into a single
   fresh tuple binder (see `flattenBound`/`collapseToSingleBinder` below). Reused by
   `Desugarer/PlusCal.lean` for `multicast`'s own filter collapse, which builds the same product
@@ -284,10 +291,10 @@ namespace SurfaceTLAPlus
     | .stutter e₁ e₂, pos => (.stutter · · @@ pos) <$> e₁.desugar <*> e₂.desugar
 
   def Declaration.desugar : Declaration α → m (CoreTLAPlus.Declaration α)
-    | .constants vs => pure <| .constants vs
+    | .constants vs => pure <| .constants (vs.map λ (x, arity, ann) ↦ (x.canonicalName, arity, ann))
     | .variables vs => pure <| .variables vs
     | .assume e => .assume <$> e.desugar
-    | .operator ann x ps e => .operator ann x ps <$> e.desugar
+    | .operator ann x ps e => .operator ann x.canonicalName ps <$> e.desugar
     | .function ann x qs e => do
       let e ← e.desugar
       -- `posOf e`, the body's own position, captured once — `Declaration` carries no position of

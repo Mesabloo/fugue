@@ -49,6 +49,10 @@ namespace SurfaceTLAPlus
     | «prefix» (_ : PrefixOperator)
     | «infix» (_ : InfixOperator)
     | «postfix» (_ : PostfixOperator)
+    /-- Unary minus's declaration-site spelling — `RECURSIVE`/`CONSTANT`'s `OpDecl`, or a
+    symbolic `==` definition — distinct from expression-level `-` to avoid ambiguity with the
+    infix form's own `_-_` shape. Never valid inside an expression. -/
+    | «-.»
     | «\A»
     | «\E»
     | «|->»
@@ -123,6 +127,7 @@ namespace SurfaceTLAPlus
       | .prefix op => s!"prefix operator '{op}'"
       | .infix op => s!"infix operator '{op}'"
       | .postfix op => s!"postfix operator '{op}'"
+      | .«-.» => "symbol '-.'"
       | .«\A» => r"symbol '\A'"
       | .«\E» => r"symbol '\E'"
       | .«|->» => r"symbol '|->'"

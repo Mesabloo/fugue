@@ -584,6 +584,23 @@ instance : Traversable Expression where
 instance instTraversableProd {α : Type} : Traversable (Prod α) where
   traverse f x := ({x with snd := ·}) <$> f x.snd
 
+/-- An operator's own name, at `CONSTANT`/`RECURSIVE`'s `OpDecl` or a symbolic `==` definition
+site — an ordinary identifier, or one of the fixed prefix/infix/postfix operator symbols.
+Canonicalized to a plain `String` during desugaring, the same way a symbolic *call* already is. -/
+inductive OpName : Type
+  | plain (name : String)
+  | «prefix» (op : PrefixOperator)
+  | «infix» (op : InfixOperator)
+  | «postfix» (op : PostfixOperator)
+  deriving Repr, Inhabited, BEq
+
+instance : ToString OpName where
+  toString
+    | .plain s => s
+    | .prefix op => toString op
+    | .infix op => toString op
+    | .postfix op => toString op
+
 /--
   A top-level TLA⁺ declaration, prior to desugaring. Own type rather than the `Core/Declaration.lean`
   shared one `CoreTLAPlus`/`TypedTLAPlus` reuse verbatim: a function definition's binder list here
@@ -595,14 +612,14 @@ instance instTraversableProd {α : Type} : Traversable (Prod α) where
 inductive Declaration (α : Type) : Type
   /-- A constant declaration, optionally operator-shaped — the `Nat` is its arity (`0` for an
   ordinary value, matching `CONSTANT F(_, _)`'s written arity otherwise). -/
-  | constants : List (String × Nat × α) → Declaration α
+  | constants : List (OpName × Nat × α) → Declaration α
   | «variables» : List (String × α) → Declaration α
   | assume : Expression α → Declaration α
   /--
     An operator definition, optionally with higher-order arguments. Each parameter's `Nat`
     is its arity (`0` for `x`, `3` for `F(_, _, _)`, …).
   -/
-  | operator : α → String → List (String × Nat) → Expression α → Declaration α
+  | operator : α → OpName → List (String × Nat) → Expression α → Declaration α
   /-- A function definition. Each binder may itself be a shared-domain or tuple-pattern shorthand
   (`QuantifierBound`, same shape quantifiers accept). -/
   | function : α → String → List (QuantifierBound α (Expression α)) → Expression α → Declaration α
