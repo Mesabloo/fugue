@@ -119,15 +119,15 @@ def Expression.recognizeBuiltin? {α : Type} : Expression α → Option (Builtin
   | .opCall (.var _ origin) args => (builtinOpOf? origin).map (·, args)
   | _ => none
 
-/-- The eight reserved temporal/action operator spellings real TLA⁺ core syntax carries, banned
+/-- The ten reserved temporal/action operator spellings real TLA⁺ core syntax carries, banned
 outright by bare name in `WellFormedness/Restrictions.lean`'s check 3 regardless of whether the
 name resolves to anything (a reserved name can never be shadowed by a user declaration, so an
-origin-agnostic check is exact). `^+`/`^*`/`^#` have no typing rule and so no `BuiltinOp`
-constructor above — genuinely unbound, unlike the other five, which double as real `builtinOpOf?`
-entries (`.enabled`, `.unchanged`, `.always`, `.eventually`, `.prime`). Kept as a separate list
-rather than derived from `builtinOpOf?`, since the two overlap but aren't the same. -/
+origin-agnostic check is exact). `^+`/`^*`/`^#`/`~>`/`-+->` have no typing rule and so no
+`BuiltinOp` constructor above — genuinely unbound, unlike the other five, which double as real
+`builtinOpOf?` entries (`.enabled`, `.unchanged`, `.always`, `.eventually`, `.prime`). Kept as a
+separate list rather than derived from `builtinOpOf?`, since the two overlap but aren't the same. -/
 def reservedTemporalActionNames : List String :=
-  ["[]", "<>", "ENABLED", "UNCHANGED", "'", "^+", "^*", "^#"]
+  ["[]", "<>", "ENABLED", "UNCHANGED", "'", "^+", "^*", "^#", "~>", "-+->"]
 
 end TypedTLAPlus
 

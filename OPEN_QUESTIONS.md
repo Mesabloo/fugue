@@ -511,10 +511,10 @@ if one does.
 
 ### 9.38 `channels` compile with FIFO (sequence) semantics; thesis wants `Set`/multiset
 
-`reference/thesis.txt:388-391` (§3.1.1): intended encoding is `Set(τ)` for `channels`,
+`reference/thesis.txt:1674` (§3.1.1): intended encoding is `Set(τ)` for `channels`,
 `Seq(τ)` for `fifos` — kept as one `Channel(τ)` type only because "the distinction is only
-meaningful when emitting code or when describing the semantics" (line 415-417), not at the
-type level. §3.1.5's subtyping rule (line 1054-1056) allows either a multiset/bag or sequence
+meaningful when emitting code or when describing the semantics" (line 1688-1689), not at the
+type level. §3.1.5's subtyping rule (line 2304-2305) allows either a multiset/bag or sequence
 encoding for `Channel(τ)` — covariant either way — so the type theory doesn't force the
 choice; codegen does, and codegen hasn't made it.
 
