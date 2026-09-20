@@ -603,11 +603,12 @@ instance : ToString OpName where
 
 /--
   A top-level TLA⁺ declaration, prior to desugaring. Own type rather than the `Core/Declaration.lean`
-  shared one `CoreTLAPlus`/`TypedTLAPlus` reuse verbatim: a function definition's binder list here
-  may still be shared-domain (`x, y \in S`) or tuple-pattern (`<<x,y>> \in S`) sugar — the same
+  shared one `TypedTLAPlus` still reuses verbatim (`CoreTLAPlus` has its own, for the same
+  reason — see its doc comment): a function definition's binder list here may still be
+  shared-domain (`x, y \in S`) or tuple-pattern (`<<x,y>> \in S`) sugar — the same
   `QuantifierBound` shape `\A`/`\E`/set-builders already accept — which `Desugarer/TLAPlus.lean`
   flattens down to `CoreTLAPlus.Declaration.function`'s plain per-binder form before anything past
-  desugaring ever sees it. `RECURSIVE` and module `INSTANCE` are not represented.
+  desugaring ever sees it. Module `INSTANCE` is not represented.
 -/
 inductive Declaration (α : Type) : Type
   /-- A constant declaration, optionally operator-shaped — the `Nat` is its arity (`0` for an
@@ -623,6 +624,9 @@ inductive Declaration (α : Type) : Type
   /-- A function definition. Each binder may itself be a shared-domain or tuple-pattern shorthand
   (`QuantifierBound`, same shape quantifiers accept). -/
   | function : α → String → List (QuantifierBound α (Expression α)) → Expression α → Declaration α
+  /-- A `RECURSIVE` predeclaration list — each entry's own name/arity, same `OpDecl` shape as
+  `constants`, no defining expression (the `==` definition is a separate, later `.operator`). -/
+  | «recursive» : List (OpName × Nat × α) → Declaration α
 
 /-- Hand-written since `deriving Repr` can't discharge the higher-kinded `Repr (Expression α)`
 obligation. -/
@@ -633,6 +637,7 @@ instance {α} [Repr α] : Repr (Declaration α) where
     | .assume e => f!"Declaration.assume {repr e}"
     | .operator a x args e => f!"Declaration.operator {repr a} {repr x} {repr args} {repr e}"
     | .function a x args e => f!"Declaration.function {repr a} {repr x} {repr args} {repr e}"
+    | .recursive xs => f!"Declaration.recursive {repr xs}"
 
 instance : Functor Declaration where
   map f
@@ -641,6 +646,7 @@ instance : Functor Declaration where
     | .assume e => .assume (f <$> e)
     | .operator a x args e => .operator (f a) x args (f <$> e)
     | .function a x qs e => .function (f a) x (Bifunctor.bimap f (f <$> ·) <$> qs) (f <$> e)
+    | .recursive xs => .recursive (Prod.map₃ id id f <$> xs)
 
 instance : Traversable Declaration where
   traverse f
@@ -650,6 +656,7 @@ instance : Traversable Declaration where
     | .operator a x args e => (.operator · x args ·) <$> f a <*> traverse f e
     | .function a x qs e =>
       (.function · x · ·) <$> f a <*> traverse (bitraverse f (traverse f)) qs <*> traverse f e
+    | .recursive xs => .recursive <$> traverse (Prod.traverse₃ pure pure f) xs
 
 /--
   A parsed TLA⁺ module, `EXTENDS`-list and all, wrapping the embedded (Distributed) PlusCal

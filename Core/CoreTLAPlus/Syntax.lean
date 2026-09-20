@@ -163,11 +163,13 @@ instance : Traversable Expression where
   traverse := Expression.traverse
 
 /--
-  A top-level TLA⁺ declaration. `RECURSIVE` and module `INSTANCE` are not represented. Own type
-  rather than an `abbrev` over `Core/Declaration.lean`'s shared one: a `CONSTANT`'s own arity
-  (`0` for an ordinary value, matching `CONSTANT F(_, _)`'s written arity otherwise) is only
-  needed up to the elaborator's arity-vs-annotation consistency check, and has no role in
-  `TypedTLAPlus.Declaration`, which reuses the shared type unchanged.
+  A top-level TLA⁺ declaration. Module `INSTANCE` is not represented. Own type rather than an
+  `abbrev` over `Core/Declaration.lean`'s shared one: a `CONSTANT`'s own arity (`0` for an
+  ordinary value, matching `CONSTANT F(_, _)`'s written arity otherwise) is only needed up to the
+  elaborator's arity-vs-annotation consistency check, and has no role in `TypedTLAPlus.Declaration`,
+  which reuses the shared type unchanged — same reason `.recursive` (below) emits no
+  `TypedTLAPlus.Declaration` at all: a `RECURSIVE` predeclaration is discharged by a later
+  `.operator`, never becomes a typed declaration in its own right.
 -/
 inductive Declaration (α : Type) : Type
   | constants : List (String × Nat × α) → Declaration α
@@ -180,6 +182,9 @@ inductive Declaration (α : Type) : Type
   | operator : α → String → List (String × Nat) → Expression α → Declaration α
   /-- A function definition, with an explicit domain for every argument. -/
   | function : α → String → List (String × Expression α) → Expression α → Declaration α
+  /-- A `RECURSIVE` predeclaration list — each entry's own canonical name/arity, no defining
+  expression (that's a separate, later `.operator`). -/
+  | «recursive» : List (String × Nat × α) → Declaration α
 
 /-- Hand-written since `deriving Repr` can't discharge the higher-kinded `Repr (Expression α)`
 obligation. -/
@@ -190,6 +195,7 @@ instance {α} [Repr α] : Repr (Declaration α) where
     | .assume e => f!"Declaration.assume {repr e}"
     | .operator a x args e => f!"Declaration.operator {repr a} {repr x} {repr args} {repr e}"
     | .function a x args e => f!"Declaration.function {repr a} {repr x} {repr args} {repr e}"
+    | .recursive xs => f!"Declaration.recursive {repr xs}"
 
 instance : Functor Declaration where
   map f
@@ -198,6 +204,7 @@ instance : Functor Declaration where
     | .assume e => .assume (f <$> e)
     | .operator a x args e => .operator (f a) x args (f <$> e)
     | .function a x args e => .function (f a) x (Bifunctor.snd (f <$> ·) <$> args) (f <$> e)
+    | .recursive xs => .recursive (Prod.map₃ id id f <$> xs)
 
 instance : Traversable Declaration where
   traverse f
@@ -206,6 +213,7 @@ instance : Traversable Declaration where
     | .assume e => .assume <$> traverse f e
     | .operator a x args e => (.operator · x args ·) <$> f a <*> traverse f e
     | .function a x args e => (.function · x · ·) <$> f a <*> traverse (bitraverse pure (traverse f)) args <*> traverse f e
+    | .recursive xs => .recursive <$> traverse (Prod.traverse₃ pure pure f) xs
 
 /--
   A desugared TLA⁺ module, wrapping the embedded (still-Surface, not-yet-desugared-at-the-

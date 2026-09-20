@@ -19,6 +19,7 @@ namespace SurfaceTLAPlus
     | «constants»
     | «variable»
     | «variables»
+    | «recursive»
     | «if»
     | «then»
     | «else»
@@ -98,6 +99,7 @@ namespace SurfaceTLAPlus
       | .constants => "keyword 'CONSTANTS'"
       | .variable => "keyword 'VARIABLE'"
       | .variables => "keyword 'VARIABLES'"
+      | .recursive => "keyword 'RECURSIVE'"
       | .if => "keyword 'IF'"
       | .then => "keyword 'THEN'"
       | .else => "keyword 'ELSE'"

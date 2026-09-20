@@ -11,21 +11,25 @@ public import Common.Position
 
 
 /-!
-  The shape of a TLA⁺ declaration/module, shared verbatim by `CoreTLAPlus` and `TypedTLAPlus`:
-  each stage's `Declaration`/`Module` is identical except for which stage's `Expression` former it
-  closes over. Parametrized here by that former (`E`) so the shape and its
-  `Functor`/`Traversable`/`Bifunctor`/`Bitraversable` instances are defined once; each stage
-  recovers its `Declaration`/`Module` via an `abbrev` over its `Expression`.
+  The shape of a TLA⁺ declaration/module, reused as-is by `TypedTLAPlus` via an `abbrev` over its
+  own `Expression`. Parametrized here by the expression former (`E`) so the shape and its
+  `Functor`/`Traversable`/`Bifunctor`/`Bitraversable` instances are defined once.
 
-  `SurfaceTLAPlus` does **not** reuse this type — its own `Declaration`/`Module`
-  (`Core/SurfaceTLAPlus/Syntax.lean`) widen `.function`'s binder list to admit the shared-domain/
-  tuple-pattern sugar `Desugarer/TLAPlus.lean` flattens down to this shape.
+  Neither `SurfaceTLAPlus` nor `CoreTLAPlus` reuses this type: each has its own `Declaration`/
+  `Module` (`Core/SurfaceTLAPlus/Syntax.lean`, `Core/CoreTLAPlus/Syntax.lean`) — `SurfaceTLAPlus`'s
+  because `.function`'s binder list there is wider, admitting the shared-domain/tuple-pattern
+  sugar `Desugarer/TLAPlus.lean` flattens down to this shape; both because `RECURSIVE`'s own
+  `.recursive` constructor lives on each of theirs (a `RECURSIVE` predeclaration is checker-
+  internal bookkeeping past that point — `Elaborator/Declarations.lean`'s `Δ` — so
+  `TypedTLAPlus.Declaration`, reusing this type unchanged, never needs one).
 
   The shared type is named `TLAModule`, not `Module`: it sits at root (see below), where it would
   otherwise collide with Mathlib's `Module` typeclass.
 -/
 
-/-- A top-level TLA⁺ declaration. `RECURSIVE` and module `INSTANCE` are not represented. -/
+/-- A top-level TLA⁺ declaration. `RECURSIVE` and module `INSTANCE` are not represented — by the
+time a declaration reaches this shared type (`TypedTLAPlus`, the only stage still using it), a
+`RECURSIVE` predeclaration has already been fully absorbed into an ordinary `.operator`. -/
 inductive Declaration (E : Type → Type) (α : Type) : Type
   | constants : List (String × α) → Declaration E α
   | «variables» : List (String × α) → Declaration E α

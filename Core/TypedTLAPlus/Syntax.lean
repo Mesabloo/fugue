@@ -234,8 +234,10 @@ protected partial def Expression.traverse {F : Type → Type} [Applicative F] {�
 instance : Traversable Expression where
   traverse := Expression.traverse
 
-/-- A top-level, type-checked TLA⁺ declaration. `RECURSIVE` and module `INSTANCE` are out of
-scope. -/
+/-- A top-level, type-checked TLA⁺ declaration. Module `INSTANCE` is out of scope. `RECURSIVE`
+is supported but gains no constructor of its own here — a `RECURSIVE` predeclaration is
+checker-internal bookkeeping (`Elaborator/Declarations.lean`'s `Δ`) that never survives past its
+own discharging `.operator` definition. -/
 abbrev Declaration := _root_.Declaration Expression
 
 /--

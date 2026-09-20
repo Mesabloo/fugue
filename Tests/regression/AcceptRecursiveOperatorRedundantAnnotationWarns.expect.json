@@ -1,0 +1,4 @@
+{
+  "warnings": [{ "code": "W0009" }],
+  "suppressible": ["redundant-recursive-annotation"]
+}

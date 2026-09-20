@@ -25,12 +25,20 @@ namespace CoreTLAPlus
 variable {m : Type → Type} [Monad m] [MonadElaborator m] [MonadPendingBounds m]
 
 /-- `Γ ⊢ M typeok`: `declarations₁`, then the embedded algorithm (if any), then `declarations₂`
-against the same `Γ` `declarations₁` left behind. -/
+against the same `Γ` `declarations₁` left behind. `Δ` (`RECURSIVE`-pending operators) threads
+across both declaration lists — a `RECURSIVE` predeclaration in `declarations₁` may be discharged
+as late as `declarations₂` (`recursive-operators-plan.md`'s B.1, "anywhere later in the module") —
+but not through the embedded algorithm, which never reads or extends `Δ`. Whatever's still
+undischarged once both lists are checked is an error: a `RECURSIVE` operator with no matching
+definition anywhere in the module. -/
 def Module.check (mod : CoreTLAPlus.Module SrcAlgorithm (Option Typ)) : m TypedModule := do
-  let (decls1', bindings1) ← checkDeclarations mod.name mod.declarations₁
+  let (decls1', bindings1, δ) ← checkDeclarations mod.name ∅ mod.declarations₁
   extendAllBindings bindings1 do
     let pcalAlgorithm' ← mod.pcalAlgorithm.mapM checkAlgorithm
-    let (decls2', _) ← checkDeclarations mod.name mod.declarations₂
+    let (decls2', _, δ) ← checkDeclarations mod.name δ mod.declarations₂
+    match δ.toList with
+    | [] => pure ()
+    | (f, _) :: _ => throw (.recursiveNeverDefined SourceSpan.placeholder f)
     return {
       name := mod.name
       «extends» := mod.extends

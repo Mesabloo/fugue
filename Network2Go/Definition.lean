@@ -13,10 +13,13 @@ public section
     Go accepts only a small class of types there, and a TLA⁺ definition generally has none of them.
     Immutability is a convention here rather than something Go enforces.
   - **A parametric operator** (`X(p₁, …, pₙ) == e`) becomes an ordinary Go function. Go supports
-    mutually recursive top-level functions natively, so nothing special is needed — and in this
-    compiler an operator is never recursive at all: `RECURSIVE` is out of the accepted language, and
-    `Elaborator/Declarations.lean`'s `[Operator definition]` rule checks the body without the
-    operator itself in `Γ`. The thesis's mutually-recursive `Even`/`Odd` example is unreachable.
+    mutually recursive top-level functions natively, so nothing special is needed here even for a
+    `RECURSIVE`-declared operator (self- or mutually-recursive, per `Elaborator/Declarations.lean`'s
+    `[Operator definition]` rule, which checks the body with `Γ ∪ Δ` — every `RECURSIVE`-pending
+    sibling in scope): compiling to a plain Go `func` and letting Go's own package-level name
+    resolution (order-independent, regardless of declaration order — see below) tie the recursion is
+    enough on its own, with no code here that needs to know a definition is recursive at all. The
+    thesis's mutually-recursive `Even`/`Odd` example compiles this way.
   - **A non-recursive function definition** (`F[x ∈ D] == e`) becomes `var F = FnConstructor(…)`.
   - **A recursive function definition** becomes `var F = MkRecFn(…)`, which ties the knot: it
     allocates the `LazyFunction` with no generator, then overwrites the generator with a closure

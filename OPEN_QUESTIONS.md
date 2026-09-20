@@ -106,8 +106,11 @@ into a new first-class operator value.
 
 ### 9.11 Most temporal/action operators aren't parsed; `WF_e(A)`/`SF_e(A)` have no parser rule
 `UNCHANGED`/`ENABLED`/prime/`~>`/`-+>`/`[]`/`<>` have real surface syntax and desugar to plain
-`opCall`s onto builtin `var`s, so the generic `OPERATOR CALL` rule already covers them. **Most
-other temporal/action operators are not parsed.** `WF_e(A)`/`SF_e(A)` (thesis Fig. 3.1.5) lex
+`opCall`s onto builtin `var`s, so the generic `OPERATOR CALL` rule already covers them. `~>`/
+`-+->` now also join `TypedTLAPlus.reservedTemporalActionNames` and `bareTemporalOrAction`'s
+rejection alongside the other five (`PLAN.md` §5.3) — they used to parse but weren't reserved,
+a gap the user-defined-operator-symbols work found while auditing every reservable name.
+**Most other temporal/action operators are not parsed.** `WF_e(A)`/`SF_e(A)` (thesis Fig. 3.1.5) lex
 correctly — `WF_`/`SF_` are their own tokens (`Parser_/TLAPlus.lean`'s `identifierOrKeyword`
 matches them ahead of the maximal-munch identifier scan, so `WF_e` lexes as `WF_` then `e`,
 `RejectWeakFairnessNotParsed` pins it) — but `parseAtom` has no production for either: `WF_`/`SF_`
@@ -481,33 +484,6 @@ compiled program's *meaning* (a spec that happens to depend on a fair distributi
 promised by the TLA⁺ source) or should stay an implementation detail nobody should rely on.
 Leaning the latter (TLA⁺'s `with` promises no distribution, only "some" outcome across
 behaviors) but nothing pins it down in writing yet.
-
-### 9.37 `RECURSIVE` operators out of scope — revisit criteria and design not pinned down
-
-`RECURSIVE` out of scope for now, `PLAN.md` §2/§8 (its language-subset-exclusions row) and
-§9's syntax-coverage list. No prior-art checkout (`distpcal-compiler`, `mesabloo/fugue`)
-parses it either, so no existing shape to port. Only `RECURSIVE` *operators* — recursive
-*functions* (`f[x ∈ S] == ...` referencing `f` in its own body) already work via the
-`MkRecFn` tie-the-knot bootstrap, `PLAN.md`'s operator/function-definitions section — a
-different mechanism, unaffected by this entry.
-
-`PLAN.md`'s exclusions row already sketches a fallback if picked up: explicit type
-annotation required on every operator in a `RECURSIVE` group's declaration, `Γ` extended
-with all declared sibling types up front, each body checked against its own annotation
-independently — breaks the circularity a mutually-recursive group creates for a
-bidirectional checker (standard precedent: mutual `def`/`def` in Coq/Agda/Lean always carry
-signatures), near-necessary for decidability under rank-1 polymorphism if any operator in
-the group is polymorphic. That sketch stops at the checker; nothing designs the parser side
-(TLA⁺ syntax lets `RECURSIVE f, g` predeclare a group, then separate `==` definitions bind
-each — needs a two-pass elaboration: collect the group's names/annotations first, check
-bodies after) or either backend (Go: same `MkRecFn`-style bootstrap as recursive functions,
-but for an operator, which compiles to a Go func rather than a `LazyFunction` value —
-ordinary Go function definitions already support mutual recursion natively, so this may be
-free; Join Calculus backend not examined at all).
-
-Open: whether to design and implement this, or leave `RECURSIVE` permanently excluded. No
-known example program in this project's fixtures or thesis chapters needs it yet — revisit
-if one does.
 
 ### 9.38 `channels` compile with FIFO (sequence) semantics; thesis wants `Set`/multiset
 

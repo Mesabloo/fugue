@@ -58,6 +58,12 @@ inductive TCError : Type
   /-- A declaration's name is already bound in `Γ` — a `CONSTANT`/`VARIABLE`/operator/function
   declared more than once, or colliding with an intrinsic/builtin-module name. -/
   | alreadyDeclared (pos : SourceSpan) (name : String)
+  /-- A `RECURSIVE`-predeclared name was never discharged by a matching operator definition
+  anywhere in the module. -/
+  | recursiveNeverDefined (pos : SourceSpan) (name : String)
+  /-- An operator definition's own `@type` disagrees with the type its `RECURSIVE` predeclaration
+  gave the same name. -/
+  | recursiveAnnotationMismatch (pos : SourceSpan) (name : String) (recursiveType definitionType : TypedTLAPlus.Typ)
   deriving Repr, Inhabited, BEq
 
 instance : CompilerDiagnostic TCError String where
@@ -84,6 +90,8 @@ instance : CompilerDiagnostic TCError String where
   | .notSendable .. => Diagnostics.notSendable.code
   | .unconstrainedMetavariable _ => Diagnostics.unconstrainedMetavariable.code
   | .alreadyDeclared .. => Diagnostics.alreadyDeclared.code
+  | .recursiveNeverDefined .. => Diagnostics.recursiveNeverDefined.code
+  | .recursiveAnnotationMismatch .. => Diagnostics.recursiveAnnotationMismatch.code
   posOf
     | .todo pos _ => pos
     | .unboundVariable pos _ => pos
@@ -106,6 +114,8 @@ instance : CompilerDiagnostic TCError String where
     | .notSendable pos _ => pos
     | .unconstrainedMetavariable pos => pos
     | .alreadyDeclared pos _ => pos
+    | .recursiveNeverDefined pos _ => pos
+    | .recursiveAnnotationMismatch pos _ _ _ => pos
   msgOf
     | .todo _ msg => msg
     | .unboundVariable _ name => s!"Unbound variable `{name}`."
@@ -134,6 +144,11 @@ instance : CompilerDiagnostic TCError String where
     | .unconstrainedMetavariable _ =>
       "A metavariable was left unconstrained at the end of checking — an explicit type annotation is needed here."
     | .alreadyDeclared _ name => s!"`{name}` is already declared in this module."
+    | .recursiveNeverDefined _ name =>
+      s!"`RECURSIVE` operator `{name}` is declared but never defined."
+    | .recursiveAnnotationMismatch _ name recursiveType definitionType =>
+      s!"Operator `{name}` was declared `RECURSIVE` with type `{recursiveType}`, but its \
+         definition's own annotation gives it type `{definitionType}` instead."
 
 /-- The type checker's non-fatal diagnostics, collected out-of-band. `todo` is a placeholder. -/
 inductive TCWarning : Type
@@ -143,26 +158,35 @@ inductive TCWarning : Type
   compiled form aborts at runtime when its precondition (a `1..n` domain, a functional pair set)
   does not hold. `op` is the operator's name. -/
   | unsafeCast (pos : SourceSpan) (op : String)
+  /-- An operator definition's own `@type` is present but redundant — it matches the type its
+  `RECURSIVE` predeclaration already gave the same name. -/
+  | redundantRecursiveAnnotation (pos : SourceSpan) (name : String)
   deriving Repr, Inhabited, BEq
 
 /-- The `-W<name>`/`-Wno-<name>` name a given warning is filtered under. -/
 def TCWarning.name : TCWarning → String
   | .todo .. => "todo"
   | .unsafeCast .. => "unsafe"
+  | .redundantRecursiveAnnotation .. => "redundant-recursive-annotation"
 
 instance : CompilerDiagnostic TCWarning String where
   isError := false
   code
     | .todo .. => Diagnostics.typeCheckTodoWarning.code
     | .unsafeCast .. => Diagnostics.unsafeCast.code
+    | .redundantRecursiveAnnotation .. => Diagnostics.redundantRecursiveAnnotation.code
   name := TCWarning.name
   posOf
     | .todo pos _ => pos
     | .unsafeCast pos _ => pos
+    | .redundantRecursiveAnnotation pos _ => pos
   msgOf
     | .todo _ msg => msg
     | .unsafeCast _ op =>
       s!"`{op}` is an unsafe cast: the generated program aborts if the value does not have the \
          shape the cast assumes. Suppress with `-Wno-unsafe`."
+    | .redundantRecursiveAnnotation _ name =>
+      s!"`{name}`'s `@type` here is redundant — it matches the type its `RECURSIVE` \
+         predeclaration already gave it. Suppress with `-Wno-redundant-recursive-annotation`."
 
 end

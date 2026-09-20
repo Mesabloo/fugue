@@ -75,13 +75,14 @@ into a resolved declaration's body — the breadcrumb `Restrictions.lean`'s erro
 "reached via" through).
 
 Whenever a node is `.var _ (.module m name)`, resolves `(m, name)` and, the first time this pair
-is seen (`ReachabilityClosure`-memoized, guarding against looping on a self-recursive `function`
-— `operator`s never self-recurse, per `Elaborator/Declarations.lean` — so only `function` bodies
-can cycle), records the resolution and, if it resolved to an `operator`/`function`, recurses into
-its body too (`path` extended by `name`). A `constant`/`variable` resolution is recorded but never
-recursed into. Resolutions after the first for an already-visited pair are no-ops for recursion —
-`visit` still runs on every node regardless, since some checks are per-reference, not
-per-declaration. -/
+is seen (`ReachabilityClosure`-memoized, guarding against looping on a self- or mutually-recursive
+`function` or `RECURSIVE` operator — a plain, non-`RECURSIVE` `operator` still never self-recurses,
+per `Elaborator/Declarations.lean`, but this memoization handles either case uniformly, with no
+need to tell them apart), records the resolution and, if it resolved to an `operator`/`function`,
+recurses into its body too (`path` extended by `name`). A `constant`/`variable` resolution is
+recorded but never recursed into. Resolutions after the first for an already-visited pair are
+no-ops for recursion — `visit` still runs on every node regardless, since some checks are
+per-reference, not per-declaration. -/
 partial def TypedTLAPlus.Expression.walkReachable [MonadStateOf ReachabilityClosure m]
     (visit : List String → TypedPlusCal.Expression → m Unit)
     (currentModule : String) (ownDecls : List Decl) (path : List String)

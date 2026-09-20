@@ -104,6 +104,9 @@ instance {α} [Std.ToFormat α] : Std.ToFormat (Declaration α) where
       " == " ++ Std.format e
     | .function ann x qs e =>
       Std.format ann ++ f!" {x}" ++ .sbracket (.joinSep (qs.map λ q ↦ q.pretty Expression.pretty) ", ") ++ " == " ++ Std.format e
+    | .recursive vs => "RECURSIVE " ++ .joinSep (vs.map λ (v, n, ann) ↦
+        Std.format ann ++ f!" {v}" ++
+        if n > 0 then Std.Format.paren (.joinSep (List.replicate n "_") ", ") else Std.Format.nil) ", "
 
 instance {α β} [Std.ToFormat α] [Std.ToFormat β] : Std.ToFormat (Module α β) where
   format mod :=

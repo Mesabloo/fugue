@@ -68,7 +68,7 @@ proof that target behavior refines source behavior, via trace/simulation framewo
 | `CONSTANT` values, process-set (`p ∈ S`) cardinality | **Left to the user of the compiled code.** `CONSTANT`s abstract (type + value) to the compiler — concretized only when someone builds an executable from generated code (no `main`, §5.7). No `ASSUME`-pinning requirement, no companion config file. Process set `p ∈ S` does **not** compile to `S`-many spawned goroutines/definitions — each process definition compiles to a **single entry point** (Go function, Join Calculus process definition), parameterized over the process's identity/address; user invokes once per concrete process. §5.3, §5.6, §5.7. |
 | When imported modules get processed | **Eagerly and transitively**, right after desugaring, before type checking. Once main module parsed/desugared (§5.1–§5.2), driver recurses on each directly `EXTENDS`ed module — parse → desugar → recurse on *its* imports → type-check — before main module's own type checker (§5.3) starts. By the time main module reaches `[Goto]`/`[Assign]`/etc. rules, `Ξ` is fully populated for everything reachable. (`INSTANCE` out of scope, §8.) §5.3. |
 | How `GuardedPlusCal.Algorithm.WellScoped` is established for Guarded→Network | **General preservation lemma, proved once**, not a per-run decision procedure: `CorePlusCal.WellScoped p → GuardedPlusCal.Algorithm.WellScoped (Computable2Guarded (Elaborator p))`, proved as part of `Elaborator`/`Computable2Guarded` verification (§5.5, §6.2), reused unchanged for every compiled program. `CorePlusCal.WellScoped`, the antecedent, authored fresh (§5.2a). |
-| Language-subset exclusions for first type checker | **`INSTANCE` and `RECURSIVE` out of scope for now.** Neither in §8's subset, neither prior-art checkout parses them, both need real design before checkable. Revisit if a program needs either. For `RECURSIVE` if picked up: require explicit type annotation on the declaration for every operator in the group, extend `Γ` with all declared sibling types up front, check each body against its own annotation independently — breaks the circularity a mutually-recursive group creates for a bidirectional checker; standard precedent (mutual `def`/`def` in Coq/Agda/Lean always carry signatures); near-necessary for decidability under rank-1 polymorphism if any operator in the group is polymorphic. §9.37. |
+| Language-subset exclusions for first type checker | **`INSTANCE` still out of scope; `RECURSIVE` is supported.** `RECURSIVE` needed a prerequisite first — user-defined operator symbols (declaration-site `OpDecl` grammar: `F(_,_)`, `_+_`, `-. _`, `_'`, plus definition-site symbolic `==` forms), since `RECURSIVE _+_`-style predeclaration was requested and nothing let a module declare an operator under a symbolic name at all before this. `RECURSIVE` itself follows the thesis's own formal system precisely (Fig. 3.1.9/3.1.10): a second context `Δ` ("operators marked recursive"), threaded through declaration checking alongside `Γ` but never merged into it — `RECURSIVE f, g` adds both to `Δ` only; each `==` definition's body checks against `Γ ∪ Δ` (right-biased), so a `Δ`-pending sibling (including the operator's own name, for self-recursion) is visible to a definition body without ever entering `Γ` itself, and discharges out of `Δ` once its own `==` lands anywhere later in the module (either `declarations₁` or `declarations₂`, any order, not necessarily adjacent to its `RECURSIVE` line). Consequence, load-bearing and worth restating precisely: a `RECURSIVE`-pending name is visible **only** while checking another operator definition's body — not from `ASSUME`, not from a `.function` body (self-recursive unconditionally already, `Δ` plays no role there), not from the embedded PlusCal algorithm. A definition's own `@type` is optional once `RECURSIVE` already gives the name a type (used directly); given anyway, it must match (`E0076` if not, `W0009` redundant-but-consistent if it does). A name still in `Δ` once the whole module is checked is `E0075`, "declared but never defined." Symbolic `RECURSIVE` forms work (`RECURSIVE _+_`), built on the same `OpDecl` grammar `CONSTANT` uses. Go backend: no special-casing needed — a `RECURSIVE`-declared operator still compiles to a plain top-level Go `func` (§5.7), and Go's own order-independent package-level name resolution ties the recursion for free. |
 | `Ξ`'s cache: disk persistence and invalidation | **In-memory only for now, no disk persistence.** A disk-backed cache under `~/.local/config/.fugue` raises an invalidation question with no good answer: a compiler-side change (bug fix, stdlib-stub update, toolchain bump) can silently invalidate a cached module's typed form without touching that module's source. In-memory `MonadModuleCache` sidesteps it: nothing persists across runs, nothing goes stale. Disk persistence, once picked up, needs either a cache-key compiler/schema-version component (bumped whenever anything affecting typing output changes) or a global "cache format version" stamp wiping the directory on mismatch — undecided, revisit once checker stabilizes. |
 | Pipeline order: well-formedness (§5.2a) vs. type checking (§5.3) | **Type checking runs first.** It already forces variable well-scopedness as a side effect of succeeding (out-of-scope/undeclared reference = `Γ`/`Σ`/`Δ`-lookup failure = type error) — a well-scopedness pre-pass would re-derive that. Well-formedness's other two checks (well-labelledness, no-bare-temporal-operators) have no typing dependency either way. Well-scopedness's "every reference resolves" half becomes redundant defense-in-depth; its "no shadowing / no duplicate names in scope" half is not implied by bidirectional type checking (a shadowed name still type-checks against something) and stays this pass's load-bearing job. §5.2a, §7. |
 | Polymorphism instantiation / metavariable resolution | **Direction-aware solving, not naive eager unification** — subtyping axioms are asymmetric coercions, not equivalence. Lower-bound constraints (`T <: ?n`) solve eagerly (coercions run narrow→wide); upper-bound constraints (`?n <: T`) recorded pending, never solved from directly (would foreclose a narrower solution arriving later). Metavariable-vs-metavariable (`?m <: ?n`, both unresolved) must **not** merge into one — unsound, conflates two independently-constrained unknowns; record the link on the lower side, propagate once one side resolves from a real ground bound. A metavariable with no bounds at end of checking — including one whose only bound is an unresolved metavariable — is a hard type error, not a silent default. Full algorithm + counterexamples §5.3. |
@@ -273,6 +273,29 @@ tokenizing; stops tokenizing at first `.moduleEnd` footer token, drops remainder
 `lexModule` requires header + footer; `lexFragment` (bare token loop to end of input, no
 header/footer) re-lexes a snippet with no module wrapper of its own —
 `Parser_/Annotations.lean`'s `parseMailbox` uses it for a `@mailbox` expression.
+
+**User-defined operator symbols** (`CONSTANT`/`RECURSIVE` declaring a symbolic name, `a + b ==
+…`-style symbolic definitions). Two grammar additions, both parser-only — checker and both
+backends already handled a symbolically-named operator exactly like `F`/`G` (arithmetic already
+works this way: `+`/`-`/etc. are ordinary `.operator` declarations in `Driver/Builtins.lean`,
+plain strings, not builtin-only magic), so nothing past the parser changed:
+- **Declaration-site**, a shared `OpDecl` combinator (`parseOpDecl`, `Parser_/TLAPlus.lean`):
+  a plain identifier (arity 0); `F(_,...,_)` (arity = `_` count, an uninterpreted higher-order
+  name); or one of the fixed prefix/infix/postfix symbols (`_+_`, `-. _`, `_'`). Used by
+  `CONSTANT`/`CONSTANTS` and `RECURSIVE`'s predeclaration list; not `VARIABLE`/`VARIABLES`
+  (variables aren't operators in TLA⁺'s own grammar).
+- **Definition-site**, new `parseOperator` rules for symbolic `==` forms: prefix (`-. x ==
+  e`), infix (`a + b == e`), postfix (`x' == e`) — alongside the existing plain/higher-order
+  shape.
+- **Unary minus's declaration-site spelling is `-.`**, not bare `-`, at both sites — bare `-`
+  is genuinely ambiguous (`RECURSIVE - _` could be a mistyped `_-_` missing its leading `_`, or
+  an intended `-_`), and `-.` is TLA⁺'s own resolution. Own atomic lexer token (`Token.«-.»`),
+  never appearing in ordinary expression grammar, so it has no effect outside declaration/
+  symbolic-definition sites; canonicalizes to unary minus's existing `"-."` name — same
+  operator, not a new one.
+- **Symbol eligibility is enforced dynamically at elaboration** (§5.3's shadowing rule), not
+  by narrowing this grammar — every `PrefixOperator`/`InfixOperator`/`PostfixOperator` member
+  parses here, whether or not it turns out to be a legal declaration target.
 
 Known parser gaps: §9.2. Type aliases (Apalache `@typeAlias`-style) unsupported, Lean
 representation not picked: §9.39.
@@ -657,7 +680,21 @@ instantiation, below):
   §3.1.1). **Every top-level `operator`/`function` *definition* carries a mandatory
   `@type`** — `Elaborator/Declarations.lean`'s `[Operator/Function definition]` rules are
   checking-only against it (thesis Fig. 3.1.9), so `X == 0` is rejected without one even
-  though its body would synthesize (§9.34). `RECURSIVE` out of scope (§2, §8).
+  though its body would synthesize (§9.34). **Exception**: a `RECURSIVE`-predeclared
+  operator's own definition may omit `@type` — its `RECURSIVE` line already gave it one,
+  used directly instead of `requireAnnotation`; given anyway, it must match (§2).
+- **No declaration may shadow an existing name.** `requireFresh` (`Elaborator/
+  Declarations.lean`), called from `CONSTANT`/`VARIABLE`/operator/function's checking rules
+  right after each declared name is known, rejects one already in `Γ` — `TCError.
+  alreadyDeclared`/`E0074`. Also rejects, regardless of whether `Γ` currently binds it, a name
+  the language permanently reserves: `TypedTLAPlus.reservedTemporalActionNames` (`[]`, `<>`,
+  `ENABLED`, `UNCHANGED`, `'`, `^+`, `^*`, `^#`, `~>`, `-+->`) plus `SUBSET`/`UNION` — these
+  have no `builtinContext` entry (no typing rule implemented for them), so a plain `Γ`-lookup
+  alone would call them free; still permanently fixed TLA⁺ primitives, never user-redefinable.
+  Needed once user-defined operator symbols (§5.1) let a declaration's grammar match an
+  operator *token* directly, bypassing the "is this a valid identifier" question a *named*
+  collision (`SUBSET == 5`) never could — before that, the lexer mapping keywords straight to
+  fixed tokens gave this protection for free.
 - **Polymorphism instantiation — not the thesis's `Specialize` rule.** Instead (per the
   local `Checker/Typechecker/{Convertibility,Rules}.lean`): one fresh metavariable `?n` per
   bound type variable when a polymorphic operator is used, resolved incrementally as
@@ -1280,9 +1317,12 @@ correctness sketch is the chapter's only remaining stub):
   Go's type system; "immutable" is a documentation convention) initialized once (Go's
   `const` accepts too small a class of types). Parametric operators → Go functions (Go has
   native mutual recursion); names capitalized (Go public/private convention) regardless of
-  original casing, except `LOCAL` definitions. **An operator is never recursive here**:
-  `RECURSIVE` is out of the language and `[Operator definition]` checks a body without the
-  operator in `Γ`. **Recursive *functions*** need a bootstrap trick (the generator closure
+  original casing, except `LOCAL` definitions. **A `RECURSIVE`-declared operator needs no
+  special-casing here**: `[Operator definition]` checks its body against `Γ ∪ Δ` (§2), so a
+  self- or mutually-recursive reference is already resolved by the time this stage sees it —
+  it compiles to a plain Go `func` exactly like any other parametric operator, and Go's own
+  package-level name resolution (order-independent) ties the recursion. **Recursive
+  *functions*** need a bootstrap trick (the generator closure
   calls back into the `LazyFunction` it's building): `MkRecFn` allocates the `LazyFunction`
   with a `nil` generator, then overwrites `.gen` with a closure capturing the function by
   reference — ties the knot. A function definition *may* recurse (its name is bound while
@@ -2193,8 +2233,8 @@ Statements: `goto`, `skip`, `await e`, `receive(c, r)`, `r ≔ e`, `with x = e d
 S ⋆ x1=e1,...,xm=em ⋆ T1...Tn` (single-process `process(x=e)` is sugar for `process(x ∈
 {e})`, thesis §3.1.5 — desugared away early). Algorithms: `fifos c1:τ1,...; P1 ∥ ... ∥ Pn`.
 
-`INSTANCE` and `RECURSIVE` are out of scope (§2). `LAMBDA` is out of scope (§9.10). Most
-temporal/action operators aren't parsed (§9.11).
+`INSTANCE` is out of scope; `RECURSIVE` is supported (§2). `LAMBDA` is out of scope (§9.10).
+Most temporal/action operators aren't parsed (§9.11).
 
 ---
 

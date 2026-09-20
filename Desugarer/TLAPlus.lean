@@ -305,6 +305,7 @@ namespace SurfaceTLAPlus
         let (bs, e) ← flattenBound pos (← bitraverse pure Expression.desugar qb) e
         return (bs ++ bindings, e)
       return .function ann x (bindings.map λ (x, _ann, dom) ↦ (x, dom)) e
+    | .recursive xs => pure <| .recursive (xs.map λ (x, arity, ann) ↦ (x.canonicalName, arity, ann))
 
   def Module.desugar (mod : Module (SurfacePlusCal.Algorithm α (Expression α)) α) :
       m (CoreTLAPlus.Module (SurfacePlusCal.Algorithm α (CoreTLAPlus.Expression α)) α) :=

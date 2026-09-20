@@ -77,6 +77,7 @@ namespace SurfaceTLAPlus.Lexer
         | "CONSTANT" => .constant
         | "VARIABLES" => .variables
         | "VARIABLE" => .variable
+        | "RECURSIVE" => .recursive
         | "IF" => .if
         | "THEN" => .then
         | "ELSE" => .else
@@ -1116,6 +1117,18 @@ namespace SurfaceTLAPlus.Parser
       return ⟨name, arity, ann⟩
     return vars.toList
 
+  /-- `RECURSIVE`'s predeclaration list — same `OpDecl` shape as `CONSTANT`, one entry per
+  eventually-defined operator, no defining expression here (that's a separate, later
+  `parseOperator`). -/
+  private def parseRecursive : TLAPlusParser (List (OpName × Nat × List CommentAnnotation)) := debug "recursive" do
+    let _ ← token .recursive
+
+    let vars ← sepBy1 comma do
+      let ann ← tryParseAnnotations
+      let (name, arity) ← parseOpDecl
+      return ⟨name, arity, ann⟩
+    return vars.toList
+
   private def parseVariables : TLAPlusParser (List (String × List CommentAnnotation)) := debug "variables" do
     let _ ← token .variable <||> token .variables
 
@@ -1202,6 +1215,7 @@ namespace SurfaceTLAPlus.Parser
     | ⟨_, .assume⟩ => (.some ∘ .assume) <$> (lexeme (pure ()) *> parseAssume)
     | ⟨_, .constant⟩ | ⟨_, .constants⟩ => (.some ∘ .constants) <$> (lexeme (pure ()) *> parseConstants)
     | ⟨_, .variable⟩ | ⟨_, .variables⟩ => (.some ∘ .variables) <$> (lexeme (pure ()) *> parseVariables)
+    | ⟨_, .recursive⟩ => (.some ∘ .recursive) <$> (lexeme (pure ()) *> parseRecursive)
     | ⟨_, .moduleStart _⟩ =>
       .none <$ (lexeme (pure ()) *> tokenFilter λ | ⟨_, .moduleStart _⟩ => true | _ => false)
     | _ =>

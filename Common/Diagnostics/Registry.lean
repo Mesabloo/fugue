@@ -229,6 +229,14 @@ def unconstrainedMetavariable : Entry :=
 def alreadyDeclared : Entry :=
   { code := e 74, stage := .typeCheck, summary := "A declaration's name is already bound in this module." }
 
+/-- A `RECURSIVE`-predeclared operator with no matching definition. -/
+def recursiveNeverDefined : Entry :=
+  { code := e 75, stage := .typeCheck, summary := "A RECURSIVE operator is declared but never defined." }
+
+/-- An operator definition's `@type` disagrees with its `RECURSIVE` predeclaration's type. -/
+def recursiveAnnotationMismatch : Entry :=
+  { code := e 76, stage := .typeCheck, summary := "An operator's definition-site @type disagrees with its RECURSIVE type." }
+
 /-! ## Well-formedness -/
 
 /-- A `goto` to a label no process defines. -/
@@ -383,6 +391,11 @@ def unsafeCast : Entry :=
   { code := w 8, stage := .typeCheck, warningName := "unsafe",
     summary := "A call to an unsafe cast whose compiled form aborts at runtime if its precondition fails." }
 
+/-- An operator definition's `@type` is present but matches its `RECURSIVE` predeclaration's type. -/
+def redundantRecursiveAnnotation : Entry :=
+  { code := w 9, stage := .typeCheck, warningName := "redundant-recursive-annotation",
+    summary := "A definition-site @type is redundant — it already matches the RECURSIVE type." }
+
 /-! ## `macro` expansion -/
 
 /-- Two `macro` declarations share a name. -/
@@ -428,6 +441,7 @@ def entries : List Entry :=
     notASetType, notARecordType, notIndexable, unknownField, invalidTupleIndex, notAnOperatorType,
     arityMismatch, ambiguousType, notAFunctionType, notATupleType, paramArityMismatch,
     notAChannelType, notShowable, notSendable, unconstrainedMetavariable, alreadyDeclared,
+    recursiveNeverDefined, recursiveAnnotationMismatch,
     unknownLabel, redefinedDone, duplicateName, shadowedName, channelInExpression,
     channelTypedVariable, nonEmptyLocalChannels, globalPlusCalVariable, globalTLAPlusVariable,
     bareTemporalOrAction, unboundedQuantifier, receiveChannelMismatch, mailboxNotIndexedBySelf,
@@ -437,6 +451,7 @@ def entries : List Entry :=
     moduleNameMismatch,
     fairIgnored, unusedAnnotation, duplicateParameterAnnotation, typeCheckTodoWarning,
     partialMulticastAnnotation, extendsAlgorithm, unusedMailbox, unsafeCast,
+    redundantRecursiveAnnotation,
     duplicateMacroDecl, labelInMacroBody, recursiveMacro, undefinedMacro, macroArityMismatch,
     macroArgumentNotAssignable, internalUnexpandedMacroCall ]
 
