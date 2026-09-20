@@ -593,7 +593,9 @@ instance instTraversableProd {α : Type} : Traversable (Prod α) where
   desugaring ever sees it. `RECURSIVE` and module `INSTANCE` are not represented.
 -/
 inductive Declaration (α : Type) : Type
-  | constants : List (String × α) → Declaration α
+  /-- A constant declaration, optionally operator-shaped — the `Nat` is its arity (`0` for an
+  ordinary value, matching `CONSTANT F(_, _)`'s written arity otherwise). -/
+  | constants : List (String × Nat × α) → Declaration α
   | «variables» : List (String × α) → Declaration α
   | assume : Expression α → Declaration α
   /--
@@ -617,7 +619,7 @@ instance {α} [Repr α] : Repr (Declaration α) where
 
 instance : Functor Declaration where
   map f
-    | .constants xs => .constants (Bifunctor.snd f <$> xs)
+    | .constants xs => .constants (Prod.map₃ id id f <$> xs)
     | .variables xs => .variables (Bifunctor.snd f <$> xs)
     | .assume e => .assume (f <$> e)
     | .operator a x args e => .operator (f a) x args (f <$> e)
@@ -625,7 +627,7 @@ instance : Functor Declaration where
 
 instance : Traversable Declaration where
   traverse f
-    | .constants xs => .constants <$> traverse (bitraverse pure f) xs
+    | .constants xs => .constants <$> traverse (Prod.traverse₃ pure pure f) xs
     | .variables xs => .variables <$> traverse (bitraverse pure f) xs
     | .assume e => .assume <$> traverse f e
     | .operator a x args e => (.operator · x args ·) <$> f a <*> traverse f e

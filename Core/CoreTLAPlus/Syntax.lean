@@ -162,19 +162,86 @@ protected partial def Expression.traverse {F : Type → Type} [Applicative F] {�
 instance : Traversable Expression where
   traverse := Expression.traverse
 
-/-- A top-level TLA⁺ declaration. `RECURSIVE` and module `INSTANCE` are not represented. -/
-abbrev Declaration := _root_.Declaration Expression
+/--
+  A top-level TLA⁺ declaration. `RECURSIVE` and module `INSTANCE` are not represented. Own type
+  rather than an `abbrev` over `Core/Declaration.lean`'s shared one: a `CONSTANT`'s own arity
+  (`0` for an ordinary value, matching `CONSTANT F(_, _)`'s written arity otherwise) is only
+  needed up to the elaborator's arity-vs-annotation consistency check, and has no role in
+  `TypedTLAPlus.Declaration`, which reuses the shared type unchanged.
+-/
+inductive Declaration (α : Type) : Type
+  | constants : List (String × Nat × α) → Declaration α
+  | «variables» : List (String × α) → Declaration α
+  | assume : Expression α → Declaration α
+  /--
+    An operator definition, optionally with higher-order arguments. Each parameter's `Nat`
+    is its arity (`0` for `x`, `3` for `F(_, _, _)`, …).
+  -/
+  | operator : α → String → List (String × Nat) → Expression α → Declaration α
+  /-- A function definition, with an explicit domain for every argument. -/
+  | function : α → String → List (String × Expression α) → Expression α → Declaration α
+
+/-- Hand-written since `deriving Repr` can't discharge the higher-kinded `Repr (Expression α)`
+obligation. -/
+instance {α} [Repr α] : Repr (Declaration α) where
+  reprPrec d _ := match d with
+    | .constants xs => f!"Declaration.constants {repr xs}"
+    | .variables xs => f!"Declaration.variables {repr xs}"
+    | .assume e => f!"Declaration.assume {repr e}"
+    | .operator a x args e => f!"Declaration.operator {repr a} {repr x} {repr args} {repr e}"
+    | .function a x args e => f!"Declaration.function {repr a} {repr x} {repr args} {repr e}"
+
+instance : Functor Declaration where
+  map f
+    | .constants xs => .constants (Prod.map₃ id id f <$> xs)
+    | .variables xs => .variables (Bifunctor.snd f <$> xs)
+    | .assume e => .assume (f <$> e)
+    | .operator a x args e => .operator (f a) x args (f <$> e)
+    | .function a x args e => .function (f a) x (Bifunctor.snd (f <$> ·) <$> args) (f <$> e)
+
+instance : Traversable Declaration where
+  traverse f
+    | .constants xs => .constants <$> traverse (Prod.traverse₃ pure pure f) xs
+    | .variables xs => .variables <$> traverse (bitraverse pure f) xs
+    | .assume e => .assume <$> traverse f e
+    | .operator a x args e => (.operator · x args ·) <$> f a <*> traverse f e
+    | .function a x args e => (.function · x · ·) <$> f a <*> traverse (bitraverse pure (traverse f)) args <*> traverse f e
 
 /--
   A desugared TLA⁺ module, wrapping the embedded (still-Surface, not-yet-desugared-at-the-
   statement-level) PlusCal algorithm at whatever `α` the caller instantiates it at — kept abstract
-  to avoid a cyclic import.
+  to avoid a cyclic import. Own type for the same reason `Declaration` above is.
 -/
-abbrev Module := _root_.TLAModule Expression
+structure Module (α β : Type) : Type where
+  name : String
+  «extends» : List String
+  declarations₁ : List (Declaration β)
+  pcalAlgorithm : Option α
+  declarations₂ : List (Declaration β)
+  deriving Inhabited
 
-namespace Module
-export _root_.TLAModule (mk)
-end Module
+/-- Hand-written, same reason as `Declaration`'s `Repr` instance above. -/
+instance {α β} [Repr α] [Repr β] : Repr (Module α β) where
+  reprPrec m _ :=
+    f!"\{ name := {repr m.name}, extends := {repr m.extends}, declarations₁ := {repr m.declarations₁}, " ++
+    f!"pcalAlgorithm := {repr m.pcalAlgorithm}, declarations₂ := {repr m.declarations₂} }"
+
+/-- `@@ posOf m`, same reason `Core/Declaration.lean`'s `TLAModule` instance carries it: mapping
+a module rebuilds the structure, and a rebuilt node that isn't re-registered has no position of
+its own. -/
+instance : Bifunctor Module where
+  bimap f g m := { m with
+    declarations₁ := (g <$> ·) <$> m.declarations₁
+    pcalAlgorithm := f <$> m.pcalAlgorithm
+    declarations₂ := (g <$> ·) <$> m.declarations₂
+  } @@ posOf m
+
+instance : Bitraversable Module where
+  bitraverse f g m :=
+    ({m with declarations₁ := ·, pcalAlgorithm := ·, declarations₂ := · } @@ posOf m)
+      <$> traverse (traverse g) m.declarations₁
+      <*> traverse f m.pcalAlgorithm
+      <*> traverse (traverse g) m.declarations₂
 
 end CoreTLAPlus
 

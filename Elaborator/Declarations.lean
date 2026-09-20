@@ -97,10 +97,15 @@ def checkDeclaration (moduleName : String) (d : SrcDecl) : m (Decl × List (Stri
     ───────────────────────────────────────────────────── [Constants]
      Γ ⊢ CONSTANTS x₁ : τ₁, …, xₙ : τₙ ⊣ Γ, x₁ : τ₁, …, xₙ : τₙ
 
-    (`xᵢ ∉ Γ` deferred to the well-scopedness pass, not checked here.)
+    (`xᵢ ∉ Γ` deferred to the well-scopedness pass, not checked here. A `CONSTANT` may itself be
+    operator-shaped — `F(_, _)` — in which case its written arity is checked against its
+    annotation's own arity, the same `checkParamArity` an operator's higher-order parameters use.)
   -/
   | .constants xs => do
-    let xs' ← xs.mapM λ (x, ann) ↦ return (x, ← requireAnnotation SourceSpan.placeholder s!"CONSTANT `{x}`" ann)
+    let xs' ← xs.mapM λ (x, arity, ann) ↦ do
+      let τ ← requireAnnotation SourceSpan.placeholder s!"CONSTANT `{x}`" ann
+      checkParamArity SourceSpan.placeholder x arity τ
+      return (x, τ)
     return (.constants xs', xs'.map λ (x, τ) ↦ (x, { type := τ, origin := .module moduleName x }))
   /-
     Same shape as [Constants].

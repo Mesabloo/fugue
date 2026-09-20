@@ -93,7 +93,9 @@ instance {α} [Std.ToFormat α] : Std.ToFormat (Expression α) := ⟨Expression.
 
 instance {α} [Std.ToFormat α] : Std.ToFormat (Declaration α) where
   format
-    | .constants vs => "CONSTANTS " ++ .joinSep (vs.map λ (v, ann) ↦ Std.format ann ++ f!" {v}") ", "
+    | .constants vs => "CONSTANTS " ++ .joinSep (vs.map λ (v, n, ann) ↦
+        Std.format ann ++ f!" {v}" ++
+        if n > 0 then Std.Format.paren (.joinSep (List.replicate n "_") ", ") else Std.Format.nil) ", "
     | .variables vs => "VARIABLES " ++ .joinSep (vs.map λ (v, ann) ↦ Std.format ann ++ f!" {v}") ", "
     | .assume e => "ASSUME " ++ Std.format e
     | .operator ann x ps e =>

@@ -1076,13 +1076,17 @@ namespace SurfaceTLAPlus.Parser
     let _ ← token .assume
     parseExpression
 
-  private def parseConstants : TLAPlusParser (List (String × List CommentAnnotation)) := debug "constant" do
+  /-- A `CONSTANT` may be an ordinary value or operator-shaped (`F(_, _)`, an uninterpreted
+  higher-order constant) — same arity-parens shape `parseOperator`'s higher-order-parameter
+  parsing already uses below. -/
+  private def parseConstants : TLAPlusParser (List (String × Nat × List CommentAnnotation)) := debug "constant" do
     let _ ← token .constant <||> token .constants
 
     let vars ← sepBy1 comma do
       let ann ← tryParseAnnotations
       let var ← parseIdentifier
-      return ⟨var, ann⟩
+      let argCount ← eoption <| parens <| Array.size <$> sepBy1 comma underscore
+      return ⟨var, argCount.getD 0, ann⟩
     return vars.toList
 
   private def parseVariables : TLAPlusParser (List (String × List CommentAnnotation)) := debug "variables" do
