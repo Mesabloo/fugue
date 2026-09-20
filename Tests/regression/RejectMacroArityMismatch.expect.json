@@ -1,0 +1,4 @@
+{
+  "failsAt": "desugar",
+  "error": { "code": "E0071", "position": "16:9", "notes": ["10:5"] }
+}

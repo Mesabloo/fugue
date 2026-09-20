@@ -21,8 +21,10 @@ purely as a verification artifact. Revisit once §5.6 exists.
 Not blockers, none hit by §8's subset:
 - Incomplete TLA⁺ reserved-word list (`TLAPlus.lean:62`); no binary/octal/hex number literals
   (`TLAPlus.lean:376`); no handling of junk before/after the module (`TLAPlus.lean:1135`).
-- PlusCal `macro`/`procedure`/`define` unsupported (`PlusCal.lean:387`) —
-  `Core/SurfacePlusCal/Syntax.lean` has no AST nodes for them.
+- PlusCal `procedure`/`define` unsupported (`PlusCal.lean:423`) — `Core/SurfacePlusCal/Syntax.
+  lean` has no AST nodes for them; `procedure` needs call-stack runtime semantics, `define` needs
+  `Elaborator` scoping, neither is "pure syntax" the way `macro` was. `macro` itself is supported
+  (`Desugarer/PlusCal.lean`'s `Algorithm.expandMacros`, a pre-desugar textual-substitution pass).
 - `LET`/`IN` are lexed (`.let`/`.in` tokens exist) but have **no parser rule at all**. `CHOOSE`
   used to be in the same state; it now has one (`parseChoose`, bounded and unbounded both).
 - `@type` supports only the Apalache-style syntax (`Channel({type: Str, agent: Address})`); the

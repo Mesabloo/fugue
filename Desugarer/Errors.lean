@@ -44,6 +44,29 @@ inductive DesugarError : Type
   /-- The right-hand side of a record-access `.` is not a bare field-name identifier (e.g. `r.1`,
   `r.(f)`). -/
   | invalidRecordFieldAccess (pos : SourceSpan)
+  /-- Two `macro` declarations share a name. `firstPos` is the earlier one's own span. -/
+  | duplicateMacroDecl (pos : SourceSpan) (name : String) (firstPos : SourceSpan)
+  /-- A label appears inside a `macro` body — never allowed, same restriction as `with`. -/
+  | labelInMacroBody (pos : SourceSpan)
+  /-- The macro call-graph (which macro name each declared macro's own body calls) has a cycle.
+  `pos` is the flagged declaration's own span; `cycle` is the chain of calls closing the loop,
+  outermost first, each entry the callee name and the call site inside its caller's body. -/
+  | recursiveMacro (pos : SourceSpan) (cycle : List (String × SourceSpan))
+  /-- A `Name(…)` call names no declared macro. -/
+  | undefinedMacro (pos : SourceSpan) (name : String)
+  /-- A macro call's argument count doesn't match its declaration's parameter count. `declPos` is
+  the declaration's own span. -/
+  | macroArityMismatch (pos : SourceSpan) (name : String) (expected got : Nat) (declPos : SourceSpan)
+  /-- A macro call's argument is substituted into a parameter that the macro body writes to
+  (`assign`/`receive`'s target, `send`'s channel), but the argument itself is not a reference
+  (variable, possibly indexed/field-accessed) that can be written to. `writePos` is the span of
+  the statement inside the macro body that writes to the parameter. -/
+  | macroArgumentNotAssignable (pos : SourceSpan) (macroName paramName : String) (writePos : SourceSpan)
+  /-- A `.macroCall` reached statement desugaring — every one should have been rewritten away by
+  `Desugarer/PlusCalMacros.lean`'s expansion pass, which runs first in `runDesugarer`. Reported as
+  a diagnostic rather than `panic!`/`unreachable!`, matching this compiler's own instinct of never
+  taking the process down on a "should be impossible" path. -/
+  | internalUnexpandedMacroCall (pos : SourceSpan)
 
 instance : CompilerDiagnostic DesugarError String where
   isError := true
@@ -60,6 +83,13 @@ instance : CompilerDiagnostic DesugarError String where
     | .duplicateAnnotation .. => Diagnostics.duplicateAnnotation.code
     | .conflictingAssignment .. => Diagnostics.conflictingAssignment.code
     | .invalidRecordFieldAccess _ => Diagnostics.invalidRecordFieldAccess.code
+    | .duplicateMacroDecl .. => Diagnostics.duplicateMacroDecl.code
+    | .labelInMacroBody _ => Diagnostics.labelInMacroBody.code
+    | .recursiveMacro .. => Diagnostics.recursiveMacro.code
+    | .undefinedMacro .. => Diagnostics.undefinedMacro.code
+    | .macroArityMismatch .. => Diagnostics.macroArityMismatch.code
+    | .macroArgumentNotAssignable .. => Diagnostics.macroArgumentNotAssignable.code
+    | .internalUnexpandedMacroCall _ => Diagnostics.internalUnexpandedMacroCall.code
   posOf
     | .misplacedAt pos
     | .gotoNotInTailPosition pos
@@ -72,7 +102,14 @@ instance : CompilerDiagnostic DesugarError String where
     | .wrongAnnotationKindAtSite pos _ _
     | .duplicateAnnotation pos _
     | .conflictingAssignment pos _
-    | .invalidRecordFieldAccess pos => pos
+    | .invalidRecordFieldAccess pos
+    | .duplicateMacroDecl pos ..
+    | .labelInMacroBody pos
+    | .recursiveMacro pos _
+    | .undefinedMacro pos _
+    | .macroArityMismatch pos ..
+    | .macroArgumentNotAssignable pos ..
+    | .internalUnexpandedMacroCall pos => pos
   msgOf
     | .misplacedAt _ => "Unexpected '@' outside 'EXCEPT' construct."
     | .gotoNotInTailPosition _ => "'goto' may not be followed by further unlabelled statements."
@@ -86,6 +123,23 @@ instance : CompilerDiagnostic DesugarError String where
     | .duplicateAnnotation _ kind => s!"Only one '{kind}' annotation is allowed per binder."
     | .conflictingAssignment _ name => s!"'{name}' is written to more than once within the same atomic step."
     | .invalidRecordFieldAccess _ => "The right-hand side of '.' must be a field name."
+    | .duplicateMacroDecl _ name _ => s!"Macro '{name}' is declared more than once."
+    | .labelInMacroBody _ => "A label may not appear inside a 'macro' body."
+    | .recursiveMacro .. => "Macro declarations may not be recursive."
+    | .undefinedMacro _ name => s!"'{name}' is not a declared macro."
+    | .macroArityMismatch _ name expected got _ =>
+      s!"Macro '{name}' expects {expected} argument(s), but was called with {got}."
+    | .macroArgumentNotAssignable _ macroName paramName _ =>
+      s!"This argument cannot be written to, but macro '{macroName}''s parameter '{paramName}' is assigned to in its body."
+    | .internalUnexpandedMacroCall _ =>
+      "Internal error: a macro call reached statement desugaring without being expanded."
+  notesOf
+    | .duplicateMacroDecl _ name firstPos => [(firstPos, s!"'{name}' first declared here")]
+    | .recursiveMacro _ cycle => cycle.map λ (name, callPos) ↦ (callPos, s!"recursively calls macro '{name}' here")
+    | .macroArityMismatch _ name _ _ declPos => [(declPos, s!"macro '{name}' declared here")]
+    | .macroArgumentNotAssignable _ _ paramName writePos =>
+      [(writePos, s!"'{paramName}' is assigned to here")]
+    | _ => []
 
 /-- Non-fatal issues found while desugaring — collected out-of-band and filtered/printed once
 desugaring returns (`Driver/Modules.lean`'s `compileModule`). -/

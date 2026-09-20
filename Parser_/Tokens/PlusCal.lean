@@ -16,6 +16,7 @@ namespace SurfacePlusCal
     | «else»
     | «while»
     | «with»
+    | macro
     | skip
     | either
     | await
@@ -50,6 +51,7 @@ namespace SurfacePlusCal
     | .else => "keyword 'else'"
     | .while => "keyword 'while'"
     | .with => "keyword 'with'"
+    | .macro => "keyword 'macro'"
     | .skip => "keyword 'skip'"
     | .either => "keyword 'either'"
     | .await => "keyword 'await'"

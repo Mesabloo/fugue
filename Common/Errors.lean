@@ -21,6 +21,10 @@ class CompilerDiagnostic (ε : Type _) (α : outParam (Type _)) [Colorized α] w
   posOf : ε → SourceSpan
   msgOf : ε → α
   hintsOf : ε → List α := λ _ ↦ []
+  /-- Extra, independently-positioned source snippets to quote after the hints, each with its own
+  message — e.g. "note: first declared here" pointing at an earlier declaration. Defaulted to `[]`,
+  so every existing instance keeps compiling untouched and renders byte-identical output. -/
+  notesOf : ε → List (SourceSpan × α) := λ _ ↦ []
   /-- The `-W<name>`/`-Wno-<name>` name this diagnostic is filtered under. Only meaningful for
   warnings — an error is never suppressed by `-W`, so its instance leaves this at the default. -/
   name : ε → String := λ _ ↦ ""
@@ -49,17 +53,10 @@ def colorizeIf {α} [Colorized α] (enabled : Bool) (c : Colorized.Color) (x : �
 def styleIf {α} [Colorized α] (enabled : Bool) (s : Colorized.Style) (x : α) : α :=
   if enabled then Colorized.style s x else x
 
-/-- Renders one diagnostic: an `error[E0042]:`-style header, the message and its hints, and the
-offending source line with the span underlined. `colored := false` (driven by `-fno-color`) disables
-ANSI styling. -/
+/-- One quoted source snippet: the offending line, with `pos`'s span underlined. Shared by a
+diagnostic's primary span and every `notesOf` span — `colored := false` disables ANSI styling. -/
 @[nospecialize]
-def CompilerDiagnostic.pretty {ε α : Type _} [Colorized α] [ToString α] [CompilerDiagnostic ε α] (err : ε) (source : List String.Slice) (colored : Bool := true) : String :=
-  -- `error[E0042]:` / `warning[W0003]:` — the code is part of the header, so continuation lines
-  -- and hints indent past all of it, not just past the severity word.
-  let header := s!"{if CompilerDiagnostic.isError ε then "error" else "warning"}[{CompilerDiagnostic.code err}]"
-  let color := if CompilerDiagnostic.isError ε then Colorized.Color.Red else .Yellow
-  let headerPadding := String.replicate (header.length + 2) ' '
-  let pos := CompilerDiagnostic.posOf err
+private def quoteSpan (source : List String.Slice) (pos : SourceSpan) (color : Colorized.Color) (colored : Bool) : String :=
   let n := pos.start.line
   let linePadding := String.replicate (n.repr.length + 2) ' '
   -- Degrade rather than panic on a line number this source doesn't have. A renderer is the last
@@ -73,10 +70,26 @@ def CompilerDiagnostic.pretty {ε α : Type _} [Colorized α] [ToString α] [Com
   let beginLine := line.take startCol
   let middleLine := line.drop startCol |>.take (endCol - startCol)
   let endLine := line.takeEnd (line.positions.length - endCol)
-  s!"{colorizeIf colored color <| styleIf colored .Bold s!"{header}:"} {toString (CompilerDiagnostic.msgOf err) |>.replace "\n" s!"\n{headerPadding}"}{String.join ((CompilerDiagnostic.hintsOf err).map λ s ↦ s!"\n{headerPadding}" ++ (toString s).replace "\n" s!"\n{headerPadding}")}
-{linePadding}|
+  s!"{linePadding}|
  {n} | {beginLine}{colorizeIf colored color middleLine}{endLine}
 {linePadding}|{String.replicate (startCol + 1) ' '}{colorizeIf colored color <| String.replicate (endCol - startCol) '^'}"
+
+/-- Renders one diagnostic: an `error[E0042]:`-style header, the message and its hints, the
+offending source line with the span underlined, and then one `note:` plus its own quoted snippet
+per `notesOf err` entry. `colored := false` (driven by `-fno-color`) disables ANSI styling. -/
+@[nospecialize]
+def CompilerDiagnostic.pretty {ε α : Type _} [Colorized α] [ToString α] [CompilerDiagnostic ε α] (err : ε) (source : List String.Slice) (colored : Bool := true) : String :=
+  -- `error[E0042]:` / `warning[W0003]:` — the code is part of the header, so continuation lines
+  -- and hints indent past all of it, not just past the severity word.
+  let header := s!"{if CompilerDiagnostic.isError ε then "error" else "warning"}[{CompilerDiagnostic.code err}]"
+  let color := if CompilerDiagnostic.isError ε then Colorized.Color.Red else .Yellow
+  let headerPadding := String.replicate (header.length + 2) ' '
+  -- `note:` is its own header line, flush left like `error[E0042]:` itself — not a continuation
+  -- of the primary message, so it does not take `headerPadding`.
+  let notes := String.join ((CompilerDiagnostic.notesOf err).map λ (notePos, noteMsg) ↦
+    s!"\n{colorizeIf colored Colorized.Color.Cyan <| styleIf colored .Bold "note:"} {toString noteMsg}\n{quoteSpan source notePos Colorized.Color.Cyan colored}")
+  s!"{colorizeIf colored color <| styleIf colored .Bold s!"{header}:"} {toString (CompilerDiagnostic.msgOf err) |>.replace "\n" s!"\n{headerPadding}"}{String.join ((CompilerDiagnostic.hintsOf err).map λ s ↦ s!"\n{headerPadding}" ++ (toString s).replace "\n" s!"\n{headerPadding}")}
+{quoteSpan source (CompilerDiagnostic.posOf err) color colored}{notes}"
 
 /-- The effects a diagnostics-producing pass needs: an always-growing `List α` of non-fatal
 warnings (`MonadWriter`), plus `MonadExceptOf`'s throw/catch for a fatal `β`. The point isn't the

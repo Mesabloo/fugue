@@ -82,6 +82,19 @@ def PipelineError.posOf : PipelineError → SourceSpan
   | .network e => CompilerDiagnostic.posOf e
   | .go e => CompilerDiagnostic.posOf e
 
+/-- This error's `notesOf`, from whichever pass produced it — the extra, independently-positioned
+source snippets `CompilerDiagnostic.pretty` renders after the hints. What a regression fixture
+asserts on (`Tests/Expectation.lean`'s `notePositions`) when a diagnostic's identity isn't enough
+and where its notes point matters too (e.g. a duplicate-declaration error's note at the first
+declaration). -/
+def PipelineError.notesOf : PipelineError → List (SourceSpan × String)
+  | .driver e => CompilerDiagnostic.notesOf e
+  | .wellFormedness e => CompilerDiagnostic.notesOf e
+  | .computable e => CompilerDiagnostic.notesOf e
+  | .guarded e => CompilerDiagnostic.notesOf e
+  | .network e => CompilerDiagnostic.notesOf e
+  | .go e => CompilerDiagnostic.notesOf e
+
 /-- Rendered form of `err`, against the source lines it belongs to: a driver error renders against
 its own module's lines (an error inside an `EXTENDS`-ed dependency is not about the main module),
 looked up in `sources`; everything past the driver only ever concerns the main module, so it

@@ -79,6 +79,10 @@ inductive Statement (α β : Type) : Type
   | receive (c : Ref β) (r : Ref β)
   | send (c : Ref β) (e : β)
   | multicast (c : String) (filter : MulticastFilter α β)
+  /-- `Name(e₁, …, eₙ);` — a call to a `macro`, expanded away by `Desugarer/PlusCalMacros.lean`
+  before `CorePlusCal` ever sees it (`Statement.desugarLabelFree`'s own `.macroCall` arm is
+  unreachable once expansion has run, and throws rather than panics if it isn't). -/
+  | macroCall (name : String) (args : List β)
   deriving Repr, Inhabited
 
 -- `partial`: structural recursion isn't visibly decreasing to Lean here (nested `List`/`Option`
@@ -97,6 +101,7 @@ protected partial def Statement.bimap {α β γ δ} (f : α → β) (g : γ → 
   | .receive c r, pos => .receive (g <$> c) (g <$> r) @@ pos
   | .send c e, pos => .send (g <$> c) (g e) @@ pos
   | .multicast c x, pos => .multicast c (bimap f g x) @@ pos
+  | .macroCall name args, pos => .macroCall name (g <$> args) @@ pos
 
 instance : Bifunctor Statement where
   bimap := Statement.bimap
@@ -121,9 +126,27 @@ protected partial def Statement.bitraverse {F : Type → Type} [Applicative F] {
   | .receive c r, pos => (.receive · · @@ pos) <$> traverse g c <*> traverse g r
   | .send c e, pos => (.send · · @@ pos) <$> traverse g c <*> g e
   | .multicast c x, pos => (.multicast c · @@ pos) <$> bitraverse f g x
+  | .macroCall name args, pos => (.macroCall name · @@ pos) <$> traverse g args
 
 instance : Bitraversable Statement where
   bitraverse := Statement.bitraverse
+
+/-- `macro Name(p₁, …, pₙ) { … }` — real PlusCal's non-hygienic, non-recursive macro. `body` is
+kept as the same label-or-statement list every other block uses (parser reuses `parseStatement`
+unchanged); the expansion pass (`Desugarer/PlusCalMacros.lean`) rejects any label found in it. -/
+structure MacroDecl (α β : Type) : Type where
+  name : String
+  params : List String
+  body : List (String ⊕ Statement α β)
+  deriving Repr, Inhabited
+
+instance : Bifunctor MacroDecl where
+  bimap f g m := { m with body := Bifunctor.snd (bimap f g) <$> m.body } @@ posOf m
+
+instance : Bitraversable MacroDecl where
+  bitraverse f g m :=
+    (MacroDecl.mk m.name m.params · @@ posOf m)
+      <$> traverse (bitraverse pure (bitraverse f g)) m.body
 
 /-- The declarations at the top of an `algorithm` or `process` block. -/
 structure Declarations (α β : Type) : Type where
@@ -181,19 +204,22 @@ structure Algorithm (α β : Type) : Type where
   isFair : Bool
   name : String
   globalState : Declarations α β
+  macros : List (MacroDecl α β)
   processes : List (Process α β)
   deriving Repr, Inhabited
 
 instance : Bifunctor Algorithm where
   bimap f g a := { a with
     globalState := bimap f g a.globalState
+    macros := bimap f g <$> a.macros
     processes := bimap f g <$> a.processes
   } @@ posOf a
 
 instance : Bitraversable Algorithm where
   bitraverse f g a :=
-    (Algorithm.mk a.isFair a.name · · @@ posOf a)
+    (Algorithm.mk a.isFair a.name · · · @@ posOf a)
       <$> bitraverse f g a.globalState
+      <*> traverse (bitraverse f g) a.macros
       <*> traverse (bitraverse f g) a.processes
 
 end SurfacePlusCal

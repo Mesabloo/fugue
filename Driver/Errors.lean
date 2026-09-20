@@ -97,6 +97,13 @@ instance : CompilerDiagnostic DriverError String where
     | .desugar _ e => CompilerDiagnostic.hintsOf e
     | .moduleNotFound _ | .ambiguousModule .. | .cyclicExtends _ | .moduleNameMismatch .. => []
     | .typeCheck _ e => CompilerDiagnostic.hintsOf e
+  notesOf
+    | .lex _ e => CompilerDiagnostic.notesOf e
+    | .parse _ e => CompilerDiagnostic.notesOf e
+    | .annotation _ e => CompilerDiagnostic.notesOf e
+    | .desugar _ e => CompilerDiagnostic.notesOf e
+    | .moduleNotFound _ | .ambiguousModule .. | .cyclicExtends _ | .moduleNameMismatch .. => []
+    | .typeCheck _ e => CompilerDiagnostic.notesOf e
 
 /-- `DriverError`'s non-fatal counterpart — carries a warning from any pass, plus its owning
 `moduleId`, through `Driver/Modules.lean`'s accumulate-then-flush machinery. -/

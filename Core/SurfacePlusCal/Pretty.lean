@@ -47,6 +47,7 @@ partial def Statement.pretty {α β} [Std.ToFormat α] [Std.ToFormat β] (S : St
     | .receive c r => f!"receive({c}, {r});"
     | .send c e => f!"send({c}, {e});"
     | .multicast c filter => f!"multicast({c}, {filter});"
+    | .macroCall name args => f!"{name}(" ++ .joinSep (args.map Std.format) ", " ++ ");"
 where
   formatPos (pos : SourceSpan) : Std.Format := .bracket "(* " (Std.format pos) " *)"
 
@@ -69,6 +70,10 @@ instance {α β} [Std.ToFormat α] [Std.ToFormat β] : Std.ToFormat (Declaration
         f!"{x} {ann}" ++ if es.isEmpty then Std.Format.nil else .join (es.map λ e ↦ .sbracket f!"{e}")) ", ")
 
 @[no_expose]
+instance {α β} [Std.ToFormat α] [Std.ToFormat β] : Std.ToFormat (MacroDecl α β) where
+  format m := f!"macro {m.name}(" ++ .joinSep (m.params.map Std.format) ", " ++ ")" ++ formatBlock Statement.pretty m.body
+
+@[no_expose]
 instance {α β} [Std.ToFormat α] [Std.ToFormat β] : Std.ToFormat (Process α β) where
   format p := Std.format p.ann ++ f!" {formatFairness p.isFair}process ({p.name} {if p.«=|∈» then " = " else " ∈ "} {p.id})" ++ .indent 2 (
     .nest 2 (Std.format p.localState) ++ .line ++
@@ -80,6 +85,7 @@ instance {α β} [Std.ToFormat α] [Std.ToFormat β] : Std.ToFormat (Algorithm �
   format alg :=
     f!"(*--{formatFairness alg.isFair}algorithm {alg.name}" ++ .cbracket (.indent 2 <|
       .nest 2 (Std.format alg.globalState) ++ .line ++
+      .joinSep (Std.format <$> alg.macros) .line ++ .line ++
       .joinSep (Std.format <$> alg.processes) .line)
 
 end SurfacePlusCal

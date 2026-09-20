@@ -103,7 +103,7 @@ Ultrametric-space (`IMetricSpace`) infrastructure.
 - `Tokens/PlusCal.lean`, `Tokens/TLAPlus.lean` — token definitions.
 
 ## `Desugarer/`
-- `PlusCal.lean` — statement and process desugaring, well-labelledness checks.
+- `PlusCal.lean` — `macro` expansion, statement and process desugaring, well-labelledness checks.
 - `TLAPlus.lean` — expression desugaring.
 - `Errors.lean`, `Monad.lean` — diagnostics and monad stack.
 

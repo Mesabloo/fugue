@@ -110,6 +110,11 @@ structure Expectation : Type where
   `errorCode`/`failsAt`: an error relocated to the start of its enclosing production keeps its code
   and stage and only moves — this is the check that catches that. -/
   errorPosition : Option String := none
+  /-- For a rejection, the exact, ordered list of `notesOf` positions the error must carry, each
+  written the same way `errorPosition` is. `some []` asserts none fired; `some [...]` asserts the
+  exact ordered list. `none` — distinct from `some []` — means unasserted, exactly like
+  `errorPosition`'s own idiom. -/
+  notePositions : Option (List String) := none
   /-- For an acceptance, the minimum stage that must have completed. `none` falls back to
   `Expectation.defaultReaches`, derived from what the compile actually produced. -/
   reaches : Option Stage := none
@@ -187,6 +192,9 @@ private structure ErrorSpec : Type where
   code : String
   /-- Where the error must point, e.g. `"2:24"` or `"2:24-2:25"`. -/
   position : Option String := none
+  /-- The exact, ordered list of `notesOf` positions the error must carry, each written the same
+  way `position` is. Absent means unasserted; `[]` asserts none fired. -/
+  notes : Option (List String) := none
   deriving FromJson
 
 /-- A whole sidecar, as written. -/
@@ -268,6 +276,7 @@ private def Sidecar.applyTo (s : Sidecar) (dir : Option System.FilePath) (base :
 (known: \"cond\")"
   return { outcome, status, failsAt, reaches, errorCode, warnings, searchPath, experimentalBackends
            errorPosition := s.error.bind ErrorSpec.position
+           notePositions := s.error.bind ErrorSpec.notes
            goBuild := s.goBuild.getD base.goBuild
            allowExtraWarnings := s.allowExtraWarnings.getD base.allowExtraWarnings
            suppressible := s.suppressible.getD base.suppressible

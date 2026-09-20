@@ -379,6 +379,37 @@ def unsafeCast : Entry :=
   { code := w 8, stage := .typeCheck, warningName := "unsafe",
     summary := "A call to an unsafe cast whose compiled form aborts at runtime if its precondition fails." }
 
+/-! ## `macro` expansion -/
+
+/-- Two `macro` declarations share a name. -/
+def duplicateMacroDecl : Entry :=
+  { code := e 67, stage := .desugar, summary := "Two macro declarations share the same name." }
+
+/-- A label inside a `macro` body. -/
+def labelInMacroBody : Entry :=
+  { code := e 68, stage := .desugar, summary := "A label appears inside a macro body." }
+
+/-- The macro call-graph has a cycle. -/
+def recursiveMacro : Entry :=
+  { code := e 69, stage := .desugar, summary := "A macro is defined, directly or indirectly, in terms of itself." }
+
+/-- A call to an undeclared macro. -/
+def undefinedMacro : Entry :=
+  { code := e 70, stage := .desugar, summary := "A macro call names no declared macro." }
+
+/-- A macro call's argument count does not match its declaration. -/
+def macroArityMismatch : Entry :=
+  { code := e 71, stage := .desugar, summary := "A macro call's argument count does not match its declaration." }
+
+/-- A macro call's argument is substituted into a parameter the body writes to, but is not itself
+a writable reference. -/
+def macroArgumentNotAssignable : Entry :=
+  { code := e 72, stage := .desugar, summary := "A macro argument substituted into a written-to parameter is not a writable reference." }
+
+/-- A `.macroCall` reached statement desugaring unexpanded — should be unreachable. -/
+def internalUnexpandedMacroCall : Entry :=
+  { code := e 73, stage := .desugar, summary := "Internal error: a macro call was not expanded before statement desugaring." }
+
 /-- Every registered diagnostic, in code order. `fugue explain --list` prints this; the regression
 runner's coverage report walks it to find codes no fixture exercises. -/
 def entries : List Entry :=
@@ -401,7 +432,9 @@ def entries : List Entry :=
     goInternalInvariant, goUnsupported,
     moduleNameMismatch,
     fairIgnored, unusedAnnotation, duplicateParameterAnnotation, typeCheckTodoWarning,
-    partialMulticastAnnotation, extendsAlgorithm, unusedMailbox, unsafeCast ]
+    partialMulticastAnnotation, extendsAlgorithm, unusedMailbox, unsafeCast,
+    duplicateMacroDecl, labelInMacroBody, recursiveMacro, undefinedMacro, macroArityMismatch,
+    macroArgumentNotAssignable, internalUnexpandedMacroCall ]
 
 -- No two entries may share a number: the whole point of a code is that it identifies exactly one
 -- diagnostic. Checked here, at build time, rather than trusted.

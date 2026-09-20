@@ -132,6 +132,30 @@ def checkErrorPosition (e : Expectation) (r : PipelineResult) : CheckResult :=
     else
       { name, status := .fail, detail := s!"expected the error at {want}, it points at {got}" }
 
+/-- Which `notesOf` positions the error carried, in order. Same rendering idiom as
+`checkErrorPosition`, decided independently per entry: each sidecar string is matched against its
+corresponding note's span as a full span when the sidecar writes one (`"2:24-2:25"`), otherwise
+just the start cursor (`"2:24"`). -/
+def checkNotePositions (e : Expectation) (r : PipelineResult) : CheckResult :=
+  let name := "note positions"
+  match e.notePositions, r.error with
+  | none, _ =>
+    { name, status := .skip, detail := "fixture does not say which notes the error should carry" }
+  | some _, none =>
+    { name, status := .fail, detail := "expected the error to carry notes, the compile succeeded" }
+  | some want, some err =>
+    let gotSpans := (PipelineError.notesOf err).map Prod.fst
+    if gotSpans.length != want.length then
+      { name, status := .fail,
+        detail := s!"expected {want.length} note(s) at {want}, got {gotSpans.length} at {gotSpans.map toString}" }
+    else
+      let gotRendered := (want.zip gotSpans).map λ (wantStr, span) ↦
+        if wantStr.contains '-' then toString span else toString span.start
+      if gotRendered == want then
+        { name, status := .pass }
+      else
+        { name, status := .fail, detail := s!"expected notes at {want}, got {gotRendered}" }
+
 /-- How many times each code was warned, as a sorted association list. Sorted so that two runs'
 tallies compare and print in a fixed order regardless of `Std.HashMap` iteration. -/
 private def warningTally (warnings : List PipelineWarning) : List (DiagnosticCode × Nat) :=
@@ -173,7 +197,7 @@ def checkWarnings (e : Expectation) (r : PipelineResult) : CheckResult :=
 /-- Every check, against one compile. -/
 def runChecks (e : Expectation) (r : PipelineResult) : List CheckResult :=
   [checkOutcome e r, checkFailureStage e r, checkErrorCode e r, checkErrorPosition e r,
-   checkReachedStage e r, checkWarnings e r]
+   checkNotePositions e r, checkReachedStage e r, checkWarnings e r]
 
 /-- `suppressible`'s check, which needs a *second* compile and so cannot be a pure function of the
 first: `r` is the fixture compiled under `flags`, which turn `warningName` off, and the warning must

@@ -80,6 +80,7 @@ namespace SurfacePlusCal.Lexer
       | "else", tk => return .else <$ tk
       | "while", tk => return .while <$ tk
       | "with", tk => return .with <$ tk
+      | "macro", tk => return .macro <$ tk
       | "either", tk => return .either <$ tk
       | "or", tk => return .or <$ tk
       | "goto", tk => return .goto <$ tk
@@ -267,6 +268,15 @@ namespace SurfacePlusCal.Parser
         return ⟨ref, expr⟩
       return .assign assigns.toList
 
+    /-- `Name(e₁, …, eₙ);` — a call to a `macro`. Tried, with backtracking, ahead of `parseAssign`
+    in `parseUnlabeledStatement`'s fallback arm: `parseRef` never consumes a leading `(` (only
+    `[...]`/`.field` segments), so `Foo(x, y);` today already hard-fails inside `parseAssign`
+    regardless — no existing program can currently parse as this. -/
+    private def parseMacroCall : PlusCalParser (Statement (List CommentAnnotation) (Expression (List CommentAnnotation))) := do
+      let name ← parseIdentifier
+      let args ← parens (sepBy comma (patchTLAParser parseExpression))
+      return .macroCall name args.toList
+
     private def parseReceive : PlusCalParser (Statement (List CommentAnnotation) (Expression (List CommentAnnotation))) := do
       let _ ← token .receive
       let ⟨c, r⟩ ← parens do
@@ -348,7 +358,7 @@ namespace SurfacePlusCal.Parser
         | ⟨_, .send⟩ => parseSend parseExpression
         | ⟨_, .either⟩ => parseEither parseStatement
         | ⟨_, .multicast⟩ => parseMulticast tryParseAnnotations parseExpression
-        | _ => parseAssign parseExpression
+        | _ => withBacktracking (parseMacroCall parseExpression) <|> parseAssign parseExpression
 
       private partial def parseCompoundStatement : PlusCalParser (List (String ⊕ (Statement (List CommentAnnotation) (Expression (List CommentAnnotation))))) := braces do
         let stmts ← sepEndBy1 (lexeme semicolon) parseStatement
@@ -363,6 +373,15 @@ namespace SurfacePlusCal.Parser
           | .none => stmts
           | .some label => .inl label :: stmts
     end
+
+    /-- `macro Name(p₁, …, pₙ) { … }`. Body reuses `parseCompoundStatement` unchanged — the
+    desugarer's expansion pass, not the parser, rejects a label found inside it. -/
+    private def parseMacroDecl : PlusCalParser (MacroDecl (List CommentAnnotation) (Expression (List CommentAnnotation))) := located do
+      let _ ← token .macro
+      let name ← parseIdentifier
+      let params ← parens (sepBy comma parseIdentifier)
+      let body ← parseCompoundStatement tryParseAnnotations parseExpression
+      return { name, params := params.toList, body }
 
     private def parseThread : PlusCalParser (List (String ⊕ (Statement (List CommentAnnotation) (Expression (List CommentAnnotation))))) := do
       -- A thread is a `{ … }` block. Comments before it are the *next* process's annotations, so
@@ -401,7 +420,7 @@ namespace SurfacePlusCal.Parser
       }
 
     def parseAlgorithm : PlusCalParser (Algorithm (List CommentAnnotation) (Expression (List CommentAnnotation))) := located do
-      -- TODO(pluscal-decls): support macros, procedures and `define` blocks.
+      -- TODO(pluscal-decls): support procedures and `define` blocks.
       let _ ← token .dashdash
       let isFair ← withBacktracking do
         let isFair ← located <| test <| token .fair
@@ -413,6 +432,7 @@ namespace SurfacePlusCal.Parser
       let «variables» ← Option.getD (dflt := []) <$> eoption (parseVariables tryParseAnnotations parseExpression)
       let channels ← Option.getD (dflt := []) <$> eoption (parseChannels tryParseAnnotations parseExpression)
       let fifos ← Option.getD (dflt := []) <$> eoption (parseFifos tryParseAnnotations parseExpression)
+      let macros ← takeMany (parseMacroDecl tryParseAnnotations parseExpression)
       let processes ← takeMany (parseProcess tryParseAnnotations parseExpression)
       let _ ← token (.tla .rbrace)
       let _ ← endOfInput
@@ -424,6 +444,7 @@ namespace SurfacePlusCal.Parser
           channels
           fifos
         }
+        macros := macros.toList
         processes := processes.toList
       }
   end
