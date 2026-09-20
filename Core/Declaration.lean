@@ -20,6 +20,9 @@ public import Common.Position
   `SurfaceTLAPlus` does **not** reuse this type — its own `Declaration`/`Module`
   (`Core/SurfaceTLAPlus/Syntax.lean`) widen `.function`'s binder list to admit the shared-domain/
   tuple-pattern sugar `Desugarer/TLAPlus.lean` flattens down to this shape.
+
+  The shared type is named `TLAModule`, not `Module`: it sits at root (see below), where it would
+  otherwise collide with Mathlib's `Module` typeclass.
 -/
 
 /-- A top-level TLA⁺ declaration. `RECURSIVE` and module `INSTANCE` are not represented. -/
@@ -70,7 +73,7 @@ instance {E} [Traversable E] : Traversable (Declaration E) where
   the `abbrev`'s full unfold, landing on this shared type instead of the stage's (nonexistent)
   namespace.
 -/
-structure Module (E : Type → Type) (α β : Type) : Type where
+structure TLAModule (E : Type → Type) (α β : Type) : Type where
   name : String
   «extends» : List String
   declarations₁ : List (Declaration E β)
@@ -79,7 +82,7 @@ structure Module (E : Type → Type) (α β : Type) : Type where
   deriving Inhabited
 
 /-- Hand-written, same reason as `Declaration`'s `Repr` instance above. -/
-instance {E α β} [Repr α] [Repr β] [Repr (E β)] : Repr (Module E α β) where
+instance {E α β} [Repr α] [Repr β] [Repr (E β)] : Repr (TLAModule E α β) where
   reprPrec m _ :=
     f!"\{ name := {repr m.name}, extends := {repr m.extends}, declarations₁ := {repr m.declarations₁}, " ++
     f!"pcalAlgorithm := {repr m.pcalAlgorithm}, declarations₂ := {repr m.declarations₂} }"
@@ -90,14 +93,14 @@ position of its own — `posOf` then answers for it with whatever unrelated valu
 that address (`Common/Position.lean`). Annotation resolution alone maps every module once
 (`CommentAnnotation → Annotation`), and `SurfaceTLAPlus.Module.desugar` reads the result's
 position. -/
-instance {E} [Functor E] : Bifunctor (Module E) where
+instance {E} [Functor E] : Bifunctor (TLAModule E) where
   bimap f g m := { m with
     declarations₁ := (g <$> ·) <$> m.declarations₁
     pcalAlgorithm := f <$> m.pcalAlgorithm
     declarations₂ := (g <$> ·) <$> m.declarations₂
   } @@ posOf m
 
-instance {E} [Traversable E] : Bitraversable (Module E) where
+instance {E} [Traversable E] : Bitraversable (TLAModule E) where
   bitraverse f g m :=
     ({m with declarations₁ := ·, pcalAlgorithm := ·, declarations₂ := · } @@ posOf m)
       <$> traverse (traverse g) m.declarations₁

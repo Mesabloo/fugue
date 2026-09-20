@@ -242,10 +242,10 @@ abbrev Declaration := _root_.Declaration Expression
   A type-checked TLA⁺ module, wrapping the (separately checked) typed PlusCal algorithm at
   whatever `α` the caller instantiates it at — kept abstract to avoid a cyclic import.
 -/
-abbrev Module := _root_.Module Expression
+abbrev Module := _root_.TLAModule Expression
 
 namespace Module
-export _root_.Module (mk)
+export _root_.TLAModule (mk)
 end Module
 
 end TypedTLAPlus

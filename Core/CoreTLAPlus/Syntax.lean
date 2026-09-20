@@ -170,10 +170,10 @@ abbrev Declaration := _root_.Declaration Expression
   statement-level) PlusCal algorithm at whatever `α` the caller instantiates it at — kept abstract
   to avoid a cyclic import.
 -/
-abbrev Module := _root_.Module Expression
+abbrev Module := _root_.TLAModule Expression
 
 namespace Module
-export _root_.Module (mk)
+export _root_.TLAModule (mk)
 end Module
 
 end CoreTLAPlus

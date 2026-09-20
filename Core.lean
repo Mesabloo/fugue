@@ -30,6 +30,9 @@ public import Core.NetworkPlusCal.Semantics.Lemmas
 public import Core.NetworkPlusCal.Semantics.Process
 public import Core.Go.Syntax
 public import Core.Go.Pretty
+public import Core.Go.Semantics.Domains
+public import Core.Go.Semantics.Operations
+public import Core.Go.Semantics.Defs
 
 public section
 
