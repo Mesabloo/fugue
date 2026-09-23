@@ -8,7 +8,7 @@ open TypedTLAPlus (Typ MVarId)
 
 /-- Every distinct `Typ.var` name occurring anywhere in a type. `partial`: recursion over
 nested `List Typ`/`List (String × Typ)` fields isn't visibly structurally decreasing to Lean. -/
-private partial def typeFreeVars : Typ → List String
+partial def typeFreeVars : Typ → List String
   | .var a => [a]
   | .bool | .int | .str | .address | .const _ | .mvar _ => []
   | .function dom rng => typeFreeVars dom ++ typeFreeVars rng
@@ -16,6 +16,16 @@ private partial def typeFreeVars : Typ → List String
   | .tuple τs => τs.flatMap typeFreeVars
   | .operator τs τ => τs.flatMap typeFreeVars ++ typeFreeVars τ
   | .record fs => fs.flatMap (typeFreeVars ∘ Prod.snd)
+
+/-- Every metavariable occurring anywhere in a type, as written — assignments are not followed. -/
+partial def typeMVars : Typ → List MVarId
+  | .mvar n => [n]
+  | .bool | .int | .str | .address | .const _ | .var _ => []
+  | .function dom rng => typeMVars dom ++ typeMVars rng
+  | .set τ | .seq τ | .channel τ | .bag τ => typeMVars τ
+  | .tuple τs => τs.flatMap typeMVars
+  | .operator τs τ => τs.flatMap typeMVars ++ typeMVars τ
+  | .record fs => fs.flatMap (typeMVars ∘ Prod.snd)
 
 /-- Substitute every `Typ.var` named in `σ` by the metavariable `σ` maps it to, leaving anything
 else (including `Typ.var`s *not* in `σ`) unchanged. -/

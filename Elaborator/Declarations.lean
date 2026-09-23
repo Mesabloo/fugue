@@ -100,6 +100,14 @@ private def checkParamArity (pos : SourceSpan) (param : String) (arity : Nat) (�
       else throw (.paramArityMismatch pos param arity σs.length)
     | _ => throw (.notAnOperatorType pos τ)
 
+/-- A fresh type for an unannotated operator-definition parameter of the given arity: one
+metavariable for an ordinary parameter, `(?, …, ?) ⇒ ?` for a higher-order `F(_, …, _)`. -/
+private def freshParamType (arity : Nat) : m Typ := do
+  if arity = 0 then return .mvar (← mkFreshMVar)
+  else
+    let params ← (List.replicate arity ()).mapM λ _ ↦ return (.mvar (← mkFreshMVar) : Typ)
+    return .operator params (.mvar (← mkFreshMVar))
+
 /-- Names the language itself permanently reserves, whether or not `builtinContext` currently
 binds one — `TypedTLAPlus.reservedTemporalActionNames`'s temporal/action names, plus `SUBSET`/
 `UNION` (core set-theory primitives, not temporal/action, so kept local here rather than folded
@@ -190,18 +198,36 @@ def checkDeclaration (moduleName : String) (δ : Δ) (d : SrcDecl) :
     Zero-argument definitions (`f == e`, no parens at all) are checked against the annotation
     directly as the bare result type, not `() => τ`: a 0-ary definition is always referenced by
     bare name, never called like `Nodes()`.)
+
+     f ∉ Γ       f ∉ Δ       Γ ∪ Δ, x₁ : ?₁, …, xₙ : ?ₙ ⊢ e ⇑ τ       σ = gen((?₁, …, ?ₙ) ⇒ τ)
+    ──────────────────────────────────────────────────────────────────────────── [Operator synthesis]
+     Γ ∣ Δ ⊢ f(x₁, …, xₙ) ≜ e ⊣ Γ, f : σ ∣ Δ
+
+    (No annotation and no `RECURSIVE` type: each parameter gets a fresh metavariable — shaped
+    `(?, …, ?) ⇒ ?` for a higher-order `F(_, …, _)` — and the body's type is synthesized. `gen`
+    is `generalizeMVars`: metavariables with upper bounds default to the tightest one, those bounded
+    only by one another merge, and whatever is left in the signature becomes a type variable of the
+    resulting scheme.)
   -/
   | .operator ann f args body => do
     requireFresh (posOf body) f
-    let τ ← match δ[f]?, ann with
-      | none, _ => requireAnnotation (posOf body) s!"operator `{f}`" ann
-      | some δτ, none => pure δτ
+    let τ? ← match δ[f]?, ann with
+      | none, _ => pure ann
+      | some δτ, none => pure (some δτ)
       | some δτ, some τ' =>
         if τ' == δτ then do
           warn (.redundantRecursiveAnnotation (posOf body) f)
-          pure δτ
+          pure (some δτ)
         else throw (.recursiveAnnotationMismatch (posOf body) f δτ τ')
     let δ' := δ.erase f
+    let some τ := τ? | do
+      let paramTys ← args.mapM λ (_, arity) ↦ freshParamType arity
+      let (retTy, body') ← extendAllBindings (Δ.asBindings moduleName δ)
+        (extendAll (args.map Prod.fst |>.zip paramTys) (inferExpr body))
+      let sig := if args.isEmpty then retTy else .operator paramTys retTy
+      let τ ← generalizeMVars (posOf body) sig [body']
+      let body' ← resolveMVars body'
+      return (some (.operator τ f args body'), [(f, { type := τ, isScheme := true, origin := .module moduleName f })], δ')
     match args, τ with
     | [], retTy => do
       let body' ← extendAllBindings (Δ.asBindings moduleName δ) (checkExpr body retTy)
@@ -227,10 +253,35 @@ def checkDeclaration (moduleName : String) (δ : Δ) (d : SrcDecl) :
     a `RECURSIVE`-predeclared name that a function definition happens to share is simply not
     discharged by it; it surfaces later as "declared but never defined" instead, same as any other
     undischarged `Δ` entry.)
+
+     f ∉ Γ       f not free in e       ∀ 1 ≤ i ≤ n, Γ ⊢ eᵢ ⇑ Set(τᵢ)
+     Γ, x₁ : τ₁, …, xₙ : τₙ ⊢ e ⇑ τ       σ = gen(⟨τ₁, …, τₙ⟩ → τ)
+    ──────────────────────────────────────────────────────────── [Function synthesis]
+     Γ ⊢ f[x₁ ∈ e₁, …, xₙ ∈ eₙ] ≜ e ⊣ Γ, f : σ
+
+    (No annotation: the domain comes from each `eᵢ`'s own element type, the range from the body.
+    A body that refers to `f` itself still needs the annotation — its type is needed before the
+    body can be checked. `gen` as in [Operator synthesis].)
   -/
   | .function ann f args body => do
     requireFresh (posOf body) f
-    let τ ← requireAnnotation (posOf body) s!"function `{f}`" ann
+    let some τ := ann | do
+      if body.mentionsFree f then
+        discard <| requireAnnotation (posOf body) s!"recursive function `{f}`" none
+      let args' ← args.mapM λ (x, e) ↦ do
+        let (setTy, e') ← inferExpr e
+        match ← instantiateMVars setTy with
+        | .set τᵢ => pure (x, τᵢ, e')
+        | got => throw (.notASetType (posOf e) got)
+      let τs := args'.map (·.2.1)
+      let domTy := match τs with
+        | [τ₁] => τ₁
+        | _ => .tuple τs
+      let (retTy, body') ← extendAll (args'.map λ (x, τᵢ, _) ↦ (x, τᵢ)) (inferExpr body)
+      let τ ← generalizeMVars (posOf body) (.function domTy retTy) (body' :: args'.map (·.2.2))
+      let doms ← args'.mapM λ (x, _, e') ↦ return (x, ← resolveMVars e')
+      let body' ← resolveMVars body'
+      return (some (.function τ f doms body'), [(f, { type := τ, isScheme := true, origin := .module moduleName f })], δ)
     match τ with
     | .function domTy retTy => do
       let τs ← match args.length, domTy with

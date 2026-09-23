@@ -64,6 +64,9 @@ inductive TCError : Type
   /-- An operator definition's own `@type` disagrees with the type its `RECURSIVE` predeclaration
   gave the same name. -/
   | recursiveAnnotationMismatch (pos : SourceSpan) (name : String) (recursiveType definitionType : TypedTLAPlus.Typ)
+  /-- A metavariable's recorded upper bounds include two types with no common subtype, so no
+  single type satisfies every use. -/
+  | conflictingUpperBounds (pos : SourceSpan) (τ τ' : TypedTLAPlus.Typ)
   deriving Repr, Inhabited, BEq
 
 instance : CompilerDiagnostic TCError String where
@@ -92,6 +95,7 @@ instance : CompilerDiagnostic TCError String where
   | .alreadyDeclared .. => Diagnostics.alreadyDeclared.code
   | .recursiveNeverDefined .. => Diagnostics.recursiveNeverDefined.code
   | .recursiveAnnotationMismatch .. => Diagnostics.recursiveAnnotationMismatch.code
+  | .conflictingUpperBounds .. => Diagnostics.conflictingUpperBounds.code
   posOf
     | .todo pos _ => pos
     | .unboundVariable pos _ => pos
@@ -116,6 +120,7 @@ instance : CompilerDiagnostic TCError String where
     | .alreadyDeclared pos _ => pos
     | .recursiveNeverDefined pos _ => pos
     | .recursiveAnnotationMismatch pos _ _ _ => pos
+    | .conflictingUpperBounds pos _ _ => pos
   msgOf
     | .todo _ msg => msg
     | .unboundVariable _ name => s!"Unbound variable `{name}`."
@@ -149,6 +154,9 @@ instance : CompilerDiagnostic TCError String where
     | .recursiveAnnotationMismatch _ name recursiveType definitionType =>
       s!"Operator `{name}` was declared `RECURSIVE` with type `{recursiveType}`, but its \
          definition's own annotation gives it type `{definitionType}` instead."
+    | .conflictingUpperBounds _ τ τ' =>
+      s!"A value here is used both as `{τ}` and as `{τ'}`, and no type is a subtype of both — \
+         an explicit type annotation is needed."
 
 /-- The type checker's non-fatal diagnostics, collected out-of-band. `todo` is a placeholder. -/
 inductive TCWarning : Type

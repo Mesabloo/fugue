@@ -63,7 +63,7 @@ partial def mapVars {α} (f : Nat → α → Origin → SourceSpan → Expressio
   | .case bs other τ, pos =>
     .case (Bifunctor.bimap (mapVars f k) (mapVars f k) <$> bs) (mapVars f k <$> other) τ @@ pos
   | .stutter e₁ e₂, pos => .stutter (mapVars f k e₁) (mapVars f k e₂) @@ pos
-  | .mvar n e', pos => .mvar n (mapVars f k e') @@ pos
+  | .mvar src tgt e', pos => .mvar src tgt (mapVars f k e') @@ pos
 
 /-- Add `d` to every `.bound` index that refers past `e`'s own binders. -/
 def liftBound {α} (d : Nat) (e : Expression α) : Expression α :=

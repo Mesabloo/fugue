@@ -1,0 +1,4 @@
+{
+  "failsAt": "typecheck",
+  "error": { "code": "E0027", "position": "7:21" }
+}

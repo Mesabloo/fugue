@@ -1,0 +1,4 @@
+{
+  "failsAt": "typecheck",
+  "error": { "code": "E0043", "position": "7:9" }
+}

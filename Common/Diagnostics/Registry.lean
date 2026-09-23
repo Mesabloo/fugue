@@ -237,6 +237,10 @@ def recursiveNeverDefined : Entry :=
 def recursiveAnnotationMismatch : Entry :=
   { code := e 76, stage := .typeCheck, summary := "An operator's definition-site @type disagrees with its RECURSIVE type." }
 
+/-- A value used at two types that have no common subtype. -/
+def conflictingUpperBounds : Entry :=
+  { code := e 77, stage := .typeCheck, summary := "A value is used at two types with no common subtype." }
+
 /-! ## Well-formedness -/
 
 /-- A `goto` to a label no process defines. -/
@@ -441,7 +445,7 @@ def entries : List Entry :=
     notASetType, notARecordType, notIndexable, unknownField, invalidTupleIndex, notAnOperatorType,
     arityMismatch, ambiguousType, notAFunctionType, notATupleType, paramArityMismatch,
     notAChannelType, notShowable, notSendable, unconstrainedMetavariable, alreadyDeclared,
-    recursiveNeverDefined, recursiveAnnotationMismatch,
+    recursiveNeverDefined, recursiveAnnotationMismatch, conflictingUpperBounds,
     unknownLabel, redefinedDone, duplicateName, shadowedName, channelInExpression,
     channelTypedVariable, nonEmptyLocalChannels, globalPlusCalVariable, globalTLAPlusVariable,
     bareTemporalOrAction, unboundedQuantifier, receiveChannelMismatch, mailboxNotIndexedBySelf,

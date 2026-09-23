@@ -137,12 +137,12 @@ inductive Expression (α : Type) : Type
   | «false» : Expression α
   /-- The stuttering-allowed action `[A]_e`. -/
   | stutter : Expression α → Expression α → Expression α
-  /-- An expression-level placeholder for a *pending* coercion: wraps an already-elaborated
-  expression whose true type still depends on an unresolved metavariable `?n`. Has no
-  `CoreTLAPlus` counterpart — every `mvar` node is substituted away before the checker's output
-  is ever handed to a caller, so no consumer outside the checker itself should pattern-match on
-  it. -/
-  | mvar : MVarId → Expression α → Expression α
+  /-- An expression-level placeholder for a *pending* coercion `src <: tgt`: wraps an
+  already-elaborated expression of type `src` that must be coerced into `tgt`, where the coercion
+  still depends on an unresolved metavariable. Has no `CoreTLAPlus` counterpart — every `mvar`
+  node is substituted away before the checker's output is ever handed to a caller, so no consumer
+  outside the checker itself should pattern-match on it. -/
+  | mvar : (src tgt : α) → Expression α → Expression α
   deriving Repr, Inhabited, BEq
 
 -- `partial`: the recursion is structural, but not visibly decreasing to Lean (nested
@@ -181,7 +181,7 @@ protected partial def Expression.map {α β} (f : α → β) (e : Expression α)
   | .case es e τ, pos =>
     .case (Bifunctor.bimap (Expression.map f) (Expression.map f) <$> es) (Expression.map f <$> e) (f τ) @@ pos
   | .stutter e₁ e₂, pos => .stutter (Expression.map f e₁) (Expression.map f e₂) @@ pos
-  | .mvar n e, pos => .mvar n (Expression.map f e) @@ pos
+  | .mvar src tgt e, pos => .mvar (f src) (f tgt) (Expression.map f e) @@ pos
 
 instance : Functor Expression where
   map := Expression.map
@@ -229,7 +229,7 @@ protected partial def Expression.traverse {F : Type → Type} [Applicative F] {�
     (.case · · · @@ pos) <$> traverse (bitraverse (Expression.traverse f) (Expression.traverse f)) es
       <*> traverse (Expression.traverse f) e <*> f τ
   | .stutter e₁ e₂, pos => (.stutter · · @@ pos) <$> Expression.traverse f e₁ <*> Expression.traverse f e₂
-  | .mvar n e, pos => (.mvar n · @@ pos) <$> Expression.traverse f e
+  | .mvar src tgt e, pos => (.mvar · · · @@ pos) <$> f src <*> f tgt <*> Expression.traverse f e
 
 instance : Traversable Expression where
   traverse := Expression.traverse

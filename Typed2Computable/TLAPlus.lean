@@ -80,7 +80,7 @@ partial def TypedTLAPlus.Expression.toComputable :
       <*> other.mapM Expression.toComputable
   | .stutter .., pos => throw (.internalInvariantViolated pos
       "a bare [A]_e (stuttering-allowed action) — already banned transitively-reachable-from-the-algorithm by WellFormedness/Restrictions.lean's check 3")
-  | .mvar _ _, pos => throw (.internalInvariantViolated pos
+  | .mvar _ _ _, pos => throw (.internalInvariantViolated pos
       "a pending coercion placeholder (mvar) — every mvar node is substituted away before the type checker's own output is ever handed to a caller (Core/TypedTLAPlus/Syntax.lean's own guarantee)")
 
 end

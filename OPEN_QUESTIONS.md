@@ -382,44 +382,6 @@ temporal/action check keys on the builtin origin directly. Check the elaborator'
 walk for the same recursion, and confirm against §9.13's two already-unreachable checks that
 nothing reachable becomes unreachable.
 
-### 9.34 No type synthesis for an unannotated operator/function definition
-`Elaborator/Declarations.lean`'s `[Operator definition]`/`[Function definition]` cases open with
-`requireAnnotation`, so `X == 0` (or `Y == 0 - 0`, `Op(x) == x + 1`) is rejected with `E0027`
-without ever looking at the body — no attempt to synthesize `X : Int` from `0 ⇒ Int`. This matches
-thesis Fig. 3.1.9, whose rule conclusions carry the type in the syntax (`f(x⃗) ⦂ (τ⃗)⇒τ ≜ e`) and
-check the body against it; §3.1.4 explicitly notes the non-recursive case *could* be inferred and
-requires the annotation anyway, for uniformity with the recursive case (where inferring `f`'s type
-needs `f`'s type).
-
-Open: whether to add a synthesis path for the unannotated, non-`RECURSIVE` case — `inferExpr body`
-(already implemented, used everywhere else), bind `f` at the synthesized type, keep
-`requireAnnotation` only when the body is in checking-only position or `f` is recursive. Cheap
-given the bidirectional machinery; a deliberate step past the thesis. `CONSTANT`/`VARIABLE`
-annotations stay mandatory regardless — they have no body to synthesize from.
-Item 7 §9.5 (thesis phase 10, P3): `Core/{Guarded,Network}PlusCal/Semantics/Denotational.lean`'s
-`Statement.reducing`/`.aborting` still have `multicast = ∅` (four sites, `TODO(item 7)`). Prior
-art left the same case `sorry` in both — no existing shape to port.
-
-`ComputableTLAPlus.ExprSemantics.mem : V → V → Prop` is a bare membership *relation*; there is no
-`enumerate : V → List V` (or similar) to pull a concrete recipient list out of a set value. A
-`multicast`'s `reducing` is meant to be "a set-indexed family of `send`s, folded over the evaluated
-address set" (plan §1 P3), which needs such a list to fold over.
-
-Proposed, not yet implemented: characterize the recipient list *relationally* instead of
-computing it — `∃ recipients : List V, (∀ r, r ∈ recipients ↔ ExprSemantics.mem r S) ∧
-recipients.Nodup ∧ …` — matching `Eval`'s own relational style ("no derivation tree" already
-*is* "no value", `Semantics/Interface.lean`'s module doc). `Nodup` rules out the degenerate
-reading where the same recipient is sent to twice. Fold sends over `recipients` via a new
-inductive relation (`MulticastFold` for `reducing`, `MulticastAborts` for "the fold gets stuck
-partway"), each recipient keyed as `(c, [.inr r])` — the recipient value as the channel's one
-index segment, matching an ordinary `chan[addr]` reference's own indexing convention.
-
-Open: whether this relational-enumeration approach is right, or whether `ExprSemantics` should
-instead grow an actual enumeration field (bigger surface, but avoids `Nodup`-as-a-proxy-for-
-"this is really a set" and the resulting order-nondeterminism in `reducing`'s outcome set).
-Blocks P3, and P6/D4 (whose generic action-statement lemma quantifies over every action
-constructor, `multicast` included) until resolved.
-
 ### 9.31 `CorrectInstance` private-import workaround
 `Guarded2Network.lean` imports `Guarded2Network.CorrectInstance` privately (bare `import`) so plain
 `lake build` builds and checks the concrete-`Value` refinement proof (`correct''`,
@@ -532,6 +494,27 @@ mathematical content transfers from prior art, but `multicast`'s own semantics d
 a `send` over a set value's members needs an enumeration primitive over `Set(τ)`, and neither
 the fresh AST nor prior art supplies a shape for one. Open until Guarded→Network's proof reaches
 the `multicast` case.
+
+Today `Core/{Guarded,Network}PlusCal/Semantics/Denotational.lean`'s `Statement.reducing`/`.aborting`
+have `multicast = ∅` (four sites). Prior art left same case `sorry` in both.
+
+`ComputableTLAPlus.ExprSemantics.mem : V → V → Prop` is bare membership *relation*; no
+`enumerate : V → List V` (or similar) to pull concrete recipient list out of set value. `multicast`'s
+`reducing` meant to be "set-indexed family of `send`s, folded over evaluated address set", needs
+such list to fold over.
+
+Proposed, not implemented: characterize recipient list *relationally* instead of computing it —
+`∃ recipients : List V, (∀ r, r ∈ recipients ↔ ExprSemantics.mem r S) ∧ recipients.Nodup ∧ …` —
+matching `Eval`'s own relational style ("no derivation tree" already *is* "no value",
+`Semantics/Interface.lean`'s module doc). `Nodup` rules out same recipient sent to twice. Fold sends
+over `recipients` via new inductive relation (`MulticastFold` for `reducing`, `MulticastAborts` for
+"fold gets stuck partway"), each recipient keyed `(c, [.inr r])` — recipient value as channel's one
+index segment, matching ordinary `chan[addr]` indexing.
+
+Open: relational enumeration right, or should `ExprSemantics` grow actual enumeration field (bigger
+surface, but avoids `Nodup`-as-proxy-for-"really a set" and resulting order-nondeterminism in
+`reducing`'s outcome set). Blocks refinement proof's `multicast` case, and any generic
+action-statement lemma quantifying over every action constructor.
 
 ### 9.39 Type aliases in annotations (Apalache `@typeAlias`) — Lean representation not picked
 Apalache lets a spec name a type once, reuse it elsewhere in `@type` annotations. Nothing here

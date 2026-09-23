@@ -677,12 +677,25 @@ instantiation, below):
 - **Discipline:** bidirectional (`Γ ⊢ e ⇐ τ` / synthesis `Γ ⊢ e ⇒ τ`), rank-1 polymorphism
   only (type variables into a prenex `∀`, no first-class schemes). Within an expression,
   annotations required only at binders the algorithm can't otherwise pin down (thesis
-  §3.1.1). **Every top-level `operator`/`function` *definition* carries a mandatory
-  `@type`** — `Elaborator/Declarations.lean`'s `[Operator/Function definition]` rules are
-  checking-only against it (thesis Fig. 3.1.9), so `X == 0` is rejected without one even
-  though its body would synthesize (§9.34). **Exception**: a `RECURSIVE`-predeclared
-  operator's own definition may omit `@type` — its `RECURSIVE` line already gave it one,
-  used directly instead of `requireAnnotation`; given anyway, it must match (§2).
+  §3.1.1). **Top-level `operator`/`function` definition `@type` optional** — deliberate step
+  past thesis Fig. 3.1.9 (rules there check-only against annotation). Given: checked
+  against, as thesis. Absent: `Elaborator/Declarations.lean`'s `[Operator synthesis]`/
+  `[Function synthesis]` synthesize body type, then **generalize** (`generalizeMVars`,
+  `Elaborator/Resolution.lean`) — top-level let-generalization, still rank-1 prenex:
+  - Operator parameter: fresh `?p`; higher-order `F(_,…,_)`: fresh `(?,…,?) ⇒ ?`.
+    Function domain: element type of `eᵢ ⇑ Set(τᵢ)`.
+  - End of declaration: default every metavariable with (transitive) upper bounds, then
+    **collapse** metavariables bounded only by each other (`?x <: ?c`, `?y <: ?c` ⇒ one
+    var; sound since `a <: a`, loses subtyping-generality MLsub would keep, keeps no
+    bounds-lattice), then each metavariable left in signature ⇒ fresh rigid `Typ.var`
+    (`a`, `b`, … skipping names body already uses). `Eq(x, y) == x = y` ⇒ `(a, a) ⇒ Bool`.
+  - Metavariable left unresolved *not* in signature (`Size == Cardinality({})`) ⇒ `E0043`,
+    never phantom scheme var: signature gives caller nothing to instantiate it with.
+  - Function definition whose body mentions `f` free still needs `@type` (`E0027`) —
+    type needed before body. No monomorphic-self-metavariable scheme.
+  - `RECURSIVE` operator: `RECURSIVE` line already gives type, used directly; definition
+    `@type` given anyway must match (§2). `RECURSIVE` line's own annotation stays
+    mandatory (polymorphic recursion). `CONSTANT`/`VARIABLE` mandatory — no body.
 - **No declaration may shadow an existing name.** `requireFresh` (`Elaborator/
   Declarations.lean`), called from `CONSTANT`/`VARIABLE`/operator/function's checking rules
   right after each declared name is known, rejects one already in `Γ` — `TCError.
@@ -699,7 +712,8 @@ instantiation, below):
   local `Checker/Typechecker/{Convertibility,Rules}.lean`): one fresh metavariable `?n` per
   bound type variable when a polymorphic operator is used, resolved incrementally as
   subtyping checks run, defaulting whatever remains at end-of-check (one defaulting point
-  per declaration — rank-1 only, no let-generalization). Direction-aware, not naive eager
+  per declaration — rank-1 only; only generalization point is an unannotated top-level
+  definition, above). Direction-aware, not naive eager
   unification:
   - `?n` is **unresolved** (pending upper bounds accumulated) or **resolved** to a monotype.
   - **Lower-bound `T <: ?n`**: `?n` unresolved → solve `?n := T` (coercion `id`), first
@@ -721,12 +735,22 @@ instantiation, below):
     would force `Seq(Int) <: Str`.) **Record `?n` as one of `?m`'s pending upper bounds** (a
     `PendingUpperBounds` entry may itself be a metavariable), leave `?n` untouched; when
     `?m` resolves from a ground lower bound, walk its pending-bounds list and re-fire the
-    ordinary rules. Both still unresolved at end-of-check = type error.
-  - **Defaulting** at end-of-check: only upper bounds → tightest one (or "ambiguous type");
-    **no bounds at all = type error**, never a silent default.
-  - **Cost**: no let-generalization ⇒ no MLsub bounds-lattice — a `Map MetaVar (Unresolved
-    pendingUpperBounds | Resolved τ)` plus the cases above, "error on a second incomparable
-    lower bound" for `lub`.
+    ordinary rules. Both still unresolved at end-of-check = type error, except under
+    generalization (collapse, above).
+  - **Defaulting** at end-of-check (`defaultMVars`), over every metavariable reachable from
+    expression: upper bounds → `glb` of all, counting transitive ones through unresolved
+    metavariable bounds (`?n <: ?c <: T` ⇒ `T` bounds `?n`); applied via `subtype glb ?n`
+    so metavariable bounds re-fire; repeated to fixpoint. Two bounds with no `glb` ⇒
+    `E0077` (`conflictingUpperBounds`). **No bounds at all = type error** (`E0043`), never
+    silent default — generalization aside.
+  - **Pending coercion node carries its site**: `Expression.mvar src tgt e`; resolution
+    recomputes `subtype src tgt` once metavariables resolved, so each use of a
+    many-bounded metavariable gets own coercion `glb <: tgtᵢ`.
+  - **Synthesis `lub` with unresolved-metavariable side** (`IF`/`CASE`/set literal): fresh
+    `?j`, both sides `<: ?j`, result `?j` — `Max(x, y) == IF x > y THEN x ELSE y`
+    synthesizes. Never probes `<:` both ways on bare metavariable (would leave junk bounds).
+  - **Cost**: no MLsub bounds-lattice — a `Map MetaVar (Unresolved pendingUpperBounds |
+    Resolved τ)` plus the cases above; generalization approximates via collapse.
   - **The judgment** `subtype : Context → Type → Type → SubtypeResult` (threading the
     metavariable-solution context) yields three outcomes: **successful coercion** (concrete
     `Coercion` + updated context), **pending coercion** (check succeeded, coercion depends

@@ -136,7 +136,7 @@ partial def TypedTLAPlus.Expression.walkReachable [MonadStateOf ReachabilityClos
   | .stutter .. => pure ()
   -- Unreachable in practice (every `mvar` is substituted away before the checker's output is
   -- ever handed to a caller) — recurse defensively rather than special-case an impossible input.
-  | .mvar _ e => recurse e
+  | .mvar _ _ e => recurse e
 
 /-- Visits every statement in `s`'s tree — `visitStatement` once per statement, before recursing
 into substructure — and threads every expression position (`print`'s `e`, `assign`'s per-pair

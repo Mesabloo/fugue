@@ -126,8 +126,7 @@ partial def subtype (τ τ' : Typ) : m SubtypeResult := do
     -- `assigned?` dispatch below, since two references to one *scheme* declaration can compare
     -- a shared, still-unassigned metavariable against itself. Without this check, `none, none`
     -- would record a spurious self-referential pending bound (`a`'s upper bound becoming `.mvar
-    -- a`) instead of recognizing the comparison as vacuous. `Elaborator/Resolution.lean`'s
-    -- `resolveExprMVars` relies on this `b <: b` reflexivity always succeeding.
+    -- a`) instead of recognizing the comparison as vacuous.
     if a == b then return .success .id
     else match ← assigned? a, ← assigned? b with
     | some s, _ => subtype s τ'
@@ -217,11 +216,28 @@ partial def subtype (τ τ' : Typ) : m SubtypeResult := do
 /-- Whether `τ <: τ'` holds, ignoring the coercion payload — all `lub`/`glb` need. -/
 private def isSubtype (τ τ' : Typ) : m Bool := return (← subtype τ τ') matches .success _
 
+/-- Whether `τ` is a metavariable still unresolved once its assignments are followed. -/
+partial def isUnresolvedMVar : Typ → m Bool
+  | .mvar a => do
+    match ← assigned? a with
+    | some τ => isUnresolvedMVar τ
+    | none => return true
+  | _ => return false
+
 /-- The least upper bound of two types under `<:`, where it exists — `<:` is a partial order with
 no `⊤`, so `lub` is a *partial* function: comparable types have one (the wider of the two),
-incomparable ones don't. -/
+incomparable ones don't. When either side is an unresolved metavariable, the result is a fresh
+metavariable recorded as an upper bound of both, left for later constraints (or end-of-declaration
+defaulting) to pin down. -/
 def lub (τ τ' : Typ) : m (Option Typ) := do
-  if ← isSubtype τ τ' then return some τ'
+  if (← isUnresolvedMVar τ) || (← isUnresolvedMVar τ') then
+    let j : Typ := .mvar (← mkFreshMVar)
+    -- Neither call can fail: `j` is fresh, so the first one only records or assigns it, and the
+    -- second then compares against at most one side that is itself a bare metavariable.
+    discard <| subtype τ j
+    discard <| subtype τ' j
+    return some j
+  else if ← isSubtype τ τ' then return some τ'
   else if ← isSubtype τ' τ then return some τ
   else return none
 

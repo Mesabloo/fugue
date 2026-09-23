@@ -101,9 +101,14 @@ one-line reason.
 
 ## Build & iterate
 
-- `lake build` standard. Prior art's dev-mode CLI wrapper (`fugue.sh`) reasonable model.
-- **Every semantics/proof module must be reachable from the executable's imports.** `lake build`
-  with no target builds `lean_exe fugue` and nothing else, so a module outside `Fugue.lean`'s import
+- `lake build fugue` standard. Prior art's dev-mode CLI wrapper (`fugue.sh`) reasonable model.
+- **Plain `lake build` is not enough.** Default target is `lean_lib Fugue.Docs`, not
+  `lean_exe fugue`: `Fugue.lean`'s own `#guard`s (e.g. every diagnostic has a
+  `docs/diagnostics/<code>.md` page) never run, "Build completed" printed anyway, and
+  `.lake/build/bin/fugue` stays stale. `lake test` builds its own exe, so tests pass on new code
+  while CLI still runs old. Final build: `lake build fugue`.
+- **Every semantics/proof module must be reachable from the executable's imports.** `lake build
+  fugue` builds `lean_exe fugue`'s import closure and nothing else, so a module outside `Fugue.lean`'s import
   closure is never elaborated — and its *stale olean is replayed silently*, meaning `lake build`
   reports success over source that no longer compiles. This bit twice before it was diagnosed. The
   fix is structural, not a longer build command: a pass's root module imports its own proof files

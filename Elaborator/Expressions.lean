@@ -81,9 +81,8 @@ private def coerceInto (pos : SourceSpan) (τ : Typ) : Typ × Expr → m Expr
   | (τ', e) => do
     match ← subtype τ' τ with
     | .success coe => return coe.apply e @@ pos
-    | .pending n => return .mvar n e @@ pos
-    | .failure => throw (.failedToConvertTypes pos
-        (← instantiateMVars τ) (← instantiateMVars τ'))
+    | .pending _ => return .mvar τ' τ e @@ pos
+    | .failure => throw (.failedToConvertTypes pos (← displayType τ) (← displayType τ'))
 
 /-- Needed for the `partial def`s below to type-check at all (an arbitrary `m` isn't otherwise
 known nonempty). -/

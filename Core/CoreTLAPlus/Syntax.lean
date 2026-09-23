@@ -162,6 +162,27 @@ protected partial def Expression.traverse {F : Type → Type} [Applicative F] {�
 instance : Traversable Expression where
   traverse := Expression.traverse
 
+/-- Whether `x` occurs free in `e` — some `.var x` not under a binder that binds `x`. A binder's own
+domain is outside its scope. -/
+protected partial def Expression.mentionsFree {α} (x : String) (e : Expression α) : Bool := match_source e with
+  | .var v, _ => v == x
+  | .nat _, _ | .str _, _ | .true, _ | .false, _ => Bool.false
+  | .opCall e es, _ => e.mentionsFree x || es.any (·.mentionsFree x)
+  | .forall y _ dom e, _ | .exists y _ dom e, _ | .choose y _ dom e, _ =>
+    dom.any (·.mentionsFree x) || (y != x && e.mentionsFree x)
+  | .fforall y _ e, _ | .eexists y _ e, _ => y != x && e.mentionsFree x
+  | .set es, _ | .tuple es, _ => es.any (·.mentionsFree x)
+  | .collect y _ dom e, _ | .map' e y _ dom, _ | .fn y _ dom e, _ =>
+    dom.mentionsFree x || (y != x && e.mentionsFree x)
+  | .fnCall e e', _ | .fnSet e e', _ | .stutter e e', _ => e.mentionsFree x || e'.mentionsFree x
+  | .record fs, _ | .recordSet fs, _ => fs.any (·.2.2.mentionsFree x)
+  | .except e upds, _ =>
+    e.mentionsFree x || upds.any λ (path, v) ↦
+      v.mentionsFree x || path.any λ | .inl _ => Bool.false | .inr i => i.mentionsFree x
+  | .recordAccess e _, _ => e.mentionsFree x
+  | .if e₁ e₂ e₃, _ => e₁.mentionsFree x || e₂.mentionsFree x || e₃.mentionsFree x
+  | .case es e, _ => es.any (λ (p, v) ↦ p.mentionsFree x || v.mentionsFree x) || e.any (·.mentionsFree x)
+
 /--
   A top-level TLA⁺ declaration. Module `INSTANCE` is not represented. Own type rather than an
   `abbrev` over `Core/Declaration.lean`'s shared one: a `CONSTANT`'s own arity (`0` for an
