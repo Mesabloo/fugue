@@ -174,6 +174,17 @@ structure PipelineResult : Type where
 /-- Did the compile succeed? -/
 def PipelineResult.succeeded (r : PipelineResult) : Bool := r.error.isNone
 
+/-- The warnings this compile actually reports, in the order they were raised: everything a pass
+raised, minus what `-Wno-<name>` turns off.
+
+Separate from `renderWarnings` because "which warnings survive `-W`" and "what they look like" are
+different questions, and more than one caller wants the first without the second — `PipelineResult
+.warnings` is deliberately the *unfiltered* record of what the passes raised, so anything asking
+whether a warning is suppressed has to apply the filter, and should not have to re-implement it. -/
+def PipelineResult.reportedWarnings (flags : FlagsEnv) (r : PipelineResult) :
+    List PipelineWarning :=
+  r.warnings.filter λ w ↦ flags.warnings.getD (PipelineWarning.name w) true
+
 /-- What the driver reports as it goes. Plain `IO` actions: a caller drives a spinner, a test
 runner collects them into a list, and neither needs to know the driver's monad. -/
 structure PipelineHooks : Type where
@@ -293,10 +304,11 @@ def runPipeline (source : String) (containingDir : Option System.FilePath) (modu
 
   -- The root module's outcome *is* the compile's, so it is reported here, where that is known,
   -- rather than at type-check time inside `compileModule` — which is why that call passes
-  -- `isRoot := true`. `hadWarnings` is the result's warnings in full: a module's scoped warnings
-  -- include those of everything it `EXTENDS`, and those every stage past the driver added.
+  -- `isRoot := true`. `hadWarnings` is over the result's reported warnings: a module's scoped
+  -- warnings include those of everything it `EXTENDS`, and those every stage past the driver added.
+  let hadWarnings := !(result.reportedWarnings (← readThe FlagsEnv)).isEmpty
   liftM <| hooks.onModuleEvent typed.name <|
-    if result.succeeded then .built !result.warnings.isEmpty else .failed
+    if result.succeeded then .built hadWarnings else .failed
   return result
 
 /-- `runPipeline` with its flags and its state supplied: one compile, self-contained, from `IO`.
@@ -309,17 +321,6 @@ def runPipelineIO (flags : FlagsEnv) (source : String) (containingDir : Option S
     (moduleId : String) (expectedName : Option String := none) (hooks : PipelineHooks := {}) :
     IO PipelineResult :=
   StateT.run' (ReaderT.run (runPipeline source containingDir moduleId expectedName hooks) flags) {}
-
-/-- The warnings this compile actually reports, in the order they were raised: everything a pass
-raised, minus what `-Wno-<name>` turns off.
-
-Separate from `renderWarnings` because "which warnings survive `-W`" and "what they look like" are
-different questions, and more than one caller wants the first without the second — `PipelineResult
-.warnings` is deliberately the *unfiltered* record of what the passes raised, so anything asking
-whether a warning is suppressed has to apply the filter, and should not have to re-implement it. -/
-def PipelineResult.reportedWarnings (flags : FlagsEnv) (r : PipelineResult) :
-    List PipelineWarning :=
-  r.warnings.filter λ w ↦ flags.warnings.getD (PipelineWarning.name w) true
 
 /-- This compile's reported warnings, rendered, in the order they were raised. Each renders against
 its own module's source lines, falling back to `mainLines`. Pure: the caller decides where the

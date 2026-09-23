@@ -67,6 +67,8 @@ payload `onModuleEvent` reports (`Fugue.lean` turns this into `Built`/`Replayed`
 lex/parse failures, which happen before a name is known, just surface as the overall compile
 failure. -/
 inductive ModuleOutcome : Type
+  /-- `hadWarnings` counts only the warnings this compile reports, after `-Wno-<name>` filtering: a
+  warning the user turned off is not shown, so the progress line must not flag it either. -/
   | built (hadWarnings : Bool)
   | replayed
   | failed
@@ -422,7 +424,7 @@ partial def compileModule (source : String) (containingDir : Option System.FileP
   | .error e => throw e
   | .ok resolved =>
     unless isRoot do
-      onModuleEvent mod.name (.built (!warnings.isEmpty))
+      onModuleEvent mod.name (.built (← warnings.anyM (FlagsEnv.isWarningEnabled ·.name)))
     return resolved
 
 /-- The `EXTENDS`-specific wrapper around `compileModule`: locate `name` (`locate` above, error on
