@@ -78,7 +78,8 @@ theorem relatesTo_of_procRelatesTo {mb : Mailbox} {pref : ChanKey V → List V}
   | .some (c, inbox), .some ibp =>
     obtain ⟨hmem, ⟨sv, hsv, hseq⟩, cpath, hpath, hibkey⟩ := hmatch
     refine relatesTo.chan_intro rfl hmem hpath hsv hseq (λ k _ ↦ hfifo k) ?_
-    rw [LocalState.fifos_mk, LocalState.fifos_mk, ← hibkey, hfifo ibp.key, hkey ibp rfl]
+    dsimp only
+    rw [← hibkey, hfifo ibp.key, hkey ibp rfl]
   | .none, .some _ => exact hmatch.elim
   | .some _, .none => exact hmatch.elim
 

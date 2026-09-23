@@ -107,13 +107,13 @@ inbox holds more than `n` elements. -/
 theorem await_lenGt_iff {inbox : String} {τ : ComputableTLAPlus.Typ} {n : Nat} {M : Memory V}
     {F : FIFOs V} {sv : V} {vs : List V} {σ' : LocalState V} {ε : Trace V}
     (hlk : M.lookup inbox = .some sv) (hseq : ExprSemantics.isSeq sv vs) :
-    (⟨(M, F, .none), ε, σ'⟩ : LocalState V × Trace V × LocalState V) ∈
+    (⟨⟨M, F, .none⟩, ε, σ'⟩ : LocalState V × Trace V × LocalState V) ∈
         NetworkPlusCal.Statement.reducing Ξ Ω (.await (lenGt τ (inboxVar inbox τ) n)) ↔
-      σ' = (M, F, .none) ∧ ε = 1 ∧ n < vs.length := by
+      σ' = ⟨M, F, .none⟩ ∧ ε = 1 ∧ n < vs.length := by
   obtain ⟨b, hb, -, hiff⟩ := eval_lenGt_inbox (Ξ := Ξ) (Ω := Ω) (τ := τ) (n := n) hlk hseq
   iff_rintro h ⟨rfl, rfl, hlen⟩
   · obtain ⟨M', F', hσ, rfl, htru, rfl⟩ := h
-    simp only [Prod.mk.injEq] at hσ
+    simp only [LocalState.mk.injEq] at hσ
     obtain ⟨rfl, rfl, -⟩ := hσ
     obtain rfl := ExprSemantics.evalUnique hb htru
     exact ⟨rfl, rfl, hiff.mp rfl⟩
@@ -125,13 +125,13 @@ elements. `await_lenGt_iff`'s companion — one is the guard firing, the other i
 theorem await_lenGt_blocking_iff {inbox : String} {τ : ComputableTLAPlus.Typ} {n : Nat}
     {M : Memory V} {F : FIFOs V} {sv : V} {vs : List V} {ε : Trace V}
     (hlk : M.lookup inbox = .some sv) (hseq : ExprSemantics.isSeq sv vs) :
-    (⟨(M, F, .none), ε⟩ : LocalState V × Trace V) ∈
+    (⟨⟨M, F, .none⟩, ε⟩ : LocalState V × Trace V) ∈
         NetworkPlusCal.Statement.blocking Ξ Ω (.await (lenGt τ (inboxVar inbox τ) n)) ↔
       ε = 1 ∧ vs.length ≤ n := by
   obtain ⟨b, hb, hbool, hiff⟩ := eval_lenGt_inbox (Ξ := Ξ) (Ω := Ω) (τ := τ) (n := n) hlk hseq
   iff_rintro h ⟨rfl, hlen⟩
   · obtain ⟨M', F', v, hbool', hne, hv, hσ, rfl⟩ := h
-    simp only [Prod.mk.injEq] at hσ
+    simp only [LocalState.mk.injEq] at hσ
     obtain ⟨rfl, rfl, -⟩ := hσ
     obtain rfl := ExprSemantics.evalUnique hv hb
     refine ⟨rfl, ?_⟩
@@ -156,7 +156,7 @@ theorem consumption_pair_iff (hΞ : Ξ.WellScoped) {r : ComputableGuardedPlusCal
           NetworkPlusCal.Statement.reducing Ξ Ω
             (.assign (inboxRef inbox τ) (tail τ (inboxVar inbox τ))) ↔
       ∃ M F M' sv t v v' vs rpath,
-        σ = (M, F, .none) ∧ σ' = (M'.insert inbox t, F, .none) ∧ ε = 1 ∧
+        σ = ⟨M, F, .none⟩ ∧ σ' = ⟨M'.insert inbox t, F, .none⟩ ∧ ε = 1 ∧
         M.lookup inbox = .some sv ∧ ExprSemantics.isSeq sv (v :: vs) ∧
         ExprSemantics.isSeq t vs ∧ ExprSemantics.coerce coe v v' ∧ Ref.EvalArgs Ξ Ω M r rpath ∧
         ComputableTLAPlus.Memory.update M r.name rpath v' = .some M' := by
@@ -166,7 +166,7 @@ theorem consumption_pair_iff (hΞ : Ξ.WellScoped) {r : ComputableGuardedPlusCal
     ⟨M, F, M', sv, t, v, v', vs, rpath, rfl, rfl, rfl, hsv, hseq, ht, hcoe, hrpath, hupd⟩
   · obtain ⟨M₁, F₁, M', v', rpath, hv', hrpath, hupd, rfl, rfl, rfl⟩ := hR
     obtain ⟨M, F, M₄, t, ipath, htail, hipath, hupdI, hσ, rfl, rfl⟩ := hI
-    simp only [Prod.mk.injEq] at hσ
+    simp only [LocalState.mk.injEq] at hσ
     obtain ⟨rfl, rfl, -⟩ := hσ
     cases hipath
     rw [inboxRef_name] at hupdI
@@ -181,7 +181,7 @@ theorem consumption_pair_iff (hΞ : Ξ.WellScoped) {r : ComputableGuardedPlusCal
       (eval_tail_inbox hsv' hseq).mp htail, hcoe, hrpath, hupd⟩
   · have hsv' : M'.lookup inbox = .some sv :=
       (Memory.lookup_update_ne hupd (Ne.symm hne)).trans hsv
-    refine ⟨(M', F, .none), 1, 1,
+    refine ⟨⟨M', F, .none⟩, 1, 1,
       NetworkPlusCal.Statement.reducing.assign.intro
         ⟨M, F, M', v', rpath, (ExprSemantics.evalCoerce hΞ hcfr').mpr
           ⟨v, (eval_head_inbox hsv hseq).mpr rfl, hcoe⟩, hrpath, hupd, rfl, rfl, rfl⟩,
@@ -228,18 +228,17 @@ theorem receive_reducing_sim (hΞ : Ξ.WellScoped) {c r : ComputableGuardedPlusC
   have hagree := sim.mem_agree
   have hlabel := sim.label_eq
   obtain ⟨M₁, F₁, l₁⟩ := σₛ
-  simp only [LocalState.mem_mk, LocalState.fifos_mk, LocalState.label_mk]
-    at hpath hinbox hoff hsplit hagree hlabel
+  dsimp only at hpath hinbox hoff hsplit hagree hlabel
   -- the target's three steps
   obtain ⟨mid1, ε₁, ε₂, hawait, ⟨mid2, ε₃, ε₄, hassignR, hassignI, rfl⟩, rfl⟩ := step
   obtain ⟨M, F, rfl, rfl, htru, rfl⟩ := hawait
-  erw [LocalState.label_mk] at hlabel
+  dsimp only at hlabel
   subst hlabel
   obtain ⟨M₀, F₀, M₃, v', rpath, hv', hrpath, hupd, hσ, rfl, rfl⟩ := hassignR
-  simp only [Prod.mk.injEq] at hσ
+  simp only [LocalState.mk.injEq] at hσ
   obtain ⟨rfl, rfl, -⟩ := hσ
   obtain ⟨M₁', F₁', M₄', t, ipath, ht, hipath, hupdI, hσ, rfl, rfl⟩ := hassignI
-  simp only [Prod.mk.injEq] at hσ
+  simp only [LocalState.mk.injEq] at hσ
   obtain ⟨rfl, rfl, -⟩ := hσ
   refine ⟨by simp, ?_⟩
   -- the guard says the inbox is non-empty, so the drained prefix has a head
@@ -263,12 +262,12 @@ theorem receive_reducing_sim (hΞ : Ξ.WellScoped) {c r : ComputableGuardedPlusC
     -- at all; there the source aborts rather than matching
     refine .inr (GuardedPlusCal.Statement.aborting.receive.intro
       (.inl (.inl (.inr ⟨M₁, F₁, cpath, rfl, rfl, hpath, ?_⟩))))
-    erw [LocalState.fifos_mk] at hsplit
+    dsimp only at hsplit
     rw [hsplit, hlk]
     rfl
   | some ws =>
     have hlk₁ : F₁.lookup ((c.name, cpath) : ChanKey V) = .some (v :: (vs' ++ ws)) := by
-      erw [LocalState.fifos_mk] at hsplit
+      dsimp only at hsplit
       rw [hsplit, hlk]
       rfl
     obtain ⟨M₁', hupd₁, hx⟩ := Memory.update_transfer (hagree r.name hrname).symm hupd
@@ -288,16 +287,16 @@ theorem receive_reducing_sim (hΞ : Ξ.WellScoped) {c r : ComputableGuardedPlusC
           (Ref.EvalArgs.congr_of_fresh hΞ hagree hfr).mpr hrpath, hlk₁, hcoe, hupd₁,
           rfl, rfl, rfl⟩⟩
     · intro y hy
-      dsimp only [LocalState.mem_mk]
+      dsimp only
       rw [Finmap.lookup_insert_of_ne _ hy]
       exact hagree₁ y hy
     · exact (Ref.EvalArgs.congr_of_fresh hΞ
         (λ y hy ↦ (Memory.lookup_update_ne hupd₁ hy).symm) hfw).mp hpath
     · intro k hk
-      dsimp only [LocalState.fifos_mk]
+      dsimp only
       rw [Finmap.lookup_insert_of_ne _ hk]
       exact hoff k hk
-    · dsimp only [LocalState.fifos_mk]
+    · dsimp only
       rw [Finmap.lookup_insert _, hlk]
       rfl
 
@@ -335,8 +334,7 @@ theorem receive_aborting_sim (hΞ : Ξ.WellScoped) {c r : ComputableGuardedPlusC
   have hagree := sim.mem_agree
   have hlabel := sim.label_eq
   obtain ⟨M₁, F₁, l₁⟩ := σₛ
-  simp only [LocalState.mem_mk, LocalState.fifos_mk, LocalState.label_mk]
-    at hpath hinbox hoff hsplit hagree hlabel
+  dsimp only at hpath hinbox hoff hsplit hagree hlabel
   obtain ⟨b, hb, hbool, hiff⟩ := eval_lenGt_inbox (Ξ := Ξ) (Ω := Ω) (τ := τ) (n := 0) hinbox hseq
   rcases step with hab | ⟨mid, ε₁, ε₂, hred, hrest, -⟩
   · -- the guard has a value and is a boolean, so neither `await` abort clause is reachable
@@ -349,23 +347,23 @@ theorem receive_aborting_sim (hΞ : Ξ.WellScoped) {c r : ComputableGuardedPlusC
       exact hw
   · -- the guard held, so the drained prefix has a head
     obtain ⟨M, F, rfl, rfl, htru, -⟩ := hred
-    simp only [LocalState.label_mk] at hlabel
+    dsimp only at hlabel
     subst hlabel
     obtain rfl := ExprSemantics.evalUnique hb htru
     obtain ⟨v, vs', rfl⟩ := List.exists_cons_of_ne_nil (List.ne_nil_of_length_pos (hiff.mp rfl))
     -- the source's queue may be absent altogether, and then the source aborts on the channel itself
     have habsent : F.lookup ((c.name, cpath) : ChanKey V) = .none →
-        (⟨(M₁, F₁, .none), (1 : Trace V)⟩ : LocalState V × Trace V) ∈
+        (⟨⟨M₁, F₁, .none⟩, (1 : Trace V)⟩ : LocalState V × Trace V) ∈
           GuardedPlusCal.Statement.aborting Ξ Ω (.receive c r coe) := by
       intro hlk
       refine GuardedPlusCal.Statement.aborting.receive.intro
         (.inl (.inl (.inr ⟨M₁, F₁, cpath, rfl, rfl, hpath, ?_⟩)))
-      erw [LocalState.fifos_mk] at hsplit
+      dsimp only at hsplit
       rw [hsplit, hlk]
       rfl
     rcases hrest with hab | ⟨mid2, ε₃, ε₄, hredR, habI, -⟩
     · obtain ⟨M, F, hM, rfl, hd⟩ := NetworkPlusCal.Statement.aborting.assign.iff.mp hab
-      simp only [Prod.mk.injEq] at hM
+      simp only [LocalState.mk.injEq] at hM
       obtain ⟨rfl, rfl, -⟩ := hM
       rcases hd with hname | habort | hrp | ⟨v', rpath, hv', hrpath, hupd⟩
       · -- the assignment's target is unbound in the target, so it is in the source too
@@ -378,7 +376,7 @@ theorem receive_aborting_sim (hΞ : Ξ.WellScoped) {c r : ComputableGuardedPlusC
         | some ws =>
           refine GuardedPlusCal.Statement.aborting.receive.intro
             (.inl (.inr ⟨M₁, F₁, cpath, v, vs' ++ ws, rfl, rfl, hpath, ?_, ?_⟩))
-          · erw [LocalState.fifos_mk] at hsplit
+          · dsimp only at hsplit
             rw [hsplit, hlk]
             rfl
           · rintro ⟨v', hv'⟩
@@ -396,19 +394,19 @@ theorem receive_aborting_sim (hΞ : Ξ.WellScoped) {c r : ComputableGuardedPlusC
           refine GuardedPlusCal.Statement.aborting.receive.intro
             (.inr ⟨M₁, F₁, cpath, rpath, v, v', vs' ++ ws, rfl, rfl, hpath,
               (Ref.EvalArgs.congr_of_fresh hΞ hagree hfr).mpr hrpath, ?_, hcoe, ?_⟩)
-          · erw [LocalState.fifos_mk] at hsplit
+          · dsimp only at hsplit
             rw [hsplit, hlk]
             rfl
           · exact Memory.update_none_transfer (hagree r.name hrname) hupd
     · -- the second assignment cannot abort: `inbox` is bound, `Tail` has a value, and an empty-path
       -- update cannot fail
       obtain ⟨M, F, M₃, v', rpath, -, -, hupd, hσ, rfl, -⟩ := hredR
-      simp only [Prod.mk.injEq] at hσ
+      simp only [LocalState.mk.injEq] at hσ
       obtain ⟨rfl, rfl, -⟩ := hσ
       have hinbox₃ : M₃.lookup inbox = .some sv :=
         (Memory.lookup_update_ne hupd (Ne.symm hrname)).trans hinbox
       obtain ⟨M, F, hM, rfl, hd⟩ := NetworkPlusCal.Statement.aborting.assign.iff.mp habI
-      simp only [Prod.mk.injEq] at hM
+      simp only [LocalState.mk.injEq] at hM
       obtain ⟨rfl, rfl, -⟩ := hM
       obtain ⟨t, ht'⟩ := ExprSemantics.isSeq_tail hseq
       rcases hd with hname | habort | hrp | ⟨u, ipath, -, hipath, hupdI⟩
@@ -447,9 +445,9 @@ theorem receive_blocking_sim {c r : ComputableGuardedPlusCal.Ref}
   have hlabel := sim.label_eq
   obtain ⟨M₁, F₁, l₁⟩ := σₛ
   obtain ⟨M₂, F₂, l₂⟩ := σₜ
-  simp only [LocalState.mem_mk, LocalState.fifos_mk, LocalState.label_mk] at *
+  dsimp only at *
   obtain ⟨M, F, b, hbool, hbne, hbeval, hσ, rfl⟩ := step
-  simp only [Prod.mk.injEq] at hσ
+  simp only [LocalState.mk.injEq] at hσ
   obtain ⟨rfl, rfl, rfl⟩ := hσ
   subst hlabel
   -- the guard blocks, so the inbox holds `0` or fewer elements
@@ -554,7 +552,7 @@ theorem reorder_consumption_lenGt (hΞ : Ξ.WellScoped) {r : ComputableGuardedPl
       (consumption_pair_iff hΞ hcfr hne).mp hpair
     -- the guard changes nothing, so it starts where the pair does
     obtain ⟨Mb, Fb, rfl, hσm, htru, rfl⟩ := hguard
-    simp only [Prod.mk.injEq] at hσm
+    simp only [LocalState.mk.injEq] at hσm
     obtain ⟨rfl, rfl, -⟩ := hσm
     obtain ⟨b, hb, -, hiff⟩ := eval_lenGt_inbox (Ξ := Ξ) (Ω := Ω) (τ := τ') (n := n + 1) hsv hseq
     obtain rfl := ExprSemantics.evalUnique hb htru
@@ -585,7 +583,7 @@ theorem await_lenGt_aborting_le (hΞ : Ξ.WellScoped) {r : ComputableGuardedPlus
     rwa [freeVars_head_inboxVar]
   rintro ⟨⟨M, F, l⟩, ε⟩ hguard
   obtain ⟨M₀, F₀, hM, rfl, hd⟩ := NetworkPlusCal.Statement.aborting.await.iff.mp hguard
-  simp only [Prod.mk.injEq] at hM
+  simp only [LocalState.mk.injEq] at hM
   obtain ⟨rfl, rfl, rfl⟩ := hM
   refine NetworkPlusCal.Statement.aborting.assign.iff.mpr
     ⟨_, _, rfl, rfl, .inr (.inl ?_)⟩

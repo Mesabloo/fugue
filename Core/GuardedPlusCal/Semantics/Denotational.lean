@@ -114,37 +114,13 @@ is gained by also carrying it at the type level — see `Statement.reducing` bel
 There is deliberately no third component for `with`-bound temporaries. That an assignment does not
 target a block-local binder is a syntactic property, checked by `WellFormedness`; keeping it in the
 state would oblige every lemma to translate between two state shapes for no proof-side gain. -/
-abbrev LocalState (V : Type u) : Type u := Memory V × FIFOs V × Option String
-
-/-! Named projections. `LocalState` is a nested anonymous product, so its components are otherwise
-reachable only as `σ.1`/`σ.2.1`/`σ.2.2` or by destructuring at every binding site. Named
-projections let a proof `intro σₜ σₜ' ε σₛ` with no pattern at all and reach components by name,
-destructuring only where it genuinely case-splits on the label. -/
-
-/-- The memory component. -/
-def LocalState.mem (σ : LocalState V) : Memory V := σ.1
-
-/-- The FIFO component. -/
-def LocalState.fifos (σ : LocalState V) : FIFOs V := σ.2.1
-
-/-- The label component: `none` while running, `some l` once the block has jumped to `l`. -/
-def LocalState.label (σ : LocalState V) : Option String := σ.2.2
-
-omit [ExprSemantics V] in
-@[simp] theorem LocalState.mem_mk (M : Memory V) (F : FIFOs V) (l : Option String) :
-    LocalState.mem ⟨M, F, l⟩ = M := rfl
-
-omit [ExprSemantics V] in
-@[simp] theorem LocalState.fifos_mk (M : Memory V) (F : FIFOs V) (l : Option String) :
-    LocalState.fifos ⟨M, F, l⟩ = F := rfl
-
-omit [ExprSemantics V] in
-@[simp] theorem LocalState.label_mk (M : Memory V) (F : FIFOs V) (l : Option String) :
-    LocalState.label ⟨M, F, l⟩ = l := rfl
-
-omit [ExprSemantics V] in
-@[simp] theorem LocalState.mk_mem_fifos_label (σ : LocalState V) :
-    (⟨σ.mem, σ.fifos, σ.label⟩ : LocalState V) = σ := rfl
+structure LocalState (V : Type u) : Type u where
+  /-- The process's own variable memory. -/
+  mem : Memory V
+  /-- The channels. -/
+  fifos : FIFOs V
+  /-- `none` while running, `some l` once the block has jumped to `l`. -/
+  label : Option String
 
 /-- Resolving one segment of a reference's access path against a memory: a field segment resolves to
 itself, an index expression to whatever it evaluates to. -/

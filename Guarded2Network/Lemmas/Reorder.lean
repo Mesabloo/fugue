@@ -238,10 +238,8 @@ theorem assign_aborting_of_insert (hΞ : Ξ.WellScoped) {r : ComputableGuardedPl
       NetworkPlusCal.Statement.aborting Ξ Ω (.assign r rhs) := by
   have hne : x ≠ r.name := ne_name_of_fresh hx
   obtain ⟨M₀, F₀, hstate, rfl, hd⟩ := NetworkPlusCal.Statement.aborting.assign.iff.mp h
-  injection hstate with hM hF'
-  subst hM
-  injection hF' with hF _
-  subst hF
+  injection hstate with hM hF _
+  subst hM hF
   refine NetworkPlusCal.Statement.aborting.assign.iff.mpr ⟨M, F, rfl, rfl, ?_⟩
   rcases hd with hname | habort | hpath | ⟨v, rpath, hv, hrpath, hupd⟩
   · exact .inl λ hmem ↦ hname (Finmap.mem_insert.mpr (.inr hmem))
@@ -278,10 +276,8 @@ theorem reorder_assign_guard (hΞ : Ξ.WellScoped) {r : ComputableGuardedPlusCal
         NetworkPlusCal.Statement.reducing.assign.elim hassign
       obtain ⟨M₀, F₀, w, u, hw, hxnone, hbv, hstate, rfl, rfl⟩ :=
         NetworkPlusCal.Statement.reducing.with.iff.mp hguard
-      injection hstate with hM hF'
-      subst hM
-      injection hF' with hF _
-      subst hF
+      injection hstate with hM hF _
+      subst hM hF
       refine ⟨⟨(M.insert x u), F, .none⟩, 1, 1, ?_, ?_, rfl⟩
       · refine NetworkPlusCal.Statement.reducing.with.iff.mpr
           ⟨M, F, w, u, (evalSubstRef hΞ hlc hv hpath hupd).mp hw, ?_, hbv, rfl, rfl, rfl⟩
@@ -294,10 +290,8 @@ theorem reorder_assign_guard (hΞ : Ξ.WellScoped) {r : ComputableGuardedPlusCal
         NetworkPlusCal.Statement.reducing.with.iff.mp hguard
       obtain ⟨M₀, F₀, M₂, v, rpath, hv, hpath, hupd, hstate, rfl, rfl⟩ :=
         NetworkPlusCal.Statement.reducing.assign.elim hassign
-      injection hstate with hM hF'
-      subst hM
-      injection hF' with hF _
-      subst hF
+      injection hstate with hM hF _
+      subst hM hF
       obtain ⟨M', hupd', rfl⟩ := (ComputableTLAPlus.Memory.update_insert_iff hne).mpr hupd
       have hv' : ExprSemantics.Eval Ξ Ω M rhs v := (eval_insert_of_fresh hΞ hrhs).mp hv
       have hpath' : Ref.EvalArgs Ξ Ω M r rpath :=
@@ -316,10 +310,8 @@ theorem reorder_assign_guard (hΞ : Ξ.WellScoped) {r : ComputableGuardedPlusCal
         NetworkPlusCal.Statement.reducing.assign.elim hassign
       obtain ⟨M₀, F₀, hstate, rfl, htru, rfl⟩ :=
         NetworkPlusCal.Statement.reducing.await.elim hguard
-      injection hstate with hM hF'
-      subst hM
-      injection hF' with hF _
-      subst hF
+      injection hstate with hM hF _
+      subst hM hF
       refine ⟨⟨M, F, .none⟩, 1, 1, ?_, ?_, rfl⟩
       · exact NetworkPlusCal.Statement.reducing.await.intro
           ⟨M, F, rfl, rfl, (evalSubstRef hΞ hlc hv hpath hupd).mp htru, rfl⟩
@@ -329,10 +321,8 @@ theorem reorder_assign_guard (hΞ : Ξ.WellScoped) {r : ComputableGuardedPlusCal
         NetworkPlusCal.Statement.reducing.await.elim hguard
       obtain ⟨M₀, F₀, M', v, rpath, hv, hpath, hupd, hstate, rfl, rfl⟩ :=
         NetworkPlusCal.Statement.reducing.assign.elim hassign
-      injection hstate with hM hF'
-      subst hM
-      injection hF' with hF _
-      subst hF
+      injection hstate with hM hF _
+      subst hM hF
       refine ⟨⟨M', F, .none⟩, 1, 1, ?_, ?_, rfl⟩
       · exact NetworkPlusCal.Statement.reducing.assign.intro
           ⟨M, F, M', v, rpath, hv, hpath, hupd, rfl, rfl, rfl⟩

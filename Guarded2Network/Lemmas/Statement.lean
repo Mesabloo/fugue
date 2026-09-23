@@ -288,7 +288,8 @@ theorem relatesTo.mem_congr (hΞ : Ξ.WellScoped) {mbox : Mailbox} {pref : ChanK
     · rintro _ _ ⟨rfl, rfl⟩
       exact hy
     · exact (Ref.EvalArgs.congr_of_fresh hΞ hs hxc).mpr hpath
-    · rwa [LocalState.mem_mk, ht inbox (Ne.symm hxi)]
+    · dsimp only
+      rwa [ht inbox (Ne.symm hxi)]
 
 /-! ## Action statements
 

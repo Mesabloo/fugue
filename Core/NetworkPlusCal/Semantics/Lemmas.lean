@@ -463,7 +463,7 @@ theorem AtomicBranch.reducing_label {M M' : Memory V} {F F' : FIFOs V} {l label 
   obtain ⟨_, _, _, _, hstmt, _⟩ := hblock
   rw [hlast] at hstmt
   obtain ⟨_, _, _, hdone, _⟩ := hstmt
-  simpa only [LocalState.label_mk, Option.some.injEq] using congrArg LocalState.label hdone
+  simpa only [Option.some.injEq] using congrArg LocalState.label hdone
 
 /-- **A statement never removes a channel.** `send` is the only constructor that writes the map, and
 it writes at a key it has just read, so its `insert` only ever overwrites. -/
@@ -487,7 +487,7 @@ theorem Statement.reducing_fifos_mem {b b' : Bool}
   | assign r e => obtain ⟨M, F, M', v, rpath, -, -, -, rfl, rfl, -⟩ := step; exact h
   | send c e =>
     obtain ⟨M, F, v, cpath, vs, p, -, -, hlk, -, rfl, rfl, -⟩ := step
-    rw [LocalState.fifos_mk] at h ⊢
+    dsimp only at h ⊢
     by_cases hk : k = ⟨c.name, cpath⟩
     · subst hk
       rw [Finmap.lookup_insert]

@@ -62,9 +62,8 @@ theorem rxStep_step (hΞ : Ξ.WellScoped) {c : ComputableGuardedPlusCal.Ref} {in
       F₂'.lookup ib.key ≠ .none ∧
       GuardedPlusCal.FIFOs.size F₂' + 1 = GuardedPlusCal.FIFOs.size F₂ := by
   obtain ⟨M, F, cpath, v, vs, old, new, hpath, hfifo, hold, happ, hrun, hdone, rfl⟩ := step
-  injection hrun with hM hrun'
-  injection hrun' with hF _
-  subst hM; subst hF
+  injection hrun with hM hF _
+  subst hM hF
   obtain ⟨cpath₁, hpath₁, hibkey⟩ := hkey
   -- the two sides resolve the channel to the same key: the reference cannot mention `inbox`, which
   -- is the only name the memories disagree on
@@ -113,9 +112,8 @@ theorem procRelatesTo.rx_step (hΞ : Ξ.WellScoped) {c : ComputableGuardedPlusCa
   obtain ⟨hlabels, hmem, hinbox, hkey⟩ := h
   obtain ⟨v, M₂'', F₂'', rfl, hdone, hmem', hinbox', hoff, hsplit', hkeep, hsize⟩ :=
     rxStep_step hΞ hfresh hmem hinbox hkey hsplit step
-  injection hdone with hM hrest
-  injection hrest with hF _
-  subst hM; subst hF
+  injection hdone with hM hF _
+  subst hM hF
   exact ⟨v, rfl, ⟨hlabels, hmem', hinbox', hkey⟩, hoff, hsplit', hkeep, hsize⟩
 
 /-- **And at the algorithm level: the source does not move at all.** One instance takes a receiving
