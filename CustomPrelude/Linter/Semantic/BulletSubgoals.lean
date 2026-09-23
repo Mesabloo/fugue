@@ -26,12 +26,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- Bullet every subgoal a splitting tactic produces. -/
-register_option linter.fugue.bulletSubgoals : Bool := {
-  defValue := true
-  descr := "flag a tactic run with several goals open that leaves some untouched — bullet each branch with `·`"
-}
-
 namespace BulletSubgoals
 
 /-- Verbatim from `Mathlib.Linter.Style.multiGoal.exclusions`, plus the project's `tac_selector`
@@ -149,9 +143,9 @@ def bulletSubgoalsCore : Syntax → CommandElabM (Array Finding) := λ _ ↦ do
         out := out.push ⟨s, m!"{before} goals open here, {n} left untouched — bullet each branch with `·`"⟩
   return out
 
-/-- The `linter.fugue.bulletSubgoals` linter. -/
-def bulletSubgoals : Linter where run := mkFugueLinterM linter.fugue.bulletSubgoals bulletSubgoalsCore
-
-initialize addLinter bulletSubgoals
+/-- Bullet every subgoal a splitting tactic produces. -/
+fugue_linter bulletSubgoals
+  "flag a tactic run with several goals open that leaves some untouched — bullet each branch with `·`"
+  := bulletSubgoalsCore
 
 end CustomPrelude.Linter

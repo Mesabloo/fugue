@@ -24,12 +24,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- `set x := e` that leaves the goal unchanged → `let`. -/
-register_option linter.fugue.setNotLet : Bool := {
-  defValue := true
-  descr := "flag `set x := e` that does not change the goal — a proof-local definition is a `let`"
-}
-
 /-- Every `set` whose goal type is the same before and after. -/
 def setNotLetCore : Syntax → CommandElabM (Array Finding) := λ stx ↦ do
   let sets := collect (·.getKind == `Mathlib.Tactic.setTactic) stx
@@ -61,9 +55,9 @@ def setNotLetCore : Syntax → CommandElabM (Array Finding) := λ stx ↦ do
         out := out.push f
   return out
 
-/-- The `linter.fugue.setNotLet` linter. -/
-def setNotLet : Linter where run := mkFugueLinterM linter.fugue.setNotLet setNotLetCore
-
-initialize addLinter setNotLet
+/-- `set x := e` that leaves the goal unchanged → `let`. -/
+fugue_linter setNotLet
+  "flag `set x := e` that does not change the goal — a proof-local definition is a `let`"
+  := setNotLetCore
 
 end CustomPrelude.Linter

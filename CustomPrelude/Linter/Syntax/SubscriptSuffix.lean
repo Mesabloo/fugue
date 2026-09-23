@@ -22,12 +22,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- Write an index suffix as a Unicode subscript (`x₁`), not ASCII digits (`x1`). -/
-register_option linter.fugue.subscriptSuffix : Bool := {
-  defValue := false
-  descr := "flag an identifier ending in ASCII digits — write the suffix as a Unicode subscript"
-}
-
 /-- `c` (an ASCII digit) as the matching Unicode subscript digit. -/
 def subscriptDigit (c : Char) : Char :=
   Char.ofNat (c.toNat - '0'.toNat + '₀'.toNat)
@@ -61,10 +55,9 @@ def subscriptSuffixCore : Syntax → Array Finding :=
       else #[]
     | none => #[]
 
-/-- The `linter.fugue.subscriptSuffix` linter. -/
-def subscriptSuffix : Linter where
-  run := mkFugueLinter linter.fugue.subscriptSuffix subscriptSuffixCore
-
-initialize addLinter subscriptSuffix
+/-- Write an index suffix as a Unicode subscript (`x₁`), not ASCII digits (`x1`). -/
+fugue_linter subscriptSuffix (default := false)
+  "flag an identifier ending in ASCII digits — write the suffix as a Unicode subscript"
+  := subscriptSuffixCore
 
 end CustomPrelude.Linter

@@ -15,12 +15,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- No `by assumption` as a term argument. -/
-register_option linter.fugue.byAssumption : Bool := {
-  defValue := true
-  descr := "flag `(by assumption)` in argument position — write `‹_›`"
-}
-
 /-- Whether `t` is a `by` block whose sequence is exactly `assumption`. -/
 private def isByAssumption (t : Syntax) : Bool :=
   t.isOfKind ``Lean.Parser.Term.byTactic
@@ -33,9 +27,8 @@ def byAssumptionCore : Syntax → Array Finding :=
     (appArgs s).filterMap λ a ↦
       if isByAssumption a then some ⟨a, m!"`by assumption` as a term argument → `‹_›`"⟩ else none
 
-/-- The `linter.fugue.byAssumption` linter. -/
-def byAssumption : Linter where run := mkFugueLinter linter.fugue.byAssumption byAssumptionCore
-
-initialize addLinter byAssumption
+/-- No `by assumption` as a term argument. -/
+fugue_linter byAssumption
+  "flag `(by assumption)` in argument position — write `‹_›`" := byAssumptionCore
 
 end CustomPrelude.Linter

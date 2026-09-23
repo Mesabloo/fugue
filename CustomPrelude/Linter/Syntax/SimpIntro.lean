@@ -15,12 +15,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- `intro …` then a closing `simp` → `simp_intro …`. -/
-register_option linter.fugue.simpIntro : Bool := {
-  defValue := true
-  descr := "flag `intro` immediately before a terminal `simp` — use `simp_intro`"
-}
-
 /-- Every tactic sequence ending `… ; intro … ; simp`. -/
 def simpIntroCore : Syntax → Array Finding :=
   scan λ seq ↦
@@ -35,9 +29,8 @@ def simpIntroCore : Syntax → Array Finding :=
       else #[]
     else #[]
 
-/-- The `linter.fugue.simpIntro` linter. -/
-def simpIntro : Linter where run := mkFugueLinter linter.fugue.simpIntro simpIntroCore
-
-initialize addLinter simpIntro
+/-- `intro …` then a closing `simp` → `simp_intro …`. -/
+fugue_linter simpIntro
+  "flag `intro` immediately before a terminal `simp` — use `simp_intro`" := simpIntroCore
 
 end CustomPrelude.Linter

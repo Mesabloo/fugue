@@ -16,12 +16,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- `contradiction`, not `*.noConfusion`. -/
-register_option linter.fugue.noConfusion : Bool := {
-  defValue := true
-  descr := "flag `*.noConfusion` — use `contradiction`"
-}
-
 /-- Every identifier or projection field named `noConfusion`. -/
 def noConfusionCore : Syntax → Array Finding :=
   scan λ s ↦
@@ -31,9 +25,8 @@ def noConfusionCore : Syntax → Array Finding :=
       else #[]
     | _ => #[]
 
-/-- The `linter.fugue.noConfusion` linter. -/
-def noConfusion : Linter where run := mkFugueLinter linter.fugue.noConfusion noConfusionCore
-
-initialize addLinter noConfusion
+/-- `contradiction`, not `*.noConfusion`. -/
+fugue_linter noConfusion
+  "flag `*.noConfusion` — use `contradiction`" := noConfusionCore
 
 end CustomPrelude.Linter

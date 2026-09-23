@@ -15,12 +15,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- Defeq massage: `change`, not `simp only` over a `rfl`-`have`. -/
-register_option linter.fugue.rflHaveSimp : Bool := {
-  defValue := true
-  descr := "flag `have _ := rfl` consumed by a following `simp only` — use `change`"
-}
-
 /-- Every `have h : _ := rfl` whose next `simp only` names `h`. -/
 def rflHaveSimpCore : Syntax → Array Finding :=
   scan λ seq ↦
@@ -44,9 +38,8 @@ def rflHaveSimpCore : Syntax → Array Finding :=
           | _, _ => out
     else #[]
 
-/-- The `linter.fugue.rflHaveSimp` linter. -/
-def rflHaveSimp : Linter where run := mkFugueLinter linter.fugue.rflHaveSimp rflHaveSimpCore
-
-initialize addLinter rflHaveSimp
+/-- Defeq massage: `change`, not `simp only` over a `rfl`-`have`. -/
+fugue_linter rflHaveSimp
+  "flag `have _ := rfl` consumed by a following `simp only` — use `change`" := rflHaveSimpCore
 
 end CustomPrelude.Linter

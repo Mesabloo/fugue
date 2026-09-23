@@ -15,12 +15,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- Use `all:` / `n:`, not `all_goals` / `any_goals` / `on_goal`. -/
-register_option linter.fugue.goalSelector : Bool := {
-  defValue := true
-  descr := "flag `all_goals` / `any_goals` / `on_goal` — use the `tac_selector` syntax"
-}
-
 /-- Every `all_goals` / `any_goals` / `on_goal`. -/
 def goalSelectorCore : Syntax → Array Finding :=
   scan λ s ↦
@@ -32,9 +26,8 @@ def goalSelectorCore : Syntax → Array Finding :=
       hit s m!"`on_goal n => tac` → `n: tac`"
     else #[]
 
-/-- The `linter.fugue.goalSelector` linter. -/
-def goalSelector : Linter where run := mkFugueLinter linter.fugue.goalSelector goalSelectorCore
-
-initialize addLinter goalSelector
+/-- Use `all:` / `n:`, not `all_goals` / `any_goals` / `on_goal`. -/
+fugue_linter goalSelector
+  "flag `all_goals` / `any_goals` / `on_goal` — use the `tac_selector` syntax" := goalSelectorCore
 
 end CustomPrelude.Linter

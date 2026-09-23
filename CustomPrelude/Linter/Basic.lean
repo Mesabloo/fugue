@@ -14,8 +14,9 @@ build.
 This module carries what the linters share:
 
 * `Finding` — a syntax node to underline and the message to show;
-* `mkFugueLinter` / `mkFugueLinterM` — the wrapper turning a finding-producer into a `Linter.run`
-  body, gated on the master toggle, the per-linter option, and the vendored-code skiplist;
+* `mkFugueLinterM` — the wrapper turning a finding-producer into a `Linter.run` body, gated on the
+  master toggle, the per-linter option, and the vendored-code skiplist;
+* `fugue_linter` — the command declaring one linter: its option, its `Linter`, its registration;
 * `linter.fugue` — the master toggle every wrapper checks;
 * `skiplist` — module-path prefixes exempt from every `linter.fugue.*` linter;
 * `scan` — a pre-order syntax walk that does not descend into syntax quotations.
@@ -207,9 +208,37 @@ public def mkFugueLinterM (opt : Lean.Option Bool)
     for fnd in (← core stx) do
       Linter.logLint opt fnd.ref fnd.msg
 
-/-- `mkFugueLinterM` for a pure `Syntax`-only core — the syntax-linter kind. -/
-public def mkFugueLinter (opt : Lean.Option Bool) (core : Syntax → Array Finding) :
-    Syntax → CommandElabM Unit :=
-  mkFugueLinterM opt λ stx ↦ pure (core stx)
+/-- A finding-producer `fugue_linter` can run: a pure `Syntax`-only core, or one in
+`CommandElabM`. -/
+public class LinterCore (α : Type) where
+  /-- The core as a `CommandElabM` finding-producer. -/
+  toM : α → Syntax → CommandElabM (Array Finding)
+
+public instance : LinterCore (Syntax → CommandElabM (Array Finding)) := ⟨id⟩
+
+public instance : LinterCore (Syntax → Array Finding) := ⟨λ core stx ↦ pure (core stx)⟩
+
+/--
+`fugue_linter name "descr" := core` declares the linter `linter.fugue.name` in one command: it
+registers the option (default `true`, or `b` when written `fugue_linter name (default := b) …`),
+carrying the leading docstring; defines the `Linter` `name`, running `core` through
+`mkFugueLinterM`; and adds it with `addLinter`. `core` is either kind `LinterCore` accepts.
+-/
+syntax (docComment)? "fugue_linter " ident (" (" &"default" " := " term ")")? str " := " term :
+  command
+
+macro_rules
+| `($[$doc?:docComment]? fugue_linter $name:ident $[(default := $dflt?)]? $descr:str := $core) => do
+  let n := name.getId
+  let opt := mkIdentFrom name (`linter.fugue ++ n)
+  let dflt ← dflt?.getDM `(true)
+  let linDoc : TSyntax ``Lean.Parser.Command.docComment :=
+    ⟨mkNode ``Lean.Parser.Command.docComment
+      #[mkAtom "/--", mkAtom s!" The `linter.fugue.{n}` linter. -/"]⟩
+  let reg ← `($[$doc?]? register_option $opt : Bool := { defValue := $dflt, descr := $descr })
+  let dfn ← `($linDoc:docComment
+    def $name : Lean.Elab.Command.Linter where run := mkFugueLinterM $opt (LinterCore.toM $core))
+  let ini ← `(initialize Lean.Elab.Command.addLinter $name)
+  return mkNullNode #[reg, dfn, ini]
 
 end CustomPrelude.Linter

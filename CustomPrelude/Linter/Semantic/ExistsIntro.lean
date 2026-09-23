@@ -28,12 +28,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- Existential goal → `exists`, not `refine ⟨…⟩`. -/
-register_option linter.fugue.existsIntro : Bool := {
-  defValue := true
-  descr := "flag `refine ⟨…, ?_⟩` on an existential goal — use `exists` for the leading witnesses"
-}
-
 private def isHoleKind (k : SyntaxNodeKind) : Bool :=
   k == ``Lean.Parser.Term.syntheticHole || k == ``Lean.Parser.Term.hole
 
@@ -79,9 +73,9 @@ def existsIntroCore : Syntax → CommandElabM (Array Finding) := λ stx ↦ do
         out := out.push f
   return out
 
-/-- The `linter.fugue.existsIntro` linter. -/
-def existsIntro : Linter where run := mkFugueLinterM linter.fugue.existsIntro existsIntroCore
-
-initialize addLinter existsIntro
+/-- Existential goal → `exists`, not `refine ⟨…⟩`. -/
+fugue_linter existsIntro
+  "flag `refine ⟨…, ?_⟩` on an existential goal — use `exists` for the leading witnesses"
+  := existsIntroCore
 
 end CustomPrelude.Linter

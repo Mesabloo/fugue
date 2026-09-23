@@ -21,12 +21,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- `rw [S]; exact h` for a local `h` → `rwa [S]`. -/
-register_option linter.fugue.rwaExactBare : Bool := {
-  defValue := true
-  descr := "flag `rw [...]` (no `at`) then `exact h` for a local hypothesis — use `rwa`"
-}
-
 /-- The rewrite word to name in the message, `none` for a non-rewrite or a rewrite with `at`. -/
 private def bareRwWord? (t : Syntax) : Option String :=
   let w := match t.getKind with
@@ -84,9 +78,8 @@ def rwaExactBareCore : Syntax → CommandElabM (Array Finding) := λ stx ↦ do
         out := out.push f
   return out
 
-/-- The `linter.fugue.rwaExactBare` linter. -/
-def rwaExactBare : Linter where run := mkFugueLinterM linter.fugue.rwaExactBare rwaExactBareCore
-
-initialize addLinter rwaExactBare
+/-- `rw [S]; exact h` for a local `h` → `rwa [S]`. -/
+fugue_linter rwaExactBare
+  "flag `rw [...]` (no `at`) then `exact h` for a local hypothesis — use `rwa`" := rwaExactBareCore
 
 end CustomPrelude.Linter

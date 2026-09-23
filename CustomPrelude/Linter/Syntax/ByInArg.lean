@@ -24,12 +24,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- No `(by …)` in argument position. Off by default (`LEAN_STYLE.md`: too common to mechanize). -/
-register_option linter.fugue.byInArg : Bool := {
-  defValue := false
-  descr := "flag `(by …)` in application-argument position — use a term, or `refine` + `?_`"
-}
-
 /-- Whether `a` is a `by` block that is not solely `assumption` (that case is `byAssumption`'s). -/
 private def flaggableBy (a : Syntax) : Bool :=
   a.isOfKind ``Lean.Parser.Term.byTactic &&
@@ -48,9 +42,9 @@ def byInArgCore : Syntax → Array Finding :=
         some ⟨a, m!"`(by …)` in argument position — a term if one exists, else `refine`/`apply` and `?_`"⟩
       else none
 
-/-- The `linter.fugue.byInArg` linter. -/
-def byInArg : Linter where run := mkFugueLinter linter.fugue.byInArg byInArgCore
-
-initialize addLinter byInArg
+/-- No `(by …)` in argument position. Off by default (`LEAN_STYLE.md`: too common to mechanize). -/
+fugue_linter byInArg (default := false)
+  "flag `(by …)` in application-argument position — use a term, or `refine` + `?_`"
+  := byInArgCore
 
 end CustomPrelude.Linter

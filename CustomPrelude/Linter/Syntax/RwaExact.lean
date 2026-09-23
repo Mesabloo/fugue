@@ -18,12 +18,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- `rw … at h; exact h` → `rwa … at h`. -/
-register_option linter.fugue.rwaExact : Bool := {
-  defValue := true
-  descr := "flag `rw [...] at h` immediately followed by `exact h` — use `rwa`"
-}
-
 /-- In each tactic sequence, a `rw`/`erw`/`simp_rw` `… at h` whose next sibling is `exact h`. -/
 def rwaExactCore : Syntax → Array Finding :=
   scan λ seq ↦
@@ -41,9 +35,8 @@ def rwaExactCore : Syntax → Array Finding :=
         | _, _ => out
     else #[]
 
-/-- The `linter.fugue.rwaExact` linter. -/
-def rwaExact : Linter where run := mkFugueLinter linter.fugue.rwaExact rwaExactCore
-
-initialize addLinter rwaExact
+/-- `rw … at h; exact h` → `rwa … at h`. -/
+fugue_linter rwaExact
+  "flag `rw [...] at h` immediately followed by `exact h` — use `rwa`" := rwaExactCore
 
 end CustomPrelude.Linter

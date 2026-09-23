@@ -15,12 +15,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- No `rw [show … by …]`. -/
-register_option linter.fugue.rwShow : Bool := {
-  defValue := true
-  descr := "flag `show … by …` inside a rewrite argument — hoist it to a `have`"
-}
-
 /-- Every `show … by …` inside a `rw`/`rwa`/`simp_rw`/`erw` rule list. -/
 def rwShowCore : Syntax → Array Finding :=
   scan λ s ↦
@@ -32,9 +26,8 @@ def rwShowCore : Syntax → Array Finding :=
       | none => #[]
     else #[]
 
-/-- The `linter.fugue.rwShow` linter. -/
-def rwShow : Linter where run := mkFugueLinter linter.fugue.rwShow rwShowCore
-
-initialize addLinter rwShow
+/-- No `rw [show … by …]`. -/
+fugue_linter rwShow
+  "flag `show … by …` inside a rewrite argument — hoist it to a `have`" := rwShowCore
 
 end CustomPrelude.Linter

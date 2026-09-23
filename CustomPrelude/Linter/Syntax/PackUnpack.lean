@@ -19,12 +19,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- Never pack a term only to unpack it. -/
-register_option linter.fugue.packUnpack : Bool := {
-  defValue := true
-  descr := "flag `obtain ⟨…⟩ : T := ⟨…⟩` — write the `have`s"
-}
-
 /-- Every `obtain <tuple pattern> : T := ⟨a, b, c⟩` where every component of the right-hand tuple
 is a plain identifier — the components already have names, so the ascription only restates their
 types. A computed witness (`⟨k.toNat - 1, by omega⟩`) is genuine existential intro and stays. -/
@@ -41,9 +35,8 @@ def packUnpackCore : Syntax → Array Finding :=
       else #[]
     else #[]
 
-/-- The `linter.fugue.packUnpack` linter. -/
-def packUnpack : Linter where run := mkFugueLinter linter.fugue.packUnpack packUnpackCore
-
-initialize addLinter packUnpack
+/-- Never pack a term only to unpack it. -/
+fugue_linter packUnpack
+  "flag `obtain ⟨…⟩ : T := ⟨…⟩` — write the `have`s" := packUnpackCore
 
 end CustomPrelude.Linter

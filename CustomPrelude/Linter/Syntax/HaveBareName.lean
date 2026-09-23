@@ -19,12 +19,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- No `have x : Y := <bare name>`. -/
-register_option linter.fugue.haveBareName : Bool := {
-  defValue := true
-  descr := "flag `have x : Y := z` for a bare identifier `z` — `change … at z`, or inline the global"
-}
-
 /-- A lone identifier with no namespace component — a hypothesis or nullary global referenced
 directly. `rfl` (a defeq fact) and dotted projections (`a.b`) are not this. -/
 private def isBareName (stx : Syntax) : Bool :=
@@ -46,9 +40,9 @@ def haveBareNameCore : Syntax → Array Finding :=
       | none => #[]
     else #[]
 
-/-- The `linter.fugue.haveBareName` linter. -/
-def haveBareName : Linter where run := mkFugueLinter linter.fugue.haveBareName haveBareNameCore
-
-initialize addLinter haveBareName
+/-- No `have x : Y := <bare name>`. -/
+fugue_linter haveBareName
+  "flag `have x : Y := z` for a bare identifier `z` — `change … at z`, or inline the global"
+  := haveBareNameCore
 
 end CustomPrelude.Linter

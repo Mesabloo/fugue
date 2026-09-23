@@ -14,12 +14,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- `by classical` on one line. -/
-register_option linter.fugue.byClassical : Bool := {
-  defValue := true
-  descr := "flag `by` and a leading `classical` split across two lines"
-}
-
 /-- Every `by` whose sequence opens with `classical` on a later line than the `by`. -/
 def byClassicalCore : Syntax → Array Finding :=
   scan λ s ↦
@@ -32,9 +26,8 @@ def byClassicalCore : Syntax → Array Finding :=
       | none => #[]
     else #[]
 
-/-- The `linter.fugue.byClassical` linter. -/
-def byClassical : Linter where run := mkFugueLinter linter.fugue.byClassical byClassicalCore
-
-initialize addLinter byClassical
+/-- `by classical` on one line. -/
+fugue_linter byClassical
+  "flag `by` and a leading `classical` split across two lines" := byClassicalCore
 
 end CustomPrelude.Linter

@@ -16,12 +16,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- No `( … )` around a selector's tactic block. -/
-register_option linter.fugue.selectorParens : Bool := {
-  defValue := true
-  descr := "flag `all: ( … )` / `all_goals ( … )` — the selector already groups"
-}
-
 /-- The tactic block a selector applies, if `s` is one. -/
 private def selectorBlock? (s : Syntax) : Option Syntax :=
   if s.isOfKind ``Lean.Parser.Tactic.allGoals || s.isOfKind ``Lean.Parser.Tactic.anyGoals then
@@ -44,10 +38,8 @@ def selectorParensCore : Syntax → Array Finding :=
         else #[]
     | none => #[]
 
-/-- The `linter.fugue.selectorParens` linter. -/
-def selectorParens : Linter where
-  run := mkFugueLinter linter.fugue.selectorParens selectorParensCore
-
-initialize addLinter selectorParens
+/-- No `( … )` around a selector's tactic block. -/
+fugue_linter selectorParens
+  "flag `all: ( … )` / `all_goals ( … )` — the selector already groups" := selectorParensCore
 
 end CustomPrelude.Linter

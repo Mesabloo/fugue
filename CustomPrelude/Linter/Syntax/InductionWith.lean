@@ -16,12 +16,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- `induction`/`fun_induction` cases in `with`, no trailing bare `case`. -/
-register_option linter.fugue.inductionWith : Bool := {
-  defValue := true
-  descr := "flag `induction`/`fun_induction` without `with`, or with a trailing `case`/`next`"
-}
-
 /-- Whether `t` is an `induction`/`fun_induction` node, and whether it has a `with`. `cases`
 is excluded — a bare `cases h` on a single-constructor type is ordinary destructuring. -/
 private def elimWith? (t : Syntax) : Option Bool :=
@@ -51,9 +45,9 @@ def inductionWithCore : Syntax → Array Finding :=
         | none => out
     else #[]
 
-/-- The `linter.fugue.inductionWith` linter. -/
-def inductionWith : Linter where run := mkFugueLinter linter.fugue.inductionWith inductionWithCore
-
-initialize addLinter inductionWith
+/-- `induction`/`fun_induction` cases in `with`, no trailing bare `case`. -/
+fugue_linter inductionWith
+  "flag `induction`/`fun_induction` without `with`, or with a trailing `case`/`next`"
+  := inductionWithCore
 
 end CustomPrelude.Linter

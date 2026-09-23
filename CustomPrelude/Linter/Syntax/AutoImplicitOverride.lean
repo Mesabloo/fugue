@@ -16,12 +16,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- `autoImplicit` stays off. -/
-register_option linter.fugue.autoImplicitOverride : Bool := {
-  defValue := true
-  descr := "flag `set_option autoImplicit true`"
-}
-
 /-- Every `set_option autoImplicit true`. -/
 def autoImplicitOverrideCore : Syntax → Array Finding :=
   scan λ s ↦
@@ -29,10 +23,8 @@ def autoImplicitOverrideCore : Syntax → Array Finding :=
       hit s m!"`autoImplicit` is off project-wide — write every implicit explicitly"
     else #[]
 
-/-- The `linter.fugue.autoImplicitOverride` linter. -/
-def autoImplicitOverride : Linter where
-  run := mkFugueLinter linter.fugue.autoImplicitOverride autoImplicitOverrideCore
-
-initialize addLinter autoImplicitOverride
+/-- `autoImplicit` stays off. -/
+fugue_linter autoImplicitOverride
+  "flag `set_option autoImplicit true`" := autoImplicitOverrideCore
 
 end CustomPrelude.Linter

@@ -15,12 +15,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- Write `λ x ↦ y`, not `fun x => y`. -/
-register_option linter.fugue.lambda : Bool := {
-  defValue := true
-  descr := "flag the `fun` keyword — write `λ x ↦ y` (`pp.unicode.fun` is on)"
-}
-
 /-- Every `fun` keyword under `stx` (quotation interiors excepted). -/
 def lambdaCore : Syntax → Array Finding :=
   scan λ s ↦
@@ -30,9 +24,8 @@ def lambdaCore : Syntax → Array Finding :=
       | _ => #[]
     else #[]
 
-/-- The `linter.fugue.lambda` linter. -/
-def lambda : Linter where run := mkFugueLinter linter.fugue.lambda lambdaCore
-
-initialize addLinter lambda
+/-- Write `λ x ↦ y`, not `fun x => y`. -/
+fugue_linter lambda
+  "flag the `fun` keyword — write `λ x ↦ y` (`pp.unicode.fun` is on)" := lambdaCore
 
 end CustomPrelude.Linter

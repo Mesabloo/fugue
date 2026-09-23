@@ -16,12 +16,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- `obtain rfl : a = b := p`, not `have h` + `rw [h]`. -/
-register_option linter.fugue.obtainRfl : Bool := {
-  defValue := true
-  descr := "flag `have h : a = b := p` + `rw [h]` with `h` then unused — use `obtain rfl`"
-}
-
 /-- A lone single-component identifier — a candidate for `subst`. `h.choose` (dotted) is not. -/
 private def loneVar : Syntax → Bool
   | .ident _ _ n _ => match n.eraseMacroScopes with
@@ -69,9 +63,9 @@ def obtainRflCore : Syntax → Array Finding :=
               else out
     else #[]
 
-/-- The `linter.fugue.obtainRfl` linter. -/
-def obtainRfl : Linter where run := mkFugueLinter linter.fugue.obtainRfl obtainRflCore
-
-initialize addLinter obtainRfl
+/-- `obtain rfl : a = b := p`, not `have h` + `rw [h]`. -/
+fugue_linter obtainRfl
+  "flag `have h : a = b := p` + `rw [h]` with `h` then unused — use `obtain rfl`"
+  := obtainRflCore
 
 end CustomPrelude.Linter

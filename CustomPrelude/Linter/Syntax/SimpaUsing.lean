@@ -15,12 +15,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- `have h := e; simp only [S] at h; exact h` → `simpa only [S] using e`. -/
-register_option linter.fugue.simpaUsing : Bool := {
-  defValue := true
-  descr := "flag the `have` / `simp … at h` / `exact h` window — use `simpa … using`"
-}
-
 /-- The name a `have` binds (its `letId`), if it binds one. -/
 private def haveName? (t : Syntax) : Option String :=
   if t.getKind == ``Lean.Parser.Tactic.tacticHave__ then
@@ -46,9 +40,8 @@ def simpaUsingCore : Syntax → Array Finding :=
         | _, _, _ => out
     else #[]
 
-/-- The `linter.fugue.simpaUsing` linter. -/
-def simpaUsing : Linter where run := mkFugueLinter linter.fugue.simpaUsing simpaUsingCore
-
-initialize addLinter simpaUsing
+/-- `have h := e; simp only [S] at h; exact h` → `simpa only [S] using e`. -/
+fugue_linter simpaUsing
+  "flag the `have` / `simp … at h` / `exact h` window — use `simpa … using`" := simpaUsingCore
 
 end CustomPrelude.Linter

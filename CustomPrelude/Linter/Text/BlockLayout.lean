@@ -16,12 +16,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- Multi-line `( … )` / `{ … }` tactic blocks are opened, indented, and closed like a block. -/
-register_option linter.fugue.blockLayout : Bool := {
-  defValue := true
-  descr := "flag a multi-line `( … )` / `{ … }` tactic block whose first tactic shares the opening line or whose closing bracket is not alone and dedented"
-}
-
 /-- The indentation (first non-whitespace column) of the source line holding `p`. -/
 private def lineIndent (fm : FileMap) (p : String.Pos.Raw) : Nat :=
   let ls := fm.lineStart (fm.toPosition p).line
@@ -68,9 +62,9 @@ def blockLayoutCore (stx : Syntax) : CommandElabM (Array Finding) := do
         m!"closing `{b[2].getAtomVal}` is not alone on its line, dedented to column {want}"⟩
   return out
 
-/-- The `linter.fugue.blockLayout` linter. -/
-def blockLayout : Linter where run := mkFugueLinterM linter.fugue.blockLayout blockLayoutCore
-
-initialize addLinter blockLayout
+/-- Multi-line `( … )` / `{ … }` tactic blocks are opened, indented, and closed like a block. -/
+fugue_linter blockLayout
+  "flag a multi-line `( … )` / `{ … }` tactic block whose first tactic shares the opening line or whose closing bracket is not alone and dedented"
+  := blockLayoutCore
 
 end CustomPrelude.Linter

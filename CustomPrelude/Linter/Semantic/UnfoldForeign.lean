@@ -28,12 +28,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- `unfold f` / `simp [f]` only inside a proof about `f`. -/
-register_option linter.fugue.unfoldForeign : Bool := {
-  defValue := false
-  descr := "flag `unfold` / `simp [f]` of a definition that another module owns"
-}
-
 /-- Candidate identifiers to resolve: `(idStx, fromSimp)`. `unfold` / `delta` arguments count
 whatever they name; a `simp` argument only when it resolves to a `def`. -/
 private def candidates (stx : Syntax) : Array (Syntax × Bool) := Id.run do
@@ -71,9 +65,8 @@ def unfoldForeignCore : Syntax → CommandElabM (Array Finding) := λ stx ↦ do
         m!"`{declName}` is imported — characterize it in the module that defines it, not by unfolding past its API here"⟩
   return out
 
-/-- The `linter.fugue.unfoldForeign` linter. -/
-def unfoldForeign : Linter where run := mkFugueLinterM linter.fugue.unfoldForeign unfoldForeignCore
-
-initialize addLinter unfoldForeign
+/-- `unfold f` / `simp [f]` only inside a proof about `f`. -/
+fugue_linter unfoldForeign (default := false)
+  "flag `unfold` / `simp [f]` of a definition that another module owns" := unfoldForeignCore
 
 end CustomPrelude.Linter

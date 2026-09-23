@@ -447,8 +447,7 @@ this entry. `Cardinality`/`IsFiniteSet`/`Address` order stay, untouched, still o
 Cost: `Network2Go` already compiles `Cardinality`/`IsFiniteSet` and the `Address` order operators
 proof-free — nothing shows compiled behavior matches spec for them.
 
-To resolve: per operator, decide (a) add an `EvalBuiltin` rule — and, separately, whether to also
-prove `Network2Go` sound against it, since no such proof exists for *any* operator yet, `Bags`
+To resolve: per operator, decide (a) add an `EvalBuiltin` rule — and, separately, whether to alsoprove `Network2Go` sound against it, since no such proof exists for *any* operator yet, `Bags`
 included — or (b) accept permanently proof-free codegen and record that choice here rather than
 leaving it implicit in the doc comment.
 

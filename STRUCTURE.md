@@ -31,7 +31,7 @@ move.
 
 ## `CustomPrelude/`
 - `Linter.lean` — re-export of the `linter.fugue.*` style-linter family.
-- `Linter/Basic.lean` — `Finding`, the `mkFugueLinter` wrapper, the master `linter.fugue` toggle, the vendored-code skiplist, and the shared syntax walkers.
+- `Linter/Basic.lean` — `Finding`, the `mkFugueLinterM` wrapper, the `fugue_linter` declaration command, the master `linter.fugue` toggle, the vendored-code skiplist, and the shared syntax walkers.
 - `Linter/Syntax.lean` — re-export of the `Syntax`-walking linters.
 - `Linter/Syntax/` — one module per `Syntax`-walking rule, named for the rule (`Lambda`, `ExactAbsurd`, …).
 - `Linter/Semantic.lean` — re-export of the `InfoTree`-reading linters.

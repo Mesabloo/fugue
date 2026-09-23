@@ -22,12 +22,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- Name introduced hypotheses in signature order. -/
-register_option linter.fugue.hypOrder : Bool := {
-  defValue := true
-  descr := "flag `intro` / `rintro` whose names are the goal's binder names in a different order"
-}
-
 /-- The identifier a plain `intro` / `rintro` pattern binds; `none` for a hole or a compound
 pattern. -/
 private partial def patIdent? (s : Syntax) : Option Name :=
@@ -79,9 +73,9 @@ def hypOrderCore : Syntax → CommandElabM (Array Finding) := λ stx ↦ do
         out := out.push f
   return out
 
-/-- The `linter.fugue.hypOrder` linter. -/
-def hypOrder : Linter where run := mkFugueLinterM linter.fugue.hypOrder hypOrderCore
-
-initialize addLinter hypOrder
+/-- Name introduced hypotheses in signature order. -/
+fugue_linter hypOrder
+  "flag `intro` / `rintro` whose names are the goal's binder names in a different order"
+  := hypOrderCore
 
 end CustomPrelude.Linter

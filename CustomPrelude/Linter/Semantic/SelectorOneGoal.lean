@@ -18,12 +18,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- `all:` / `all_goals` over one goal → `·` bullet. -/
-register_option linter.fugue.selectorOneGoal : Bool := {
-  defValue := true
-  descr := "flag `all:` / `all_goals` applied when only one goal is open — use a `·` bullet"
-}
-
 /-- The selector word for `s` if it is `all_goals` or an `all:` `tac_selector`; `none` otherwise
 (a numbered/range `tac_selector` is deliberately explicit and left alone). -/
 private def allSelectorWord? (s : Syntax) : Option String :=
@@ -56,9 +50,9 @@ def selectorOneGoalCore : Syntax → CommandElabM (Array Finding) := λ stx ↦ 
       some ⟨s, m!"`{w}` over a single goal — use a `·` bullet"⟩
     else none
 
-/-- The `linter.fugue.selectorOneGoal` linter. -/
-def selectorOneGoal : Linter where run := mkFugueLinterM linter.fugue.selectorOneGoal selectorOneGoalCore
-
-initialize addLinter selectorOneGoal
+/-- `all:` / `all_goals` over one goal → `·` bullet. -/
+fugue_linter selectorOneGoal
+  "flag `all:` / `all_goals` applied when only one goal is open — use a `·` bullet"
+  := selectorOneGoalCore
 
 end CustomPrelude.Linter

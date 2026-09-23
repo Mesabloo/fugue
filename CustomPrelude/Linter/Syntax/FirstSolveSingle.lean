@@ -15,12 +15,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- `first | t` / `solve | t` with one alternative → `t`. -/
-register_option linter.fugue.firstSolveSingle : Bool := {
-  defValue := true
-  descr := "flag single-alternative `first` / `solve` — drop the wrapper"
-}
-
 /-- Every `first` / `solve` with exactly one alternative. -/
 def firstSolveSingleCore : Syntax → Array Finding :=
   scan λ s ↦
@@ -31,10 +25,8 @@ def firstSolveSingleCore : Syntax → Array Finding :=
     | some kw => if s[1].getNumArgs == 1 then hit s m!"`{kw} | t` is just `t`" else #[]
     | none => #[]
 
-/-- The `linter.fugue.firstSolveSingle` linter. -/
-def firstSolveSingle : Linter where
-  run := mkFugueLinter linter.fugue.firstSolveSingle firstSolveSingleCore
-
-initialize addLinter firstSolveSingle
+/-- `first | t` / `solve | t` with one alternative → `t`. -/
+fugue_linter firstSolveSingle
+  "flag single-alternative `first` / `solve` — drop the wrapper" := firstSolveSingleCore
 
 end CustomPrelude.Linter

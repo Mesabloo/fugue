@@ -28,12 +28,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- Delete a `have` / `haveI` the proof does not use. -/
-register_option linter.fugue.unusedHave : Bool := {
-  defValue := true
-  descr := "flag a `have` / `haveI` whose hypothesis the rest of the proof never uses"
-}
-
 private def isHaveKind (k : SyntaxNodeKind) : Bool :=
   k == ``Lean.Parser.Tactic.tacticHave__ || k == ``Lean.Parser.Tactic.tacticHaveI__
 
@@ -86,9 +80,8 @@ def unusedHaveCore : Syntax → CommandElabM (Array Finding) := λ stx ↦ do
         out := out.push f
   return out
 
-/-- The `linter.fugue.unusedHave` linter. -/
-def unusedHave : Linter where run := mkFugueLinterM linter.fugue.unusedHave unusedHaveCore
-
-initialize addLinter unusedHave
+/-- Delete a `have` / `haveI` the proof does not use. -/
+fugue_linter unusedHave
+  "flag a `have` / `haveI` whose hypothesis the rest of the proof never uses" := unusedHaveCore
 
 end CustomPrelude.Linter

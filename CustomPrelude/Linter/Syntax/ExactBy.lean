@@ -15,12 +15,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- `exact by tac` → `tac`. -/
-register_option linter.fugue.exactBy : Bool := {
-  defValue := true
-  descr := "flag `exact by …` — run the tactics directly"
-}
-
 /-- Every `exact` whose term (through one `( … )`) is a `by` block. -/
 def exactByCore : Syntax → Array Finding :=
   scan λ s ↦
@@ -31,9 +25,8 @@ def exactByCore : Syntax → Array Finding :=
       else #[]
     else #[]
 
-/-- The `linter.fugue.exactBy` linter. -/
-def exactBy : Linter where run := mkFugueLinter linter.fugue.exactBy exactByCore
-
-initialize addLinter exactBy
+/-- `exact by tac` → `tac`. -/
+fugue_linter exactBy
+  "flag `exact by …` — run the tactics directly" := exactByCore
 
 end CustomPrelude.Linter

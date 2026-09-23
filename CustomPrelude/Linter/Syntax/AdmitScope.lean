@@ -15,12 +15,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- Tactic-position `sorry` → `admit`. -/
-register_option linter.fugue.admitScope : Bool := {
-  defValue := true
-  descr := "flag a tactic-position `sorry` — write `admit`"
-}
-
 /-- Every tactic-position `sorry`. -/
 def admitScopeCore : Syntax → Array Finding :=
   scan λ s ↦
@@ -28,9 +22,8 @@ def admitScopeCore : Syntax → Array Finding :=
       hit s m!"tactic-position `sorry` → `admit`"
     else #[]
 
-/-- The `linter.fugue.admitScope` linter. -/
-def admitScope : Linter where run := mkFugueLinter linter.fugue.admitScope admitScopeCore
-
-initialize addLinter admitScope
+/-- Tactic-position `sorry` → `admit`. -/
+fugue_linter admitScope
+  "flag a tactic-position `sorry` — write `admit`" := admitScopeCore
 
 end CustomPrelude.Linter

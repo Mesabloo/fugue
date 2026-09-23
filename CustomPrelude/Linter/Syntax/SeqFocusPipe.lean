@@ -16,12 +16,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- `t <;> [a; b]` → `t <;> [a | b]`. -/
-register_option linter.fugue.seqFocusPipe : Bool := {
-  defValue := true
-  descr := "flag Batteries' `;`-separated `<;> [ … ]` — use the project's `|`-separated form"
-}
-
 /-- Every Batteries `seq_focus` node. -/
 def seqFocusPipeCore : Syntax → Array Finding :=
   scan λ s ↦
@@ -29,9 +23,9 @@ def seqFocusPipeCore : Syntax → Array Finding :=
       hit s m!"`t <;> [a; b]` → `t <;> [a | b]` (the project's spelling)"
     else #[]
 
-/-- The `linter.fugue.seqFocusPipe` linter. -/
-def seqFocusPipe : Linter where run := mkFugueLinter linter.fugue.seqFocusPipe seqFocusPipeCore
-
-initialize addLinter seqFocusPipe
+/-- `t <;> [a; b]` → `t <;> [a | b]`. -/
+fugue_linter seqFocusPipe
+  "flag Batteries' `;`-separated `<;> [ … ]` — use the project's `|`-separated form"
+  := seqFocusPipeCore
 
 end CustomPrelude.Linter

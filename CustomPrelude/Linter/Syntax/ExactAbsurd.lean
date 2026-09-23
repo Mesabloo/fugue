@@ -15,12 +15,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- No `exact absurd x y`. -/
-register_option linter.fugue.exactAbsurd : Bool := {
-  defValue := true
-  descr := "flag `exact absurd x y` — use the `absurd` tactic, `nomatch`, or `contradiction`"
-}
-
 /-- Every `exact` whose term is a `absurd …` application. -/
 def exactAbsurdCore : Syntax → Array Finding :=
   scan λ s ↦
@@ -32,9 +26,9 @@ def exactAbsurdCore : Syntax → Array Finding :=
       else #[]
     else #[]
 
-/-- The `linter.fugue.exactAbsurd` linter. -/
-def exactAbsurd : Linter where run := mkFugueLinter linter.fugue.exactAbsurd exactAbsurdCore
-
-initialize addLinter exactAbsurd
+/-- No `exact absurd x y`. -/
+fugue_linter exactAbsurd
+  "flag `exact absurd x y` — use the `absurd` tactic, `nomatch`, or `contradiction`"
+  := exactAbsurdCore
 
 end CustomPrelude.Linter

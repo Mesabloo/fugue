@@ -15,12 +15,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- `by_cases! h`, not `by_cases h` + `push_neg`. -/
-register_option linter.fugue.byCasesBang : Bool := {
-  defValue := true
-  descr := "flag `by_cases`/`by_contra` whose bound name a later `push_neg` clears — use the `!` form"
-}
-
 /-- The keyword of a plain (non-`!`) `by_cases` / `by_contra`, by its leading atom. -/
 private def plainKw? (stx : Syntax) : Option String :=
   match stx[0] with
@@ -48,9 +42,9 @@ def byCasesBangCore : Syntax → Array Finding := fun root ↦
       else #[]
     | _, _ => #[]) root
 
-/-- The `linter.fugue.byCasesBang` linter. -/
-def byCasesBang : Linter where run := mkFugueLinter linter.fugue.byCasesBang byCasesBangCore
-
-initialize addLinter byCasesBang
+/-- `by_cases! h`, not `by_cases h` + `push_neg`. -/
+fugue_linter byCasesBang
+  "flag `by_cases`/`by_contra` whose bound name a later `push_neg` clears — use the `!` form"
+  := byCasesBangCore
 
 end CustomPrelude.Linter

@@ -16,12 +16,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- No parens around a `first` over a `cases`/`rcases`/`match` arm. -/
-register_option linter.fugue.firstParens : Bool := {
-  defValue := true
-  descr := "flag `(first | …)` — the parentheses add nothing over an arm"
-}
-
 /-- Every `( … )` tactic grouping whose sole content is a `first`. -/
 def firstParensCore : Syntax → Array Finding :=
   scan λ s ↦
@@ -30,9 +24,8 @@ def firstParensCore : Syntax → Array Finding :=
       hit s m!"parentheses around `first` add nothing — `| pat => first` then the `|` branches under it"
     else #[]
 
-/-- The `linter.fugue.firstParens` linter. -/
-def firstParens : Linter where run := mkFugueLinter linter.fugue.firstParens firstParensCore
-
-initialize addLinter firstParens
+/-- No parens around a `first` over a `cases`/`rcases`/`match` arm. -/
+fugue_linter firstParens
+  "flag `(first | …)` — the parentheses add nothing over an arm" := firstParensCore
 
 end CustomPrelude.Linter

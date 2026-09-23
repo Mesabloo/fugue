@@ -17,12 +17,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- No blanket selector over a `first`/`solve` with ≥2 alternatives. -/
-register_option linter.fugue.selectorFirst : Bool := {
-  defValue := true
-  descr := "flag `all:` / `all_goals` / `any_goals` wrapping a multi-branch `first` / `solve`"
-}
-
 /-- Every blanket selector whose (unwrapped) body is a `first`/`solve` with ≥2 alternatives. -/
 def selectorFirstCore : Syntax → Array Finding :=
   scan λ s ↦
@@ -35,9 +29,9 @@ def selectorFirstCore : Syntax → Array Finding :=
       | none => #[]
     | none => #[]
 
-/-- The `linter.fugue.selectorFirst` linter. -/
-def selectorFirst : Linter where run := mkFugueLinter linter.fugue.selectorFirst selectorFirstCore
-
-initialize addLinter selectorFirst
+/-- No blanket selector over a `first`/`solve` with ≥2 alternatives. -/
+fugue_linter selectorFirst
+  "flag `all:` / `all_goals` / `any_goals` wrapping a multi-branch `first` / `solve`"
+  := selectorFirstCore
 
 end CustomPrelude.Linter

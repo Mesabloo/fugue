@@ -19,12 +19,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- Never `rename_i` / `expose_names`. -/
-register_option linter.fugue.renameI : Bool := {
-  defValue := true
-  descr := "flag `rename_i` / `expose_names` — name the hypothesis where it is bound"
-}
-
 /-- Every `rename_i` / `expose_names` outside a quotation. -/
 def renameICore : Syntax → Array Finding :=
   scan λ s ↦
@@ -34,9 +28,8 @@ def renameICore : Syntax → Array Finding :=
       hit s m!"never `expose_names` — name the hypotheses where they are bound"
     else #[]
 
-/-- The `linter.fugue.renameI` linter. -/
-def renameI : Linter where run := mkFugueLinter linter.fugue.renameI renameICore
-
-initialize addLinter renameI
+/-- Never `rename_i` / `expose_names`. -/
+fugue_linter renameI
+  "flag `rename_i` / `expose_names` — name the hypothesis where it is bound" := renameICore
 
 end CustomPrelude.Linter

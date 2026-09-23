@@ -16,12 +16,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- `t <;> solve | s₁ | … | sₙ` (distinct sᵢ) → `t <;> [s₁ | … | sₙ]`. -/
-register_option linter.fugue.seqSolveBracket : Bool := {
-  defValue := true
-  descr := "flag `t <;> solve | s₁ | … | sₙ` with distinct scripts — use `t <;> [s₁ | … | sₙ]`"
-}
-
 /-- Every `t <;> solve | …` whose alternatives are pairwise distinct. -/
 def seqSolveBracketCore : Syntax → Array Finding :=
   scan λ s ↦
@@ -32,10 +26,9 @@ def seqSolveBracketCore : Syntax → Array Finding :=
       else #[]
     else #[]
 
-/-- The `linter.fugue.seqSolveBracket` linter. -/
-def seqSolveBracket : Linter where
-  run := mkFugueLinter linter.fugue.seqSolveBracket seqSolveBracketCore
-
-initialize addLinter seqSolveBracket
+/-- `t <;> solve | s₁ | … | sₙ` (distinct sᵢ) → `t <;> [s₁ | … | sₙ]`. -/
+fugue_linter seqSolveBracket
+  "flag `t <;> solve | s₁ | … | sₙ` with distinct scripts — use `t <;> [s₁ | … | sₙ]`"
+  := seqSolveBracketCore
 
 end CustomPrelude.Linter

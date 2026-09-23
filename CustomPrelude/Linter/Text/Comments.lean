@@ -30,12 +30,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- The comment-discipline linter. -/
-register_option linter.fugue.comments : Bool := {
-  defValue := true
-  descr := "flag comment-discipline violations from INSTRUCTIONS.md §Comments"
-}
-
 /--
 The two heuristic sub-checks — long module docs and status prose — that carry enough false
 positives to be opt-in. Off by default; `linter.fugue.comments` still gates them.
@@ -209,9 +203,8 @@ def core (stx : Syntax) : CommandElabM (Array Finding) := do
 
 end Comments
 
-/-- The `linter.fugue.comments` linter. -/
-def comments : Linter where run := mkFugueLinterM linter.fugue.comments Comments.core
-
-initialize addLinter comments
+/-- The comment-discipline linter. -/
+fugue_linter comments
+  "flag comment-discipline violations from INSTRUCTIONS.md §Comments" := Comments.core
 
 end CustomPrelude.Linter

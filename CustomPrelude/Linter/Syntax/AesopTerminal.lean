@@ -18,12 +18,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- `aesop` terminal, or not at all. -/
-register_option linter.fugue.aesopTerminal : Bool := {
-  defValue := true
-  descr := "flag the escapes that silence aesop's own non-terminal warning"
-}
-
 /-- Every `set_option aesop.warn.nonterminal false`, and every `aesop` whose config mentions
 `warnOnNonterminal`. -/
 def aesopTerminalCore : Syntax → Array Finding :=
@@ -35,9 +29,8 @@ def aesopTerminalCore : Syntax → Array Finding :=
       hit s m!"`aesop` config silences the non-terminal warning — make the `aesop` terminal instead"
     else #[]
 
-/-- The `linter.fugue.aesopTerminal` linter. -/
-def aesopTerminal : Linter where run := mkFugueLinter linter.fugue.aesopTerminal aesopTerminalCore
-
-initialize addLinter aesopTerminal
+/-- `aesop` terminal, or not at all. -/
+fugue_linter aesopTerminal
+  "flag the escapes that silence aesop's own non-terminal warning" := aesopTerminalCore
 
 end CustomPrelude.Linter

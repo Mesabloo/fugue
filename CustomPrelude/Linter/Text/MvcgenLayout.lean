@@ -16,12 +16,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- `mvcgen`'s `invariants`/`with` alternatives align to the keyword, like a `match`. -/
-register_option linter.fugue.mvcgenLayout : Bool := {
-  defValue := true
-  descr := "flag `mvcgen` `invariants`/`with` whose keyword is mid-line or whose alternatives are indented past it"
-}
-
 /-- `mvcgen`'s alternative node kinds — `Name` literals, not resolved, so this module needs no
 import of `Std.Tactic.Do.Syntax`. -/
 private def altKinds : List Name :=
@@ -54,9 +48,9 @@ def mvcgenLayoutCore (stx : Syntax) : CommandElabM (Array Finding) := do
           m!"`mvcgen` alternative is indented past `{kwName}` — align it to the keyword's column"⟩
   return out
 
-/-- The `linter.fugue.mvcgenLayout` linter. -/
-def mvcgenLayout : Linter where run := mkFugueLinterM linter.fugue.mvcgenLayout mvcgenLayoutCore
-
-initialize addLinter mvcgenLayout
+/-- `mvcgen`'s `invariants`/`with` alternatives align to the keyword, like a `match`. -/
+fugue_linter mvcgenLayout
+  "flag `mvcgen` `invariants`/`with` whose keyword is mid-line or whose alternatives are indented past it"
+  := mvcgenLayoutCore
 
 end CustomPrelude.Linter

@@ -18,12 +18,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- Terminal `first | …` → `solve | …`. -/
-register_option linter.fugue.firstVsSolve : Bool := {
-  defValue := true
-  descr := "flag a `first` that is the last tactic of a proof block — use `solve`"
-}
-
 /-- Every `first` that ends a multi-step tactic sequence. -/
 def firstVsSolveCore : Syntax → Array Finding :=
   scan λ seq ↦
@@ -37,9 +31,8 @@ def firstVsSolveCore : Syntax → Array Finding :=
       | none => #[]
     else #[]
 
-/-- The `linter.fugue.firstVsSolve` linter. -/
-def firstVsSolve : Linter where run := mkFugueLinter linter.fugue.firstVsSolve firstVsSolveCore
-
-initialize addLinter firstVsSolve
+/-- Terminal `first | …` → `solve | …`. -/
+fugue_linter firstVsSolve
+  "flag a `first` that is the last tactic of a proof block — use `solve`" := firstVsSolveCore
 
 end CustomPrelude.Linter

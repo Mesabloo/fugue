@@ -19,12 +19,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- Signature continuation indent: binders +2, statement +4. -/
-register_option linter.fugue.sigIndent : Bool := {
-  defValue := false
-  descr := "flag signature continuation lines whose binders are not indented +2 or statement not +4"
-}
-
 /-- The indentation (first non-whitespace column) of the source line holding `p`. -/
 private def lineIndent (fm : FileMap) (p : String.Pos.Raw) : Nat :=
   let ss : Substring.Raw := ⟨fm.source, fm.lineStart (fm.toPosition p).line, p⟩
@@ -63,9 +57,9 @@ def sigIndentCore (stx : Syntax) : CommandElabM (Array Finding) := do
           out := out.push ⟨t, m!"statement at column {(fm.toPosition tp).column} — indent it {base + 4}"⟩
   return out
 
-/-- The `linter.fugue.sigIndent` linter. -/
-def sigIndent : Linter where run := mkFugueLinterM linter.fugue.sigIndent sigIndentCore
-
-initialize addLinter sigIndent
+/-- Signature continuation indent: binders +2, statement +4. -/
+fugue_linter sigIndent (default := false)
+  "flag signature continuation lines whose binders are not indented +2 or statement not +4"
+  := sigIndentCore
 
 end CustomPrelude.Linter

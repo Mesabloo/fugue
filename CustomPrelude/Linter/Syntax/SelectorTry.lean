@@ -17,12 +17,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- No `try` as the whole body of a goal selector. -/
-register_option linter.fugue.selectorTry : Bool := {
-  defValue := true
-  descr := "flag a goal selector (`all:` / `n-m:` / `all_goals`) whose body is a bare `try`"
-}
-
 /-- Every selector whose (unwrapped) body is a lone `try …`. -/
 def selectorTryCore : Syntax → Array Finding :=
   scan λ s ↦
@@ -33,9 +27,9 @@ def selectorTryCore : Syntax → Array Finding :=
       else #[]
     | none => #[]
 
-/-- The `linter.fugue.selectorTry` linter. -/
-def selectorTry : Linter where run := mkFugueLinter linter.fugue.selectorTry selectorTryCore
-
-initialize addLinter selectorTry
+/-- No `try` as the whole body of a goal selector. -/
+fugue_linter selectorTry
+  "flag a goal selector (`all:` / `n-m:` / `all_goals`) whose body is a bare `try`"
+  := selectorTryCore
 
 end CustomPrelude.Linter

@@ -22,12 +22,6 @@ open Lean Elab Command Linter
 
 namespace CustomPrelude.Linter
 
-/-- `by exact e` → `e`; `by classical exact e` → hoist `classical` or drop it. -/
-register_option linter.fugue.byExact : Bool := {
-  defValue := true
-  descr := "flag `by exact e` / `by classical exact e` whose inner term stands on its own"
-}
-
 /-- A `by` block that is exactly `exact e` or `classical exact e`: `(byStx, hasClassical, headTac,
 term)`. -/
 private structure Cand where
@@ -88,9 +82,8 @@ def byExactCore : Syntax → CommandElabM (Array Finding) := λ stx ↦ do
         out := out.push f
   return out
 
-/-- The `linter.fugue.byExact` linter. -/
-def byExact : Linter where run := mkFugueLinterM linter.fugue.byExact byExactCore
-
-initialize addLinter byExact
+/-- `by exact e` → `e`; `by classical exact e` → hoist `classical` or drop it. -/
+fugue_linter byExact
+  "flag `by exact e` / `by classical exact e` whose inner term stands on its own" := byExactCore
 
 end CustomPrelude.Linter
