@@ -5,9 +5,6 @@ public import Lean.Elab.Tactic.Basic
 
 public section
 
--- register_label_attr is_closed_embedding
-
--- set_option hygiene false in
 /--
   Tries to automatically discharge goals of the shape `⊢ Topology.IsClosedEmbedding ?f`.
   This is an extendible tactic, new entries can be added via `macro_rules`.

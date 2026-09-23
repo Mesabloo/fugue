@@ -406,35 +406,6 @@ namespace IMetric
       change (0 : ℝ) / k = 0
       exact zero_div k
 
-  -- -- NB: only `≤` holds in general; equality fails when s = ∅ (LHS = 1/k < 1 = RHS for k > 1).
-  -- theorem div_iInf_I_of_one_le {α} [PseudoIMetricSpace α] {s : Set α} {f : α → unitInterval} {k : ℝ} (hk : 1 ≤ k) :
-  --     (⨅ b ∈ s, f b).val / k ≤
-  --       (⨅ b ∈ s, { val := f b / k
-  --                   property := ⟨div_nonneg (unitInterval.nonneg _) (le_trans zero_le_one hk),
-  --                                 div_le_one_of_le₀ (by grind only [=Set.mem_Icc]) (le_trans zero_le_one hk)⟩
-  --                   : unitInterval }).val := by
-  --   by_cases hs : s.Nonempty
-  --   · haveI : Nonempty s := hs.to_subtype
-  --     -- Nonempty case: equality holds, proved as for div_iSup_I_of_one_le.
-  --     rw [← iInf_subtype'', ← iInf_subtype'',
-  --         Set.Icc.coe_iInf (by norm_num : (0:ℝ) ≤ 1),
-  --         Set.Icc.coe_iInf (by norm_num : (0:ℝ) ≤ 1)]
-  --     have hk_pos : (0 : ℝ) < k := lt_of_lt_of_le zero_lt_one hk
-  --     have mono : Monotone (· / k) := λ a b hab ↦ div_le_div_of_nonneg_right hab (le_of_lt hk_pos)
-  --     have hbdd : BddBelow (Set.range (λ i : s ↦ (f i.val).val)) :=
-  --       ⟨0, λ _ ⟨i, hi⟩ ↦ hi ▸ (f i.val).2.1⟩
-  --     exact le_of_eq (mono.map_ciInf_of_continuousAt (continuousAt_id.div_const k) hbdd)
-  --   · -- Empty case: LHS = 1/k ≤ 1 = RHS.
-  --     rw [Set.not_nonempty_iff_eq_empty.mp hs]
-  --     have top_eq : ∀ g : α → unitInterval, (⨅ b ∈ (∅ : Set α), g b) = ⊤ := by
-  --       intro g
-  --       apply iInf_eq_top.mpr; intro b
-  --       apply iInf_eq_top.mpr; intro hb
-  --       exact absurd hb (Set.notMem_empty b)
-  --     rw [top_eq f, top_eq]
-  --     change (1 : ℝ) / k ≤ 1
-  --     exact div_le_one_of_le₀ hk (by linarith)
-
   theorem hausdorffIDist_image_lipschitz' {α β} [PseudoIMetricSpace α] [PseudoIMetricSpace β]
     {s t : Set α} {Φ : α → β} {k : ℝ} (hk : 1 ≤ k)
     (hΦ : ∀ x y, (idist (Φ x) (Φ y) : ℝ) ≤ k * idist x y) :
@@ -906,33 +877,6 @@ theorem Closeds.map_isometry {α β} [IMetricSpace α] [IMetricSpace β] {f : α
   apply Closeds.map_isometry'
   apply Isometry.to_idist_eq
   assumption
-
--- theorem Topology.IsClosedEmbedding.Closeds.closed_map {α β} [IMetricSpace α] [IMetricSpace β] {f : α → β} :
---     Topology.IsClosedEmbedding (Closeds.closed_map f) where
---   eq_induced := by
---     admit
---   injective := by
---     admit
---   isClosed_range := by
---     admit
-
--- theorem Topology.IsClosedEmbedding.Closeds.map {α β} [IMetricSpace α] [IMetricSpace β] {f : α → β}
---   (hf : Topology.IsClosedEmbedding f) (hf' : Isometry f) :
---     Topology.IsClosedEmbedding (Closeds.map _ hf) where
---   eq_induced := by
-
---     admit
---   injective := by
---     replace hf : Function.Injective (Set.image f) := by
---       rw [Set.image_injective]
---       exact hf.injective
-
---     intros x y h
---     rw [Closeds.ext_iff] at h ⊢
---     exact hf h
---   isClosed_range := by
-
---     admit
 
 theorem Closeds.map_comp {α β γ} [IMetricSpace α] [IMetricSpace β] [IMetricSpace γ] {f : α → β} {g : β → γ}
   (hf : Topology.IsClosedEmbedding f) (hg : Topology.IsClosedEmbedding g) :

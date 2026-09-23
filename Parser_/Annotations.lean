@@ -181,15 +181,10 @@ section
     | ⟨"parameter", args⟩, pos => throw <| .invalidArgsLen pos "@parameter" 0 args.length
     | _, _ => unreachable!
 
-  private def resolveAnnotations' :
+  def resolveAnnotations :
       Module (SurfacePlusCal.Algorithm (List CommentAnnotation) (Expression (List CommentAnnotation))) (List CommentAnnotation) →
       m (Module (SurfacePlusCal.Algorithm (List Annotation) (Expression (List Annotation))) (List Annotation)) :=
     bitraverse (bitraverse (traverse tryResolveAnnotations) (traverse (traverse tryResolveAnnotations))) (traverse tryResolveAnnotations)
-
-  def resolveAnnotations :
-      Module (SurfacePlusCal.Algorithm (List CommentAnnotation) (Expression (List CommentAnnotation))) (List CommentAnnotation) →
-      Except ResolverError (Module (SurfacePlusCal.Algorithm (List Annotation) (Expression (List Annotation))) (List Annotation)) :=
-    resolveAnnotations'
 end
 
 end

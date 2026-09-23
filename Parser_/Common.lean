@@ -29,8 +29,8 @@ structure ParseError (σ τ : Type _) [Parser.Stream σ τ] where
   posOverride : Option SourceSpan := none
 
 -- `debug` (below) requires `[Repr ε]` of whatever error type a parser threads, even though its
--- own body never calls `repr` — a documented no-op seam for tracing that isn't wired up yet
--- (`.claude/FINDINGS.md`). Not `deriving`: the `Parser.Stream.Position σ` field is a projection
+-- own body never calls `repr`: it is a no-op tracing seam. Not `deriving`: the
+-- `Parser.Stream.Position σ` field is a projection
 -- through a typeclass, and the deriving handler cannot infer the `[Repr (Parser.Stream.Position σ)]`
 -- hypothesis that needs it.
 instance {σ τ} [Parser.Stream σ τ] [Repr (Parser.Stream.Position σ)] [Repr τ] : Repr (ParseError σ τ) where

@@ -1689,12 +1689,13 @@ expression layer is abstract. `StrongRefinement` takes the relations as plain `S
 Both languages share one state space (`Behavior`, `ChanKey`, `FIFOs`, `LocalState`),
 declared once in `GuardedPlusCal`. `Guarded2Network` touches neither memories nor channels
 (it moves a `receive` out of guard position into a `Thread.rx`), so sharing lets the
-refinement be stated over one state type. `Semantics/Lemmas.lean` also carries a flat
-encoding `LocalState'` where the terminality index becomes an `Option String` field —
+refinement be stated over one state type. Terminality is an `Option String` label field
+of `LocalState` itself (`none` while running, `some l` after a `goto l`), not a type index —
 `StrongRefinement`'s relation is over one fixed type, can't be indexed.
 
 **`reference/jlamp.pdf` §3.3 is authoritative for these semantics.** `LocalState` is the
-paper's `LState = (Var → Value) × (Var → Value*)`: memory and channels, nothing else — no
+paper's `LState = (Var → Value) × (Var → Value*)`: memory and channels, plus the label
+field above, nothing else — no
 component for `with`-bound temporaries (a syntactic property `WellFormedness/` establishes
 on the way in; keeping it would force every transcribed lemma through a state-shape
 translation). `Value*` is one sequence-valued component for every `ChanKey`, `channels`-

@@ -246,8 +246,6 @@ noncomputable section Domain
         idist (IterativeDomain.branch f) (IterativeDomain.branch g) = ⨆ σ, IMetric.hausdorffIDist (f σ) (g σ) := by
       erw [UniformFun.idist_eq_iSup]
 
-    ------------
-
     @[push_cast]
     theorem IterativeDomain.Branch.cast_recv {m n} (h : m = n) {π : α →ᵤ Bool →ᵤ Restriction (IterativeDomain «Σ» Γ α β m).carrier unitInterval.half} {c : Γ} :
         h ▸ Branch.recv («Σ» := «Σ») c π = Branch.recv c λ v ok ↦ { val := h ▸ (π v ok).val } := by
@@ -288,14 +286,6 @@ noncomputable section Domain
         Sum.map (Prod.map id (Restriction.map g)) <|
         Sum.map (Prod.map id (Restriction.map g)) <|
                 (Prod.map id (Restriction.map g))
-
-      -- omit [Nonempty «Σ»] in
-      -- theorem Branch.map_closedEmbedding_of_closedEmbedding {γ'} [IMetricSpace γ'] {g : γ → γ'} (hg : Topology.IsClosedEmbedding g) :
-      --     Topology.IsClosedEmbedding (Branch.map («Σ» := «Σ») (Γ := Γ) (α := α) g) := by
-      --   is_closed_embedding <;> {
-      --     apply Restriction.map.isClosedEmbedding
-      --     assumption
-      --   }
 
       omit [PseudoIMetricSpace «Σ»] [PseudoIMetricSpace α] [PseudoIMetricSpace γ] [PseudoIMetricSpace Γ] in
       theorem Branch.map_recv {γ'} {f : γ → γ'} {c : Γ} {π : α →ᵤ Bool →ᵤ Restriction γ unitInterval.half} :
@@ -767,12 +757,6 @@ noncomputable section Domain
         cases h'
         rfl
 
-      -- theorem IterativeDomain.lift.isClosedEmbedding
-
-      -- theorem IterativeDomain.lift_injective {m n} (h : m ≤ n := by linarith) :
-      --     Function.Injective (lift («Σ» := «Σ») (Γ := Γ) (α := α) (β := β) h) :=
-      --   (lift h).isClosedEmbedding.injective
-
       theorem IterativeDomain.lift_refl {m} :
           lift («Σ» := «Σ») (Γ := Γ) (α := α) (β := β) (n := m) (Nat.le_of_eq rfl) = id := by
         cases m with
@@ -1002,7 +986,6 @@ noncomputable section Domain
         IDist.idist (DomainUnion.mk p) (DomainUnion.mk q) = IDist.idist (IterativeDomain.lift (le_max_left m n) p) (IterativeDomain.lift (le_max_right m n) q) := by
       rfl
 
-    --set_option maxHeartbeats 2000000 in
     instance [IsUltrametricIDist «Σ»] [IsUltrametricIDist Γ] [IsUltrametricIDist α] [IsUltrametricIDist β] :
         IsUltrametricIDist (DomainUnion «Σ» Γ α β) where
       idist_triangle_max x y z := by

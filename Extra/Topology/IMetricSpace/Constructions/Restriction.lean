@@ -156,12 +156,6 @@ theorem Restriction.map_injective {α β ε h} [TopologicalSpace α] [Topologica
   ext : 1
   exact hf h
 
--- theorem Restriction.map.isClosedEmbedding {α β ε h} [TopologicalSpace α] [TopologicalSpace β] {f : α → β}
---   (hf : Topology.IsClosedEmbedding f) :
---     Topology.IsClosedEmbedding (Restriction.map (ε := ε) (h := h) f) := by
---   -- FIXME: This is true but painful to prove
---   admit
-
 macro_rules
 | `(tactic| is_closed_embedding_step) =>
   `(tactic| apply Restriction.map.isClosedEmbedding)

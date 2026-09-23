@@ -84,6 +84,15 @@ def commentedCode : Nat :=
   -- import Foo.Bar
   0
 
+/--
+warning: subjectless `TODO` — write `TODO(subject): what is owed`
+
+Note: This linter can be disabled with `set_option linter.fugue.comments false`
+-/
+#guard_msgs in
+def betweenDecls : Nat := 0
+-- TODO handle the empty case
+
 -- A docstring that says what the declaration is draws no warning.
 #guard_msgs in
 /-- The answer to everything. -/

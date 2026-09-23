@@ -372,7 +372,7 @@ partial def compileModule (source : String) (containingDir : Option System.FileP
   onModuleProgress mod.name
   let (warnings, result) ← runScoped do
     let mod ← reportFailureOnThrow /- lines colored logLine -/ onModuleEvent mod.name do
-      let mod ← match resolveAnnotations mod with
+      let mod ← match resolveAnnotations (m := Except ResolverError) mod with
         | .error e => throw (.annotation moduleId e)
         | .ok mod => pure mod
       -- Each `runDesugarer`/`runChecker` is polymorphic in its base monad (it needs only the

@@ -6,7 +6,8 @@ public meta import CustomPrelude.Linter.Basic
 # `linter.fugue.comments`
 
 The mechanically-checkable half of `INSTRUCTIONS.md` §Comments, in one pass over each command's
-source span (leading trivia, doc comment, and inline `--` notes included):
+source span (doc comment, inline `--` notes, and the trailing trivia up to the next command
+included — which is where a comment standing between two declarations lives):
 
 * **commented-out code** — a `--` line that is really a pasted declaration / directive / proof;
 * **plan reference** — `PLAN.md`, `OPEN_QUESTIONS.md`, `.claude/`, `§N`;
@@ -159,7 +160,7 @@ private def bareSeparator (v : List Char) : Bool :=
 /-- Findings for one command's source span. -/
 def core (stx : Syntax) : CommandElabM (Array Finding) := do
   if stx.isOfKind ``Lean.Parser.Module.header then return #[]
-  let some sstr := stx.getSubstring? (withTrailing := false) | return #[]
+  let some sstr := stx.getSubstring? | return #[]
   let soft := getLinterValue linter.fugue.comments.soft (← getLinterOptions)
   let lines := (sstr.splitOn "\n").toArray
   let mut out : Array Finding := #[]

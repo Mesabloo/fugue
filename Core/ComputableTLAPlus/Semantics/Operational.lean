@@ -2791,7 +2791,7 @@ theorem evalCoerce' {Ξ : OperatorEnv} {Ω : Model Value} (hΞ : Ξ.WellScoped) 
         · obtain ⟨i, hi, rfl⟩ := List.getElem_of_mem hnc
           obtain ⟨vk, hvk, hc⟩ := hstep i hi
           exact ⟨vk, vs[i], hvk, hc⟩
-        · rw [Value.ofRecord, Value.mem_recordGraph]
+        · rw [Value.mem_ofRecord]
           iff_rintro ⟨k, w, hmem, rfl⟩ ⟨nc, hnc, vk, w, hvk, hc, rfl⟩
           · rw [List.mem_iff_getElem] at hmem
             obtain ⟨i, hizip, heq⟩ := hmem
@@ -2833,7 +2833,7 @@ theorem evalCoerce' {Ξ : OperatorEnv} {Ω : Model Value} (hΞ : Ξ.WellScoped) 
             x.1.2.1.applyComputable (Expression.recordAccess e x.1.1)))).map (·.2.1)).zip vs) := by
         rw [hnames]
         refine ZFSet.ext (λ z ↦ ?_)
-        rw [hcv z, Value.ofRecord, Value.mem_recordGraph]
+        rw [hcv z, Value.mem_ofRecord]
         constructor
         · rintro ⟨nc, hnc, vk, w, hvk, hc, rfl⟩
           obtain ⟨i, hi, rfl⟩ := List.getElem_of_mem hnc

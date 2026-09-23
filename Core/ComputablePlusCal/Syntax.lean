@@ -43,8 +43,7 @@ def Ref.stepType (τ : ComputableTLAPlus.Typ) : String ⊕ Expression → Comput
     | _ => τ
 
 /-- The type a `Ref`'s bracket-index expression must have at one particular `.inr` step, given
-the type *before* that step (unlike `stepType`, which gives the type *after*). Used by
-`Computable2Guarded/Par.lean`'s `parRef` to annotate hoisted index-temp `with`-bindings. -/
+the type *before* that step (unlike `stepType`, which gives the type *after*). -/
 def Ref.indexType : ComputableTLAPlus.Typ → ComputableTLAPlus.Typ
   | .function dom _ => dom
   | .seq _ => .int

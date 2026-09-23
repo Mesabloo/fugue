@@ -43,7 +43,7 @@ noncomputable instance : DiscreteIMetricSpace Channel where
   __ := IMetricSpace.discrete
 instance : CompleteSpace Channel := DiscreteIMetricSpace.completeSpace
 
--- TODO: this will need to be defined mutually with 𝕍 — see `.claude/plans/go-semantics-port.md`.
+-- TODO(go-semantics): define `Store` mutually with `𝕍` instead of axiomatizing it.
 axiom Store : NonemptyType.{0}
 
 instance : Nonempty Store.type := Store.property

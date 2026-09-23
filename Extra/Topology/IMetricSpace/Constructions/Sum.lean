@@ -107,8 +107,6 @@ theorem Isometry.sumMap {W X Y Z} {f : W → X} {g : Y → Z} [PseudoIMetricSpac
   · apply Isometry.to_idist_eq
     assumption
 
----------
-
 nonrec abbrev Sigma.idist {α} {β : α → _} [DecidableEq α] [(x : α) → IDist (β x)] (x y : Sigma β) : unitInterval :=
   if h : x.1 = y.1 then idist (h ▸ x.2) y.2 else ⊤
 

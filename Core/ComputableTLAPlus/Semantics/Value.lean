@@ -48,10 +48,10 @@ noncomputable def ofInt (z : ℤ) : Value :=
 noncomputable def ofNat (n : ℕ) : Value := ofInt n
 
 /-- `TRUE`. -/
-def tru : Value := ZFSet.zftrue
+abbrev tru : Value := ZFSet.zftrue
 
 /-- `FALSE`. -/
-def fls : Value := ZFSet.zffalse
+abbrev fls : Value := ZFSet.zffalse
 
 /-- The boolean `b`. -/
 def ofBool (b : Bool) : Value := bif b then tru else fls
@@ -67,20 +67,17 @@ tuples are the same kind of value; their two syntactic forms differ only in how 
 noncomputable def ofSeq (vs : List Value) : Value := seqGraphFrom 1 vs
 
 /-- A TLA⁺ tuple `⟨v₁, …, vₙ⟩`. Identical to `ofSeq`. -/
-noncomputable def ofTuple : List Value → Value := ofSeq
+noncomputable abbrev ofTuple : List Value → Value := ofSeq
 
 /-- A TLA⁺ string: the sequence of its Unicode code points. `"abc"` is the tuple `⟨97, 98, 99⟩`,
 matching TLA⁺'s treatment of a string as a tuple of characters. -/
 noncomputable def ofString (s : String) : Value := ofSeq (s.toList.map λ c ↦ ofNat c.toNat)
 
-/-- The graph `{(k₁, v₁), …}` of a record's fields, keyed by the string encodings of the field
-names. -/
-noncomputable def recordGraph : List (String × Value) → Value
+/-- A TLA⁺ record `[a₁ ↦ v₁, …]`: the function from field-name strings to values, i.e. the graph
+`{(k₁, v₁), …}` keyed by the string encodings of the field names. -/
+noncomputable def ofRecord : List (String × Value) → Value
   | [] => ∅
-  | f :: fs => insert (ZFSet.pair (ofString f.1) f.2) (recordGraph fs)
-
-/-- A TLA⁺ record `[a₁ ↦ v₁, …]`: the function from field-name strings to values. -/
-noncomputable def ofRecord (fs : List (String × Value)) : Value := recordGraph fs
+  | f :: fs => insert (ZFSet.pair (ofString f.1) f.2) (ofRecord fs)
 
 /-- A finite set literal `{v₁, …, vₙ}`. -/
 def ofFinSet (vs : List Value) : Value := vs.foldr insert ∅
@@ -88,8 +85,7 @@ def ofFinSet (vs : List Value) : Value := vs.foldr insert ∅
 instance : Inhabited Value := ⟨(∅ : ZFSet)⟩
 
 /-- `TRUE` and `FALSE` are distinct values. -/
-@[simp] theorem tru_ne_fls : tru ≠ fls := by
-  unfold tru fls; exact ZFSet.zftrue_ne_zffalse
+@[simp] theorem tru_ne_fls : tru ≠ fls := ZFSet.zftrue_ne_zffalse
 
 /-- `FALSE` and `TRUE` are distinct values — the flipped orientation, for rewriting. -/
 @[simp] theorem fls_ne_tru : fls ≠ tru := tru_ne_fls.symm
@@ -287,14 +283,14 @@ noncomputable def cartesian (A B : Value) : Value :=
   | 0, _ => exact ⟨by simp, .inl ha⟩
   | 1, _ => exact ⟨by simp, .inr hb⟩
 
-/-- The pairs of a `recordGraph`: one per field, keyed by the string encoding of its name. -/
-theorem mem_recordGraph {z : Value} {fs : List (String × Value)} :
-    z ∈ recordGraph fs ↔ ∃ (k : String) (v : Value), (k, v) ∈ fs ∧ z = ZFSet.pair (ofString k) v := by
+/-- The pairs of a record: one per field, keyed by the string encoding of its name. -/
+theorem mem_ofRecord {z : Value} {fs : List (String × Value)} :
+    z ∈ ofRecord fs ↔ ∃ (k : String) (v : Value), (k, v) ∈ fs ∧ z = ZFSet.pair (ofString k) v := by
   induction fs with
-  | nil => simp [recordGraph]
+  | nil => simp [ofRecord]
   | cons f fs ih =>
     obtain ⟨k, v⟩ := f
-    rw [recordGraph, ZFSet.mem_insert_iff, ih]
+    rw [ofRecord, ZFSet.mem_insert_iff, ih]
     iff_rintro (rfl | ⟨k', v', hmem, rfl⟩) ⟨k', v', hmem, rfl⟩
     · exact ⟨k, v, by simp, rfl⟩
     · exact ⟨k', v', by simp [hmem], rfl⟩
