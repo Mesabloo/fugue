@@ -223,6 +223,70 @@ namespace StrongRefinement
     rwa [Relation.star.star_eq] at h
 
   /--
+    Stuttering refinement: behavior refinement for one target step, where the source may answer
+    with no step at all.
+
+    From `R σₛ σₜ` and a `stepₜ` step `(σₜ, ε, σₜ')`, the source either takes a matching `stepₛ`
+    step to some `σₛ'` with `R σₛ' σₜ'` and `Rτ ε' ε`, or stays at `σₛ` with `R σₛ σₜ'` while the
+    target emits `1` and the measure `μ` strictly drops, or aborts via `semₛ'` on a trace with
+    `ε' ≼[Rτ] ε`. The measure is what rules out a target that stutters forever against a source
+    standing still.
+
+    $$
+    \begin{CD}
+    \sigma_s @>R>> \sigma_t \\
+    @V{\mathit{step}_s}V{\varepsilon'}V @V{\mathit{step}_t}V{\varepsilon}V \\
+    \sigma_s' @>R>> \sigma_t'
+    \end{CD}
+    $$
+    or
+    $$
+    \begin{CD}
+    \sigma_s @>R>> \sigma_t \\
+    @| @V{\mathit{step}_t}V{1,\ \mu \downarrow}V \\
+    \sigma_s @>R>> \sigma_t'
+    \end{CD}
+    $$
+    or
+    $$
+    \begin{CD}
+    \sigma_s @>R>> \sigma_t \\
+    @V{\mathit{sem}_s'}V{\varepsilon' \preceq \varepsilon}V @V{\mathit{step}_t}V{\varepsilon}V \\
+    \unicode{x21AF} @. \sigma_t'
+    \end{CD}
+    $$
+  -/
+  @[expose]
+  protected def Stuttering (μ : β → ℕ) (stepₛ : Set (α × εₛ × α)) (semₛ' : Set (α × εₛ))
+      (stepₜ : Set (β × εₜ × β)) : Prop :=
+    ∀ (σₜ σₜ' : β) (ε : εₜ) (σₛ : α), R σₛ σₜ → (σₜ, ε, σₜ') ∈ stepₜ →
+      (∃ (σₛ' : α) (ε' : εₛ), R σₛ' σₜ' ∧ Rτ ε' ε ∧ (σₛ, ε', σₛ') ∈ stepₛ) ∨
+      (R σₛ σₜ' ∧ ε = 1 ∧ μ σₜ' < μ σₜ) ∨
+      (∃ ε' : εₛ, ε' ≼[Rτ] ε ∧ (σₛ, ε') ∈ semₛ')
+
+  /-- A stuttering refinement is a `Terminating` refinement of the target step by source runs: a
+  source step is a one-step run, a stutter the empty one, and an abort passes through unchanged. -/
+  protected theorem Stuttering.terminating {R : Rel α β} [T : Trace εₛ εₜ] {μ : β → ℕ}
+      {stepₛ : Set (α × εₛ × α)} {semₛ' : Set (α × εₛ)} {stepₜ : Set (β × εₜ × β)}
+      (ref : StrongRefinement.Stuttering R T.Rτ μ stepₛ semₛ' stepₜ) :
+        StrongRefinement.Terminating R R T.Rτ (Relation.star stepₛ) semₛ' stepₜ := by
+    intro σₜ σₜ' ε σₛ hR hstep
+    rcases ref σₜ σₜ' ε σₛ hR hstep with ⟨σₛ', ε', hR', hRτ, hsem⟩ | ⟨hR', rfl, -⟩ | habort
+    · exact Or.inl ⟨σₛ', ε', hR', hRτ, Relation.star.single hsem⟩
+    · exact Or.inl ⟨σₛ, 1, hR', T.Rτ_one, Relation.star.refl σₛ⟩
+    · exact Or.inr habort
+
+  /-- Terminating refinement of `Relation.star` on both sides from a stuttering refinement, with
+  aborting set `Relation.star stepₛ ∘ᵣ₁ Yₛ`. `Stuttering.terminating` lifted by
+  `Terminating.starStutter`. -/
+  protected theorem Stuttering.star {R : Rel α β} [T : Trace εₛ εₜ] {μ : β → ℕ}
+      {stepₛ : Set (α × εₛ × α)} {Yₛ : Set (α × εₛ)} {stepₜ : Set (β × εₜ × β)}
+      (ref : StrongRefinement.Stuttering R T.Rτ μ stepₛ (Relation.star stepₛ ∘ᵣ₁ Yₛ) stepₜ) :
+        StrongRefinement.Terminating R R T.Rτ (Relation.star stepₛ) (Relation.star stepₛ ∘ᵣ₁ Yₛ)
+          (Relation.star stepₜ) :=
+    Terminating.starStutter ref.terminating
+
+  /--
     Behavior refinement for a target run that diverges.
 
     From `R σₛ σₜ` and a diverging `semₜ` run `(σₜ, ε)`, the source either diverges too via `semₛ`
@@ -403,19 +467,15 @@ namespace StrongRefinement
           -- transparency `using` matches at does not see through.
           simpa only [Nat.zero_add] using! habort m 0 (Nat.zero_add m)
 
-  /-- Divergence refinement for a stuttering source, where instantiating `semₛ` at a `star` is not
-  available (`Relation.omega (Relation.star stepₛ) ≤ Relation.omega stepₛ` is false). The
-  hypothesis is a stuttering simulation: per target step the source takes one step, or none while
-  a well-founded measure `μ` on target configurations strictly drops, or aborts. The idle branch
-  requires the target trace to be `1` there — a step the source does not answer must be
-  unobservable. -/
-  protected theorem Diverging.omegaStutter {R : Rel α β} [ωMonoid εₛ] [ωMonoid εₜ]
+  /-- Divergence refinement of `Relation.omega` from a stuttering refinement, where instantiating
+  `semₛ` at a `star` is not available (`Relation.omega (Relation.star stepₛ) ≤ Relation.omega stepₛ`
+  is false). The source either keeps pace with the target forever — its idle indices finitely
+  spaced by the measure and each emitting `1`, so deleting them leaves an infinite source run — or
+  aborts at the first index it cannot. -/
+  protected theorem Stuttering.omega {R : Rel α β} [ωMonoid εₛ] [ωMonoid εₜ]
       [T : ωTrace εₛ εₜ] {stepₛ : Set (α × εₛ × α)} {Yₛ : Set (α × εₛ)}
       {stepₜ : Set (β × εₜ × β)} {μ : β → ℕ}
-      (ref : ∀ (σₜ σₜ' : β) (ε : εₜ) (σₛ : α), R σₛ σₜ → (σₜ, ε, σₜ') ∈ stepₜ →
-        (∃ (σₛ' : α) (ε' : εₛ), R σₛ' σₜ' ∧ T.Rτ ε' ε ∧ (σₛ, ε', σₛ') ∈ stepₛ) ∨
-        (R σₛ σₜ' ∧ ε = 1 ∧ μ σₜ' < μ σₜ) ∨
-        (∃ ε' : εₛ, ε' ≼[T.Rτ] ε ∧ (σₛ, ε') ∈ Relation.star stepₛ ∘ᵣ₁ Yₛ)) :
+      (ref : StrongRefinement.Stuttering R T.Rτ μ stepₛ (Relation.star stepₛ ∘ᵣ₁ Yₛ) stepₜ) :
         StrongRefinement.Diverging R T.Rτ (Relation.omega stepₛ) (Relation.star stepₛ ∘ᵣ₁ Yₛ)
           (Relation.omega stepₜ) := by classical
     let semₛ' := Relation.star stepₛ ∘ᵣ₁ Yₛ

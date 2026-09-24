@@ -24,10 +24,11 @@ import all Guarded2Network.PlusCal
   The pass's per-process refinement (`ProcessesRefine`) plus the front-end facts (`MailboxUsed`,
   `AlgorithmFresh`) are what that needs and nothing more.
 
-  **The source side is `Relation.star Aₛ.step`, not `Aₛ.step`.** A receiving thread's step is
-  answered with *no* source step at all, so no single-step form can be stated — see
-  `StrongRefinement.Terminating.starStutter`, which is the shape that admits it and which
-  `terminating_reducing` below spends.
+  **The per-step obligation is a `StrongRefinement.Stuttering`, not a `Terminating`.** A receiving
+  thread's step is answered with *no* source step at all, so no single-step `Terminating` can be
+  stated. `algRelatesTo.stuttering` is that obligation; the reducing, diverging, aborting and blocking
+  halves are the framework's `Stuttering.star`, `Stuttering.omega` and `Stuttering.terminating`
+  applied to it.
 -/
 
 namespace Guarded2Network
@@ -45,7 +46,7 @@ variable {V : Type u} [ExprSemantics V] [SeqBuiltins V] {ι : Type u} {Ξ : Oper
   global state, so the syntactic half is `Spec.mapM_list` a fourth time and nothing more.
 
   The semantic half — turning the resulting `ProcessRefines` into the label dispatch
-  `algRelatesTo.step_or_stutter` and `.immediateAbort` run — is a different kind of step and is not
+  `algRelatesTo.stuttering` and `.immediateAbort` run — is a different kind of step and is not
   here. It has to go through `Algorithm.algebra`'s by-name lookup on both sides, and it is the first
   place the two languages' `Process.codeTable`s are compared rather than their syntax.
 -/
@@ -105,7 +106,7 @@ resolve an instance `⟨name, self⟩` by exactly this lookup.
 `List.Forall₂.find?_right` is what makes it work: the two `find?`s walk their lists in step, so
 agreement on the *predicate* at related pairs is enough, and `ProcessRefines.name_eq` is that
 agreement. The target side is the hypothesis rather than the source's because that is the direction
-`algRelatesTo.step_or_stutter` and `.immediateAbort` need it — a target step names a target label,
+`algRelatesTo.stuttering` and `.immediateAbort` need it — a target step names a target label,
 and resolving that label's owning process is the first thing either proof does. -/
 theorem find?_refines (href : ProcessesRefine (V := V) Ξ Ω mbox c₀ pref algo algo')
     (hfind : algo'.processes.find? (·.name == name) = some p') :
@@ -155,7 +156,7 @@ theorem src_algebra_table (hfind : algo.processes.find? (·.name == name) = some
 omit [SeqBuiltins V] in
 /-- **A generated `inbox` is never `self`.** A mailbox `procMailbox` reports is one a process
 registered a thread for, so its `inbox` is a name `freshName` generated, and no generated name is
-`self` (`Generated.ne_selfName`). Spent inside `algRelatesTo.step_or_stutter`/`.immediateAbort` to
+`self` (`Generated.ne_selfName`). Spent inside `algRelatesTo.stuttering`/`.immediateAbort` to
 rewrite the source memory's `selfName` lookup through `procRelatesTo.mem_agree'` unchanged.
 
 Load-bearing rather than hygiene: `CodeTable.procReducing` requires the memory to bind `selfName`,
@@ -191,9 +192,9 @@ def AlgorithmFresh (mbox : String → String → Mailbox)
     ∀ p ∈ algo.processes, ProcessFresh (mbox p.name) (c₀ p.name) p
 
 omit [SeqBuiltins V] in
-/-- **One target step, answered — and never answered by nothing forever.** The per-step obligation
-in the three-way form a stuttering simulation needs: the source takes *one* step, or it takes none
-and the target's queued-message count strictly drops, or it aborts.
+/-- **One target step, answered — and never answered by nothing forever.** The algorithm-level
+`Stuttering` refinement, at the target's queued-message count: the source takes *one* step, or it
+takes none and that count strictly drops, or it aborts.
 
 The middle disjunct is what a divergence argument needs and `Terminating` cannot express. A
 receiving thread's step is answered with no source step at all, so an infinite target run could in
@@ -215,20 +216,15 @@ scheduled, and the memory to bind `selfName`. The first comes from the code bran
 together with `procRelatesTo`'s `L₂ = L₁`; the second from memory agreement away from the generated
 `inbox`, which is not `self` — and since both algebras read `self` off the instance's own identity,
 that memory fact needs no translation between the two sides. -/
-theorem algRelatesTo.step_or_stutter (hΞ : Ξ.WellScoped) [DecidableEq V]
+theorem algRelatesTo.stuttering (hΞ : Ξ.WellScoped) [DecidableEq V]
     (href : ∀ pref : ChanKey V → List V, ProcessesRefine (V := V) Ξ Ω mbox c₀ pref algo algo')
-    (used : MailboxUsed mbox algo) (fresh : AlgorithmFresh mbox c₀ algo)
-    {Sₜ Sₜ' Sₛ : AlgState (String × V) V} {ε : Trace V}
-    (hrel : Sₛ ≋[Ξ, Ω,procMailbox algo'] Sₜ)
-    (hstep : (⟨Sₜ, ε, Sₜ'⟩ : AlgState (String × V) V × Trace V × AlgState (String × V) V) ∈
-      (NetworkPlusCal.Algorithm.algebra Ξ Ω algo').step) :
-    (∃ Sₛ' ε', Sₛ' ≋[Ξ, Ω,procMailbox algo'] Sₜ' ∧ (instTrace (V := V)).Rτ ε' ε ∧
-        (⟨Sₛ, ε', Sₛ'⟩ : AlgState (String × V) V × Trace V × AlgState (String × V) V) ∈
-          (GuardedPlusCal.Algorithm.algebra Ξ Ω algo).step) ∨
-      (Sₛ ≋[Ξ, Ω,procMailbox algo'] Sₜ' ∧ ε = 1 ∧
-        GuardedPlusCal.FIFOs.size Sₜ'.2 < GuardedPlusCal.FIFOs.size Sₜ.2) ∨
-      (∃ ε', ε' ≼[(instTrace (V := V)).Rτ] ε ∧ (⟨Sₛ, ε'⟩ : AlgState (String × V) V × Trace V) ∈
-        (GuardedPlusCal.Algorithm.algebra Ξ Ω algo).aborting) := by
+    (used : MailboxUsed mbox algo) (fresh : AlgorithmFresh mbox c₀ algo) :
+    StrongRefinement.Stuttering (algRelatesTo (V := V) Ξ Ω (procMailbox algo'))
+      (instTrace (V := V)).Rτ (λ S ↦ GuardedPlusCal.FIFOs.size S.2)
+      (GuardedPlusCal.Algorithm.algebra Ξ Ω algo).step
+      (GuardedPlusCal.Algorithm.algebra Ξ Ω algo).aborting
+      (NetworkPlusCal.Algorithm.algebra Ξ Ω algo').step := by
+  intro Sₜ Sₜ' ε Sₛ hrel hstep
   obtain ⟨Qs, F₂⟩ := Sₜ
   obtain ⟨Qs', F₂'⟩ := Sₜ'
   obtain ⟨Ps, F₁⟩ := Sₛ
@@ -312,29 +308,8 @@ theorem algRelatesTo.step_or_stutter (hΞ : Ξ.WellScoped) [DecidableEq V]
       omega
 
 omit [SeqBuiltins V] in
-/-- **The algorithm-level `Terminating`**, read off `step_or_stutter`: a source step is a one-step
-run, a stutter is the empty one, and the abort disjunct passes through unchanged. The measure is
-dropped here — `Terminating` has nowhere to put it, which is exactly why the divergence half needs
-`step_or_stutter` directly. -/
-theorem algRelatesTo.terminating (hΞ : Ξ.WellScoped) [DecidableEq V]
-    (href : ∀ pref : ChanKey V → List V, ProcessesRefine (V := V) Ξ Ω mbox c₀ pref algo algo')
-    (used : MailboxUsed mbox algo) (fresh : AlgorithmFresh mbox c₀ algo) :
-    StrongRefinement.Terminating (algRelatesTo (V := V) Ξ Ω (procMailbox algo'))
-      (algRelatesTo (V := V) Ξ Ω (procMailbox algo'))
-      (instTrace (V := V)).Rτ (Relation.star (GuardedPlusCal.Algorithm.algebra Ξ Ω algo).step)
-      (GuardedPlusCal.Algorithm.algebra Ξ Ω algo).aborting
-      (NetworkPlusCal.Algorithm.algebra Ξ Ω algo').step := by
-  intro Sₜ Sₜ' ε Sₛ hrel hstep
-  rcases algRelatesTo.step_or_stutter hΞ href used fresh hrel hstep with
-    ⟨Sₛ', ε', hrel', hτ, hsstep⟩ | ⟨hrel', rfl, _⟩ | habort
-  · exact .inl ⟨Sₛ', ε', hrel', hτ, Relation.star.single hsstep⟩
-  · refine .inl ⟨Sₛ, 1, hrel', ?_, Relation.star.refl _⟩
-    trace_rel
-  · exact .inr habort
-
-omit [SeqBuiltins V] in
 /-- **Where the target goes wrong, so does the source.** The aborting counterpart of
-`algRelatesTo.terminating`. A `.rx` thread's step is in `relay`, not in `procAborting`, and has no
+`algRelatesTo.stuttering`. A `.rx` thread's step is in `relay`, not in `procAborting`, and has no
 aborting rule at all, so every algorithm-level abort is a code thread's, answered by the source
 block's through `blockRefines_abort`.
 
@@ -388,9 +363,8 @@ theorem algRelatesTo.immediateAbort [DecidableEq V]
 
 omit [SeqBuiltins V] in
 /-- **And the whole reducing semantics.** `Algebra.reducing` is `step*` by definition and
-`Algebra.aborting` is `step* ∘ᵣ₁ immediateAbort`, so this is `Terminating.starStutter` at those and
-nothing else — including its absorption side condition, which is `Relation.star.star_lcomp₁_absorb`
-at exactly this shape. -/
+`Algebra.aborting` is `step* ∘ᵣ₁ immediateAbort`, so this is `Stuttering.star` at those and nothing
+else. -/
 theorem algRelatesTo.terminating_reducing (hΞ : Ξ.WellScoped) [DecidableEq V]
     (href : ∀ pref : ChanKey V → List V, ProcessesRefine (V := V) Ξ Ω mbox c₀ pref algo algo')
     (used : MailboxUsed mbox algo) (fresh : AlgorithmFresh mbox c₀ algo) :
@@ -399,12 +373,12 @@ theorem algRelatesTo.terminating_reducing (hΞ : Ξ.WellScoped) [DecidableEq V]
       (instTrace (V := V)).Rτ (GuardedPlusCal.Algorithm.algebra Ξ Ω algo).reducing
       (GuardedPlusCal.Algorithm.algebra Ξ Ω algo).aborting
       (NetworkPlusCal.Algorithm.algebra Ξ Ω algo').reducing :=
-  StrongRefinement.Terminating.starStutter (algRelatesTo.terminating hΞ href used fresh)
+  (algRelatesTo.stuttering hΞ href used fresh).star
 
 omit [SeqBuiltins V] in
 /-- **And the whole diverging semantics.** `Algebra.diverging` is `step^∞` by definition, so this is
-`Diverging.omegaStutter` at `step_or_stutter` — the same three-way obligation the other two halves
-are built from, here with its measure disjunct finally load-bearing.
+`Stuttering.omega` at `algRelatesTo.stuttering` — the same obligation the other two halves are built
+from, here with its measure disjunct finally load-bearing.
 
 `FIFOs.size` is the measure: a receiving thread's relay moves one message out of a channel, and only
 a `send` puts one back — and a `send` is a code thread's step, which *does* move the source. So the
@@ -417,8 +391,7 @@ theorem algRelatesTo.diverging (hΞ : Ξ.WellScoped) [DecidableEq V]
       (instTrace (V := V)).Rτ (GuardedPlusCal.Algorithm.algebra Ξ Ω algo).diverging
       (GuardedPlusCal.Algorithm.algebra Ξ Ω algo).aborting
       (NetworkPlusCal.Algorithm.algebra Ξ Ω algo').diverging :=
-  StrongRefinement.Diverging.omegaStutter (μ := λ S ↦ GuardedPlusCal.FIFOs.size S.2)
-    (λ _ _ _ _ hrel hstep ↦ algRelatesTo.step_or_stutter hΞ href used fresh hrel hstep)
+  (algRelatesTo.stuttering hΞ href used fresh).omega
 
 omit [SeqBuiltins V] in
 /-- **And the whole aborting semantics.** `Algebra.aborting` is `step* ∘ᵣ₁ immediateAbort` by
@@ -430,7 +403,7 @@ theorem algRelatesTo.aborting (hΞ : Ξ.WellScoped) [DecidableEq V]
     StrongRefinement.Aborting (algRelatesTo (V := V) Ξ Ω (procMailbox algo'))
       (instTrace (V := V)).Rτ (GuardedPlusCal.Algorithm.algebra Ξ Ω algo).aborting
       (NetworkPlusCal.Algorithm.algebra Ξ Ω algo').aborting :=
-  StrongRefinement.Aborting.starStutter (algRelatesTo.terminating hΞ href used fresh)
+  StrongRefinement.Aborting.starStutter (algRelatesTo.stuttering hΞ href used fresh).terminating
     (algRelatesTo.immediateAbort href used fresh)
 
 open Std.Do in

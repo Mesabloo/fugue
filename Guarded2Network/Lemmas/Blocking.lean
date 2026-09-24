@@ -263,7 +263,7 @@ theorem algRelatesTo.blocking (hΞ : Ξ.WellScoped) [DecidableEq V]
       (instTrace (V := V)).Rτ (GuardedPlusCal.Algorithm.algebra Ξ Ω algo).blocking
       (GuardedPlusCal.Algorithm.algebra Ξ Ω algo).aborting
       (NetworkPlusCal.Algorithm.algebra Ξ Ω algo').blocking :=
-  StrongRefinement.Blocking.starStutter (algRelatesTo.terminating hΞ href used fresh)
+  StrongRefinement.Blocking.starStutter (algRelatesTo.stuttering hΞ href used fresh).terminating
     (algRelatesTo.immediateBlock hΞ href used)
 
 omit [SeqBuiltins V] in

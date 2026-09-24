@@ -218,7 +218,7 @@ the other mailbox: a thread is registered only for a branch that receives, and a
 is what `BranchesFresh.mbox_some` says has a mailbox at all. And the channel does not mention the
 generated name, which is `ReceiveFresh`'s first clause and what `ProcessRefines.rxThread` reports it
 for — a relay resolves its channel in a memory the relay itself is about to write `inbox` in.
-`algRelatesTo.step_or_stutter`/`.immediateAbort` read it off `rxThread` at the resolved instance. -/
+`algRelatesTo.stuttering`/`.immediateAbort` read it off `rxThread` at the resolved instance. -/
 def IsRxThread (mbox : Mailbox) (c₀ : ComputableGuardedPlusCal.Ref) (inbox : String)
   (T : ComputableNetworkPlusCal.Thread) : Prop :=
     mbox = .some (c₀, inbox) ∧ inbox ∉ GuardedPlusCal.Ref.freeVars c₀ ∧

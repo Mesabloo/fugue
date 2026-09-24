@@ -434,7 +434,7 @@ theorem algRelatesTo.block_step (hΞ : Ξ.WellScoped) {ι : Type u} [DecidableEq
   The other half of the process layer, above `Thread.toNetwork`. Everything above is about a
   process *step*; everything below is about
   `Process.toNetwork` — what a compiled process owes its source syntactically, so that
-  `algRelatesTo.step_or_stutter`/`.immediateAbort` can dispatch a target label off it into a code
+  `algRelatesTo.stuttering`/`.immediateAbort` can dispatch a target label off it into a code
   thread's or a receiving thread's.
 
   This is the rung where `freshName` first matters. `Thread.toNetwork` is *handed* its `inbox`;
@@ -462,7 +462,7 @@ def ProcessFresh (mbox : String → Mailbox) (c₀ : ComputableGuardedPlusCal.Re
 
 /-- **A generated `inbox` is never `self`**, which is load-bearing rather than hygiene:
 `CodeTable.procReducing` requires the memory to bind `selfName`, and the source memory agrees with
-the target's only *away* from the generated name — `algRelatesTo.step_or_stutter`/`.immediateAbort`
+the target's only *away* from the generated name — `algRelatesTo.stuttering`/`.immediateAbort`
 spend this to rewrite that lookup through unchanged (`procMailbox_inbox_ne_selfName`).
 
 Pure arithmetic on the shape of the name, needing nothing from the source program: `selfName` is
@@ -759,7 +759,7 @@ theorem src_aborting_le {p : ComputableGuardedPlusCal.Process} {l : String}
   obtain ⟨T, hT, blk, hblk, hlab, hBr⟩ := mem_srcBranchesAt.mp h
   exact λ _ hx ↦ ⟨T, hT, blk, hblk, hlab, Br, hBr, hx⟩
 
-/-- **The refinement, at a label rather than at a block** — what `algRelatesTo.step_or_stutter`
+/-- **The refinement, at a label rather than at a block** — what `algRelatesTo.stuttering`
 resolves at every prefix function to build a `BranchesRefine` fact for the code case.
 
 Three `exists_left`s stacked: a compiled branch sits in a compiled block, which sits in a compiled
@@ -848,7 +848,7 @@ theorem rxMailbox_mem {p' : ComputableNetworkPlusCal.Process}
 /-- **Any receiving thread of a compiled process is one the pass registered**, and so is on the
 process's own channel and `inbox` — which in turn means the process has a mailbox naming both.
 
-The primitive the receiving side is built from. `algRelatesTo.step_or_stutter`/`.immediateAbort`
+The primitive the receiving side is built from. `algRelatesTo.stuttering`/`.immediateAbort`
 read the mailbox and its freshness off its first two components. -/
 theorem ProcessRefines.rxThread (h : ProcessRefines (V := V) Ξ Ω mbox c₀ inbox pref p p')
     {chan : ComputableNetworkPlusCal.Ref} {l ib : String} {τ : ComputableTLAPlus.Typ}

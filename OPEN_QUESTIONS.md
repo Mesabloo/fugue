@@ -121,56 +121,6 @@ thesis, not standard TLA⁺ as far as traced. Left unbound in `builtinContext`; 
 fails at `unboundVariable`. Their canonical names are in `WellFormedness/Restrictions.lean`'s
 check-3 list for forward-compatibility, currently inert.
 
-### 9.12 Regression fixtures parked as `xfail`
-All run, all still fail as described, and an unexpected pass is reported as XPASS. They were
-`skip_*` files until phase 4; skipping meant they could quietly start working and nobody would
-know.
-
-**Left this list.** `AcceptFunctionDefinitionMultiArgTupleDomain.tla` — `Parser_/TLAPlus.lean`'s
-`parseDeclaration` had no production for `Declaration.function` at all, so no module-level
-function definition of any arity could be written, whether or not its shape would type-check.
-Fixed by adding `parseFunctionDefinition` (binder list = `sepBy1 comma parseQuantifierBound`,
-reusing the same grammar `\A`/`\E`/set-builders already use rather than a narrower one) and
-dispatching to it from `parseDeclaration` on a `[` peek past the leading identifier. Sidecar
-dropped, fixture passes for real; a companion, `…GoCodegen.tla`, pairs the same definition with a
-process that calls it and asserts `goBuild: true`, since this fixture's own module has no
-algorithm and so never reaches `Network2Go` at all.
-
-**Also left this list already:** `AcceptFunctionLiteralCartesianProductBinder.tla` — `\X` typed
-(`(Set(a), Set(b)) => Set(<<a,b>>)`, `builtinContext`) but had no Go compilation: a product's
-elements are pairs, and a tuple compiles to an *anonymous* struct only the site building it can
-name, so a runtime `SetProduct` could not construct its own elements the way `SetUnion` does.
-Fixed by taking the pair constructor as a callback, the way `SetMap` takes its mapping function —
-`runtime/tlaplus/sets.go`'s `SetProduct`, called from `Network2Go/Expression.lean`'s `"\\X"` case.
-No dictionary parameter or renormalizing pass needed there, unlike `SetMap`: the pair constructor
-is always injective and row-major order over two sorted inputs is already ascending in the tuple's
-own lexicographic order, so both invariants hold by construction. Sidecar dropped, fixture passes
-for real (confirmed via a real `go build`, not just the in-process pipeline check).
-
-**Three left this list by that last rule**, all rewritten as `Reject*` fixtures asserting the
-rejection they actually produce, since each encodes a construct outside §8:
-- `RejectUnboundedChooseWithExpectedType` (was `Accept*`) — `CHOOSE` parses now (§9.2's gap is
-  closed), and the fixture type-checks through `Elaborator/Expressions.lean`'s checking-mode
-  `[Unbounded choice]` rule, so what it really exercises is check 3's `unboundedQuantifier`
-  (`E0054`, `wellformedness`). §8 has no unbounded quantifier.
-- `RejectMulticastMultiComponent`, `RejectMulticastPartialAnnotation` (both were `Accept*`) — a
-  multi-component multicast filter (§5.2) makes the recipients a tuple, so the channel's domain is
-  one, and the `Network` struct holds `map[comm.Address]`; the Go backend rejects it with `E0061`
-  at `go`, the same limit `compileSend` has for a channel indexed by more than one bracket group.
-  §8's multicast is single-binder (`multicast(x, [y ∈ e1 ↦ e2])`), so the multi-component form is
-  outside the v1 subset and the rejection is the expectation. The second of the two remains the
-  only route to W0005 (`partial-multicast-annotation`); the warning fires and is asserted there,
-  now alongside the error.
-
-**`\X` is binary here**, with a precedence and left associativity, though
-`Core/SurfaceTLAPlus/Syntax.lean` notes it is not really binary in TLA⁺'s grammar. So `A \X B \X
-C` is `(A \X B) \X C`, whose elements are pairs holding a pair rather than the flat triples TLA⁺
-means. Nothing accepts the wrong shape — `collapseToSingleBinder` projects component `i` as
-`z[i]`, and `z[3]` on a pair is caught by the tuple-index bound — but a genuinely n-ary `\X`
-(needed before three-component products of any kind work, including multicast filters) is
-unwritten. Binary `\X` itself compiles to Go now (`SetProduct`, above); this paragraph is only
-about the n≥3 shape.
-
 ### 9.13 Two well-formedness checks are currently unreachable
 The rule is right in each case; the parser/type-checker just can't produce the triggering input:
 - **Check 2(b)'s `nonEmptyLocalChannels`**: `Parser_/PlusCal.lean`'s `parseProcess` hardcodes

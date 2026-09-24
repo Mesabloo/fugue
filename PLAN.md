@@ -1771,12 +1771,17 @@ instantiating the framework law at `semₛ := Relation.star stepₛ` and collaps
 `Relation.star.star_eq`. Divergence has no such collapse — `Relation.omega (Relation.star R)
 ≤ Relation.omega R` is **false** (an infinite sequence of empty runs witnesses the former,
 nothing in the latter). The shape that works is CompCert's — per target step the source
-takes one step, or none with a well-founded measure decreasing, or aborts —
-`algRelatesTo.step_or_stutter` (`Lemmas/Algorithm.lean`, with `terminating` derived from
-it). Measure = `GuardedPlusCal.FIFOs.size`: a relay moves a message out of a channel, only
-a `send` puts one back (a code step, which does move the source).
-`StrongRefinement.Diverging.omegaStutter` is the framework law at that shape;
-`algRelatesTo.refines` assembles all three components at the closed forms. The stutter
+takes one step, or none with a well-founded measure decreasing, or aborts. Framework names
+that shape `StrongRefinement.Stuttering R Rτ μ stepₛ semₛ' stepₜ` (single relation `R`,
+measure `μ : β → ℕ` on target configurations) with three generic laws:
+`Stuttering.terminating` (to `Terminating` at `star stepₛ` against `stepₜ`),
+`Stuttering.star` (to `Terminating` at `star` both sides, through `Terminating.starStutter`),
+`Stuttering.omega` (to `Diverging` at `omega` both sides). Pass proves one
+`algRelatesTo.stuttering` (`Lemmas/Algorithm.lean`); reducing/diverging halves are
+`.star`/`.omega` of it, aborting/blocking halves `Aborting`/`Blocking.starStutter` of its
+`.terminating`. Measure = `GuardedPlusCal.FIFOs.size`: a relay moves a message out of a
+channel, only a `send` puts one back (a code step, which does move the source).
+`algRelatesTo.refines` assembles all components at the closed forms. The stutter
 branch requires the *target's* trace to be `1` there, keeping the reindexing one-sided
 (`Rτ_omega` applies pointwise at the original indices, only the source's run compressed) —
 compression is `Relation.omega.of_idle` over `Stream'.Seq.ωProduct_comp_of_ones`. No
@@ -1793,20 +1798,21 @@ channel presence had no home. Nothing removes a key (`send` writes only at a key
 read), so it rides along (`NetworkPlusCal.AtomicBranch.reducing'_fifos_mem`); established
 initially by `Algorithm.init`.
 
-**A stuttering source needs `Terminating.starStutter`, not `sequentialOmega`.**
+**A stuttering source needs `Stuttering`, not `sequentialOmega`.**
 `sequentialOmega`'s terminating hypothesis answers one target step with one *source step*;
 this pass can't (an `.rx` thread's step has no source counterpart, answered with the empty
-run). `starStutter` is the `semₛ := Relation.star stepₛ` instantiation
+run). `Stuttering.star` goes through `Terminating.starStutter`, the
+`semₛ := Relation.star stepₛ` instantiation
 (`Terminating.star`'s), with `Relation.star.star_eq` collapsing the `R**`, so the conclusion
 stays at `star stepₛ`; its absorption side condition arrives starred too
-(`Relation.star.star_lcomp₁_absorb`). The `Aborting`/`Diverging` halves of `sequentialOmega`
-want the same treatment; divergence unattempted (§6.3).
+(`Relation.star.star_lcomp₁_absorb`). `Aborting`/`Blocking.starStutter` are the same
+instantiation for those halves; the `Diverging` half is `Stuttering.omega`.
 
 **The algorithm level's dispatch is D8's specification, inlined.** No interface between pass
 and proof: per instance and per owned *target* label it's either a code label (block
 compiled from the source block at the same label, branches pairwise `BranchRefines` at every
 `pref`) or an `.rx` label (block is `Thread.rxBranch` on the instance's own channel),
-resolved inline where each consumer needs it — `step_or_stutter` and `immediateAbort`
+resolved inline where each consumer needs it — `stuttering` and `immediateAbort`
 dispatch on `ProcessRefines.label_cases` directly. Establishing the dispatch is a question
 about `Thread.toNetwork` (D8), not the proof. `inbox_ne_self` is load-bearing:
 `CodeTable.procReducing` requires the memory to bind `selfName`, and source agrees with
@@ -1880,7 +1886,7 @@ corollaries; `goto` being the only terminal statement constructor lets the secon
 stated syntactically (`Br.action.last`). `ProcessRefines.ownedLabels_eq` makes the split an
 *equation* (`NetworkPlusCal.Process.ownedLabels p' = rxLabels p' ∪
 GuardedPlusCal.Process.ownedLabels p`); `label_cases` packages it with the disjointness for
-`step_or_stutter`/`immediateAbort`. Exhaustive + exclusive make `ownedLabels p'` a genuine
+`stuttering`/`immediateAbort`. Exhaustive + exclusive make `ownedLabels p'` a genuine
 disjoint union, matching `procRelatesTo`'s `L₂ = L₁ ∪ rx` / `Disjoint L₁ rx`.
 
 **A label's branches are a concatenation, so `refines` is `BranchesRefine`, not `Forall₂`.**
@@ -1916,7 +1922,7 @@ obligations need — they take `mb : ι → Mailbox` as a parameter). The front-
 p`), established by `checkReceiveChannels` rejecting a receive without a mailbox.
 
 **No interface layer between dispatch and pass correctness** — no `AlgebraRefines`.
-`algRelatesTo.step_or_stutter`/`.immediateAbort` resolve the instance and dispatch on
+`algRelatesTo.stuttering`/`.immediateAbort` resolve the instance and dispatch on
 `ProcessRefines.label_cases` directly. `find?_refines` turns an instance into a related
 process pair; `src_algebra_table`/`tgt_algebra_table` get past `Algorithm.algebra`'s
 `Option.elim` to the bare `Process.codeTable` the field lemmas are stated at. Four

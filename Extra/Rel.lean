@@ -392,7 +392,7 @@ open Classical in
 still — emitting `1` when it stands still — is a run of the stepping relation alone, provided it
 steps *cofinally often*.
 
-This is what a stuttering simulation needs and cannot get from `Relation.omega.mono`:
+This is what a stuttering refinement needs and cannot get from `Relation.omega.mono`:
 `Relation.omega (R ∪ Idle) ≤ Relation.omega R` is false outright, since standing still forever is a
 witness of the left and of nothing on the right. Cofinality is exactly the missing side condition,
 and a caller supplies it from whatever well-founded measure forbids an infinite idle tail.
