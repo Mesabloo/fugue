@@ -420,6 +420,12 @@ private def runCli (p : Parsed) : IO UInt32 := do
       IO.Process.exit 1
     | _, _ => pure ()
 
+    -- The pipeline accepts a module without an algorithm once it type-checks, but the command line
+    -- is asked for a program, and such a module has none to give.
+    if result.computable.any (·.pcalAlgorithm.isNone) then
+      spinner.fail "No Distributed PlusCal algorithm to compile."
+      IO.Process.exit 1
+
     -- `-o` names a *file*, not a directory: a compile produces exactly one Go file. Everything
     -- lands in one package, and the only thing that could split it — a file per process — would
     -- buy nothing, since Go compiles a package as a unit and the declarations reference each
