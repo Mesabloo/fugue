@@ -272,10 +272,14 @@ Go, not Lean — the library generated code links against. Every package is a su
 - `comm_test.go`, `multicast_test.go`, `address_test.go` — their tests.
 
 ### `runtime/comm/tcp/`
-- `tcp.go` — the `Name` address type and its gob registration.
+- `doc.go` — the package doc comment.
 - `endpoint.go` — the `Sender`/`Receiver` implementations over TCP.
-- `nameserver.go` — the name server and its `Register`/`Lookup` clients.
 - `tcp_test.go` — their tests.
+
+### `runtime/comm/nameserver/`
+- `name.go` — the `Name` address type and its gob registration.
+- `nameserver.go` — the name server (`Serve`) and its `Register`/`Lookup` clients.
+- `nameserver_test.go` — its tests.
 
 ### `runtime/debug/`
 - `log.go` — `LogSender`/`LogReceiver`, decorators that log the values crossing a `Sender`/
@@ -330,7 +334,7 @@ tied to the root module for `runtime/*` imports by the root `go.work` — see "R
 - `pong/main.go` — one `Pong` process's `main`, run once per `Pong` identity with a different
   command-line name each time; resolves only `Ping`, wraps its mailbox and the `Ping` endpoint
   in `runtime/debug`'s logging `Sender`/`Receiver`, then starts `spec.Proc_Pong`.
-- `nameserver/main.go` — runs the `runtime/comm/tcp` name server `ping`/`pong` register with and
+- `nameserver/main.go` — runs the `runtime/comm/nameserver` name server `ping`/`pong` register with and
   resolve each other through.
 - `run.sh` — starts the name server, one `Ping`, and two `Pong`s (`Pong1`, `Pong2`) locally over
   TCP, matching `README.md`'s own "Run" section.
@@ -346,7 +350,7 @@ tied to the root module for `runtime/*` imports by the root `go.work` — see "R
 - `spec/constants.go` — hand-written CONSTANTs `ReplicaSet`/`ClientSet` (`r1`–`r3`,
   `c1`–`c2`) the generated file leaves free, shared here rather than duplicated per `main`.
 - `replica/main.go` — one replica's `main`: CLI flags for identity/bind/name-server address,
-  `runtime/comm/tcp` wiring to resolve every client's mailbox, and `runtime/debug`'s logging
+  `runtime/comm/tcp`/`runtime/comm/nameserver` wiring to resolve every client's mailbox, and `runtime/debug`'s logging
   `Sender`/`Receiver` wrapped around its own mailbox and each resolved client endpoint; all three
   identities run this same binary with a different `-name`.
 - `client/main.go` — one client's `main`, the mirror of `replica/main.go`: resolves every
@@ -354,7 +358,7 @@ tied to the root module for `runtime/*` imports by the root `go.work` — see "R
   `runtime/debug`'s logging wrappers, and runs all four client threads
   (`Get`/`Put`/`Disconnect`/`ClockUpdate`) concurrently; both identities run this same binary with
   a different `-name`.
-- `nameserver/main.go` — runs the `runtime/comm/tcp` name server replicas and clients register
+- `nameserver/main.go` — runs the `runtime/comm/nameserver` name server replicas and clients register
   with and resolve each other through.
 - `run.sh` — starts the name server, three replicas (`r1`–`r3`), and two clients (`c1`–`c2`)
   locally over TCP; runs forever, Ctrl-C stops all of them.
@@ -368,12 +372,12 @@ tied to the root module for `runtime/*` imports by the root `go.work` — see "R
   directive that produces it (gitignored, not part of the tree).
 - `spec/constants.go` — hand-written CONSTANTs `Nodes`/`N`/`Values`/`MaxRound` the generated
   package leaves free, plus `NodeNames`/`ValidNodeName` for `main.go`'s `-name` flag.
-- `main.go` — one node's `main`: CLI flags for identity/bind/name-server address, `runtime/comm/tcp`
-  wiring to reach the other two, and `runtime/debug`'s logging `Sender`/`Receiver` wrapped around
+- `main.go` — one node's `main`: CLI flags for identity/bind/name-server address, `runtime/comm/tcp`/
+  `runtime/comm/nameserver` wiring to reach the other two, and `runtime/debug`'s logging `Sender`/`Receiver` wrapped around
   its own mailbox and each peer endpoint. All three node identities run this same binary with a
   different `-name`.
-- `nameserver/main.go` — runs the `runtime/comm/tcp` name server the nodes register with and
-  resolve each other through.
+- `nameserver/main.go` — runs the `runtime/comm/nameserver` name server the nodes register with
+  and resolve each other through.
 - `run.sh` — starts the name server and all three nodes locally over TCP.
 
 ### `examples/lamport_mutex/`
@@ -386,13 +390,13 @@ tied to the root module for `runtime/*` imports by the root `go.work` — see "R
   directive that produces it (gitignored, not part of the tree).
 - `spec/constants.go` — hand-written CONSTANT `Nodes` the generated package leaves free, plus
   `NodeNames`/`ValidNodeName` for `main.go`'s `-name` flag.
-- `main.go` — one node's `main`: CLI flags for identity/bind/name-server address, `runtime/comm/tcp`
-  wiring to reach every node (including itself — the spec's "try" thread multicasts to the full
+- `main.go` — one node's `main`: CLI flags for identity/bind/name-server address, `runtime/comm/tcp`/
+  `runtime/comm/nameserver` wiring to reach every node (including itself — the spec's "try" thread multicasts to the full
   `Nodes` set), and `runtime/debug`'s logging `Sender`/`Receiver` wrapped around its own mailbox
   and each resolved endpoint. All three node identities run this same binary with a different
   `-name`.
-- `nameserver/main.go` — runs the `runtime/comm/tcp` name server the nodes register with and
-  resolve each other through.
+- `nameserver/main.go` — runs the `runtime/comm/nameserver` name server the nodes register with
+  and resolve each other through.
 - `run.sh` — starts the name server and all three nodes locally over TCP.
 
 ## `persistent/`

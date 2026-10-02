@@ -1,4 +1,12 @@
-package tcp
+// Package nameserver is the rendezvous point through which the processes of one
+// distributed system find each other: a registry mapping each process's stable
+// logical name to the "host:port" it is currently reachable at.
+//
+// Each process registers the address its mailbox bound to under its logical
+// name, and resolves a peer's name to an address before opening an endpoint to
+// it. The registry itself runs as a separate process, served over net/rpc on
+// TCP.
+package nameserver
 
 import (
 	"net"
@@ -7,8 +15,8 @@ import (
 )
 
 // rpcName is the service name the name server registers under and clients call
-// into. It is an implementation detail shared between ServeNameServer and the
-// Register / Lookup helpers.
+// into. It is an implementation detail shared between Serve and the Register /
+// Lookup helpers.
 const rpcName = "NameServer"
 
 // Registration is the argument of a NameServer.Register call: the logical name
@@ -16,7 +24,7 @@ const rpcName = "NameServer"
 //
 // It is exported because net/rpc requires a call's argument type to be.
 type Registration struct {
-	Name string
+	Name Name
 	Addr string
 }
 
@@ -30,7 +38,7 @@ type Registration struct {
 type nameServer struct {
 	mu      sync.Mutex
 	arrived *sync.Cond
-	entries map[string]string
+	entries map[Name]string
 }
 
 // Register records that name is reachable at the given address, replacing any
@@ -45,7 +53,7 @@ func (ns *nameServer) Register(args Registration, _ *struct{}) error {
 
 // Lookup returns the address registered under name, blocking until some process
 // registers it.
-func (ns *nameServer) Lookup(name string, addr *string) error {
+func (ns *nameServer) Lookup(name Name, addr *string) error {
 	ns.mu.Lock()
 	defer ns.mu.Unlock()
 	for {
@@ -57,25 +65,25 @@ func (ns *nameServer) Lookup(name string, addr *string) error {
 	}
 }
 
-// ServeNameServer runs a name server on bind ("host:port") and does not return
-// until its listener fails.
+// Serve runs a name server on bind ("host:port") and does not return until its
+// listener fails.
 //
 // One name server process must be running and reachable before the processes
 // that use it start, since they register and resolve names through it.
-func ServeNameServer(bind string) error {
+func Serve(bind string) error {
 	ln, err := net.Listen("tcp", bind)
 	if err != nil {
 		return err
 	}
-	return serveNameServerOn(ln)
+	return serveOn(ln)
 }
 
-// serveNameServerOn is ServeNameServer once the listener exists, split out so a
-// test can serve on a listener it bound to an arbitrary free port.
-func serveNameServerOn(ln net.Listener) error {
+// serveOn is Serve once the listener exists, split out so a test can serve on a
+// listener it bound to an arbitrary free port.
+func serveOn(ln net.Listener) error {
 	defer ln.Close()
 
-	ns := &nameServer{entries: map[string]string{}}
+	ns := &nameServer{entries: map[Name]string{}}
 	ns.arrived = sync.NewCond(&ns.mu)
 
 	srv := rpc.NewServer()
@@ -89,7 +97,7 @@ func serveNameServerOn(ln net.Listener) error {
 
 // Register tells the name server at nsAddr that name is reachable at addr. It
 // opens a fresh connection for the one call.
-func Register(nsAddr, name, addr string) error {
+func Register(nsAddr string, name Name, addr string) error {
 	client, err := rpc.Dial("tcp", nsAddr)
 	if err != nil {
 		return err
@@ -101,7 +109,7 @@ func Register(nsAddr, name, addr string) error {
 // Lookup asks the name server at nsAddr for the address registered under name.
 // The call does not return until that name has been registered, so a caller may
 // resolve a peer that has not started yet.
-func Lookup(nsAddr, name string) (string, error) {
+func Lookup(nsAddr string, name Name) (string, error) {
 	client, err := rpc.Dial("tcp", nsAddr)
 	if err != nil {
 		return "", err

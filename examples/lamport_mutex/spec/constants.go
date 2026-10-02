@@ -9,24 +9,24 @@ import (
 	"slices"
 
 	"github.com/mesabloo/fugue/runtime/comm"
-	"github.com/mesabloo/fugue/runtime/comm/tcp"
+	"github.com/mesabloo/fugue/runtime/comm/nameserver"
 	"github.com/mesabloo/fugue/runtime/tlaplus"
 )
 
-// NodeNames is Nodes spelled out as the logical names (comm/tcp.Name values) each node
-// process registers with the name server under; ../main.go's -name flag picks one.
-var NodeNames = []string{"n1", "n2", "n3"}
+// NodeNames is Nodes spelled out as the logical names each node process registers with the
+// name server under; ../main.go's -name flag picks one.
+var NodeNames = []nameserver.Name{"n1", "n2", "n3"}
 
 // Nodes is LamportMutex.tla's CONSTANT Nodes.
 var Nodes = tlaplus.MkSet(comm.AddressOrd, namesToAddresses(NodeNames)...)
 
-func namesToAddresses(names []string) []comm.Address {
+func namesToAddresses(names []nameserver.Name) []comm.Address {
 	addrs := make([]comm.Address, len(names))
 	for i, n := range names {
-		addrs[i] = tcp.Name(n)
+		addrs[i] = n
 	}
 	return addrs
 }
 
 // ValidNodeName reports whether name is one of NodeNames.
-func ValidNodeName(name string) bool { return slices.Contains(NodeNames, name) }
+func ValidNodeName(name nameserver.Name) bool { return slices.Contains(NodeNames, name) }

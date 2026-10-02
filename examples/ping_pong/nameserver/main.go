@@ -1,6 +1,6 @@
 // Command nameserver runs the rendezvous point the PingPongs example's Ping
 // and Pong processes register with and resolve each other through; see
-// ../ping, ../pong, and runtime/comm/tcp.ServeNameServer.
+// ../ping, ../pong, and runtime/comm/nameserver.Serve.
 //
 // Usage: nameserver <bind-addr>
 package main
@@ -9,7 +9,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/mesabloo/fugue/runtime/comm/tcp"
+	"github.com/mesabloo/fugue/runtime/comm/nameserver"
 )
 
 func main() {
@@ -19,7 +19,7 @@ func main() {
 	bind := os.Args[1]
 
 	log.Printf("name server listening on %s", bind)
-	if err := tcp.ServeNameServer(bind); err != nil {
+	if err := nameserver.Serve(bind); err != nil {
 		log.Fatal(err)
 	}
 }

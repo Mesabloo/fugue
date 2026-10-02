@@ -10,13 +10,13 @@ import (
 	"slices"
 
 	"github.com/mesabloo/fugue/runtime/comm"
-	"github.com/mesabloo/fugue/runtime/comm/tcp"
+	"github.com/mesabloo/fugue/runtime/comm/nameserver"
 	"github.com/mesabloo/fugue/runtime/tlaplus"
 )
 
-// NodeNames is Nodes spelled out as the logical names (comm/tcp.Name values) each node
-// process registers with the name server under; ../main.go's -name flag picks one.
-var NodeNames = []string{"n1", "n2", "n3"}
+// NodeNames is Nodes spelled out as the logical names each node process registers with the
+// name server under; ../main.go's -name flag picks one.
+var NodeNames = []nameserver.Name{"n1", "n2", "n3"}
 
 // N is Paxos.tla's CONSTANT N.
 var N tlaplus.Int = tlaplus.MkInt(len(NodeNames))
@@ -26,7 +26,7 @@ var N tlaplus.Int = tlaplus.MkInt(len(NodeNames))
 var Values = tlaplus.MkSet(tlaplus.StrOrd, tlaplus.Str("red"), tlaplus.Str("green"), tlaplus.Str("blue"))
 
 // Nodes is Paxos.tla's CONSTANT Nodes. It holds logical identities
-// (comm/tcp.Name values), kept apart from the "host:port" each process
+// (nameserver.Name values), kept apart from the "host:port" each process
 // actually binds to — the name server bridges the two at Register/Lookup
 // time, not here, so this can be built once at package init.
 var Nodes = tlaplus.MkSet(comm.AddressOrd, namesToAddresses(NodeNames)...)
@@ -34,13 +34,13 @@ var Nodes = tlaplus.MkSet(comm.AddressOrd, namesToAddresses(NodeNames)...)
 // MaxRound is Paxos.tla's CONSTANT MaxRound, the upper bound on ballot round numbers.
 var MaxRound tlaplus.Int = tlaplus.MkInt(1000)
 
-func namesToAddresses(names []string) []comm.Address {
+func namesToAddresses(names []nameserver.Name) []comm.Address {
 	addrs := make([]comm.Address, len(names))
 	for i, n := range names {
-		addrs[i] = tcp.Name(n)
+		addrs[i] = n
 	}
 	return addrs
 }
 
 // ValidNodeName reports whether name is one of NodeNames.
-func ValidNodeName(name string) bool { return slices.Contains(NodeNames, name) }
+func ValidNodeName(name nameserver.Name) bool { return slices.Contains(NodeNames, name) }

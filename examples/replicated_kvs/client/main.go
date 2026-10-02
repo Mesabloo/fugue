@@ -1,7 +1,7 @@
 // Command client runs one client of ReplicatedKVS.tla as a standalone OS process, running
 // all four of the client's threads (Get-loop, Put-loop, Disconnect, ClockUpdate-loop, see
 // ReplicatedKVS.tla's file header) concurrently and reachable by replicas over TCP through
-// the name-server-mediated wiring in runtime/comm/tcp; see ../README.md. -name picks which
+// runtime/comm/tcp endpoints resolved via runtime/comm/nameserver; see ../README.md. -name picks which
 // of spec.ClientNames this process is.
 //
 // Usage: client -name <c1|c2> [-bind addr] [-ns addr]
@@ -13,6 +13,7 @@ import (
 
 	"github.com/mesabloo/fugue/examples/replicated_kvs/spec"
 	"github.com/mesabloo/fugue/runtime/comm"
+	"github.com/mesabloo/fugue/runtime/comm/nameserver"
 	"github.com/mesabloo/fugue/runtime/comm/tcp"
 	"github.com/mesabloo/fugue/runtime/debug"
 	"github.com/mesabloo/fugue/runtime/tlaplus"
@@ -41,17 +42,17 @@ func main() {
 	ns := flag.String("ns", "127.0.0.1:9000", "name server address")
 	flag.Parse()
 
-	if !spec.ValidClientName(*name) {
+	self := nameserver.Name(*name)
+	if !spec.ValidClientName(self) {
 		log.Fatalf("-name must be one of %v, got %q", spec.ClientNames, *name)
 	}
-	self := tcp.Name(*name)
 
 	rawMailbox, addr, err := tcp.Listen[responseMsg](*bind)
 	if err != nil {
 		log.Fatalf("listen on %s: %v", *bind, err)
 	}
 	mailbox := debug.LogReceiver(self, rawMailbox)
-	if err := tcp.Register(*ns, *name, addr); err != nil {
+	if err := nameserver.Register(*ns, self, addr); err != nil {
 		log.Fatalf("register %s with name server at %s: %v", *name, *ns, err)
 	}
 	log.Printf("%s: listening on %s, registered with name server at %s", *name, addr, *ns)
@@ -61,11 +62,11 @@ func main() {
 	// sends to another client, so ClientMailboxes is left nil.
 	replicasNetwork := map[comm.Address]comm.Sender[requestMsg]{}
 	for _, r := range spec.ReplicaNames {
-		peer, err := tcp.Lookup(*ns, r)
+		peer, err := nameserver.Lookup(*ns, r)
 		if err != nil {
 			log.Fatalf("lookup replica %s: %v", r, err)
 		}
-		replicasNetwork[tcp.Name(r)] = debug.LogSender(self, tcp.Name(r), tcp.Dial[requestMsg](peer))
+		replicasNetwork[r] = debug.LogSender(self, r, tcp.Dial[requestMsg](peer))
 		log.Printf("%s: resolved replica %s at %s", *name, r, peer)
 	}
 

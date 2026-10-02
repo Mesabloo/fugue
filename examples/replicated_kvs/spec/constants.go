@@ -10,15 +10,15 @@ import (
 	"slices"
 
 	"github.com/mesabloo/fugue/runtime/comm"
-	"github.com/mesabloo/fugue/runtime/comm/tcp"
+	"github.com/mesabloo/fugue/runtime/comm/nameserver"
 	"github.com/mesabloo/fugue/runtime/tlaplus"
 )
 
-// ReplicaNames and ClientNames are ReplicaSet/ClientSet spelled out as the logical names
-// (comm/tcp.Name values) each replica/client process registers with the name server under;
-// replica/main.go's and client/main.go's -name flag picks one.
-var ReplicaNames = []string{"r1", "r2", "r3"}
-var ClientNames = []string{"c1", "c2"}
+// ReplicaNames and ClientNames are ReplicaSet/ClientSet spelled out as the logical names each
+// replica/client process registers with the name server under; replica/main.go's and
+// client/main.go's -name flag picks one.
+var ReplicaNames = []nameserver.Name{"r1", "r2", "r3"}
+var ClientNames = []nameserver.Name{"c1", "c2"}
 
 // ReplicaSet is ReplicatedKVS.tla's CONSTANT ReplicaSet.
 var ReplicaSet = tlaplus.MkSet(comm.AddressOrd, namesToAddresses(ReplicaNames)...)
@@ -30,16 +30,16 @@ var ClientSet = tlaplus.MkSet(comm.AddressOrd, namesToAddresses(ClientNames)...)
 // Lamport clock before it disconnects.
 var MaxClock tlaplus.Int = tlaplus.MkInt(100)
 
-func namesToAddresses(names []string) []comm.Address {
+func namesToAddresses(names []nameserver.Name) []comm.Address {
 	addrs := make([]comm.Address, len(names))
 	for i, n := range names {
-		addrs[i] = tcp.Name(n)
+		addrs[i] = n
 	}
 	return addrs
 }
 
 // ValidReplicaName reports whether name is one of ReplicaNames.
-func ValidReplicaName(name string) bool { return slices.Contains(ReplicaNames, name) }
+func ValidReplicaName(name nameserver.Name) bool { return slices.Contains(ReplicaNames, name) }
 
 // ValidClientName reports whether name is one of ClientNames.
-func ValidClientName(name string) bool { return slices.Contains(ClientNames, name) }
+func ValidClientName(name nameserver.Name) bool { return slices.Contains(ClientNames, name) }

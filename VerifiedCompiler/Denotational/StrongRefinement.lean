@@ -511,8 +511,7 @@ namespace StrongRefinement
             ((nextp i (σs i)).1 = σs i ∧ (nextp i (σs i)).2 = 1))
         rw [hnext]
         obtain hm' | ⟨hR, hone, -⟩ := h
-        · absurd hm
-          exact hm'
+        · contradiction
         · rw [hone]
           exact ⟨hR, T.Rτ_one, .inr ⟨rfl, rfl⟩⟩
 
