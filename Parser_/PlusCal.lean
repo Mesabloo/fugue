@@ -98,9 +98,21 @@ namespace SurfacePlusCal.Lexer
     patchTLALexer lexTLAToken,
   ]
 
-  /-- Lex a full algorithm, until `*)` is reached (but not consumed). -/
-  def lexAlgorithm (lexTLAToken : Unit → PlusCalLexer (Located Token)) : PlusCalLexer (Array (Located Token)) := do
-    Prod.fst <$> takeUntil (lookAhead <| takeMany1 (withBacktracking <| char '*') <* char ')') (lexeme <| lexToken lexTLAToken)
+  /-- Lex a full algorithm, up to and including the `}` closing its body, so that text after it in
+  the enclosing comment is never lexed. Stops early, without consuming it, at a `*)` reached before
+  that `}`, leaving the parser to report the unclosed body. -/
+  partial def lexAlgorithm (lexTLAToken : Unit → PlusCalLexer (Located Token)) : PlusCalLexer (Array (Located Token)) :=
+    go #[] 0
+  where
+    go (acc : Array (Located Token)) (depth : Nat) : PlusCalLexer (Array (Located Token)) := do
+      if ← test (lookAhead <| takeMany1 (withBacktracking <| char '*') <* char ')') then
+        return acc
+      let tk ← lexeme <| lexToken lexTLAToken
+      let acc := acc.push tk
+      match tk with
+      | ⟨_, .tla .lbrace⟩ => go acc (depth + 1)
+      | ⟨_, .tla .rbrace⟩ => if depth ≤ 1 then return acc else go acc (depth - 1)
+      | _ => go acc depth
 end SurfacePlusCal.Lexer
 
 namespace SurfacePlusCal.Parser

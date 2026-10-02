@@ -221,7 +221,8 @@ fixture suite (§2).
 
 ### 5.1 Lexing & parsing
 **Input:** raw TLA+ module source (`.tla`), embedded Distributed PlusCal algorithm inside a
-`(* --algorithm ... *)` comment block, plus `@type`/`@mailbox` annotations in comments
+`(* --algorithm ... *)` comment block (free text allowed before `--algorithm` and after
+algorithm's closing `}`; nested comments never hold algorithm), plus `@type`/`@mailbox` annotations in comments
 (annotation style: Ping-Pong listing, thesis §8.6).
 **Output:** `SurfaceTLAPlus.Module` wrapping a `SurfacePlusCal.Algorithm`.
 

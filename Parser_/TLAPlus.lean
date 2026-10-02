@@ -202,24 +202,25 @@ namespace SurfaceTLAPlus.Lexer
 
     private partial def blockComment (lexTLAToken : TLAPlusLexer (Located (Token (Located SurfacePlusCal.Token)))) (inner : Bool := false) : TLAPlusLexer (Token (Located SurfacePlusCal.Token)) := do
       let _ ← chars "(*"
-      unless inner do
-        let isAlg ← test <| lookAhead do
-          -- Assumes the comment starts directly with the algorithm, not other content.
-          let _ ← takeMany (withBacktracking <| lexeme <| char '*')
-          let _ ← chars "--"
-          let _ ← eoption (withBacktracking (chars "fair") <* takeMany1 (withBacktracking <| Unicode.whitespace))
-          let _ ← chars "algorithm"
-          pure ()
-        if isAlg then
-          let _ ← takeMany (lexeme <| withBacktracking <| char '*')
-          let alg ← lexeme <| SurfacePlusCal.Lexer.lexAlgorithm λ () ↦ ((SurfacePlusCal.Token.tla ∘ (Located.data <$> ·)) <$> ·) <$> lexTLAToken
-          let _ ← lexeme <| takeMany1 (withBacktracking <| char '*') <* char ')'
-          return Token.pcal alg.toList
-      let ⟨chars, _⟩ ← takeUntil (chars "*)") <| first [
+      -- Text before `--algorithm`/`--fair algorithm` and after the algorithm's closing `}` is
+      -- free-form; a nested comment never holds an algorithm.
+      let algStop := if inner then [] else [true <$ lookAhead algorithmStart]
+      let ⟨text, isAlg⟩ ← takeUntil (first <| (false <$ chars "*)") :: algStop) commentChunk
+      if isAlg then
+        let alg ← lexeme <| SurfacePlusCal.Lexer.lexAlgorithm λ () ↦ ((SurfacePlusCal.Token.tla ∘ (Located.data <$> ·)) <$> ·) <$> lexTLAToken
+        let _ ← takeUntil (chars "*)") commentChunk
+        return Token.pcal alg.toList
+      return .blockComment (text.foldl (init := "") (· ++ ·))
+    where
+      algorithmStart : TLAPlusLexer Unit := do
+        let _ ← chars "--"
+        let _ ← eoption (withBacktracking (chars "fair") <* takeMany1 (withBacktracking <| Unicode.whitespace))
+        let _ ← chars "algorithm"
+      /-- One character of comment text, or a whole nested comment. -/
+      commentChunk : TLAPlusLexer String := first [
         (λ | .blockComment cs => cs | _ => unreachable!) <$> blockComment lexTLAToken (inner := true),
         String.singleton <$> anyToken
       ]
-      return .blockComment (chars.foldl (init := "") (· ++ ·))
 
     -- TODO(numerals): support binary, octal and hexadecimal literals.
     private def number {α} : TLAPlusLexer (Token α) :=
