@@ -14,74 +14,6 @@ open scoped UniformConvergence Domain
   Go-specific semantics, built on the domain theory of `Domains.lean`/`Operations.lean`.
 -/
 
-open Classical in
-/-- `Go.Typ`'s equality, decided classically: nothing in the compiler pipeline computes it, it
-exists only to satisfy `IMetricSpace.discrete`'s constraint below. -/
-noncomputable instance : DecidableEq Go.Typ := λ a b ↦ propDecidable (a = b)
-
-/-- `Go.Typ`'s metric: discrete, since `Value.𝕍`'s `Typ` parameter is opaque throughout
-`Domains.lean` — nothing there inspects which two types are equal, only whether they are. -/
-noncomputable instance : DiscreteIMetricSpace Go.Typ where
-  __ := IMetricSpace.discrete
-
-instance : CompleteSpace Go.Typ := DiscreteIMetricSpace.completeSpace
-
-theorem ENNReal.toReal_two : ENNReal.toReal 2 = 2 := rfl
-
-abbrev Address : Type := PUnit ⊕ PUnit ⊕ ℕ
-
-abbrev nil : Address := .inl .unit
-abbrev dummy : Address := .inr (.inl .unit)
-instance : Coe ℕ Address := ⟨λ x ↦ .inr (.inr x)⟩
-
-def Channel := ℕ × Go.Typ
-
-open Classical in
-noncomputable instance : DecidableEq Channel := λ a b ↦ propDecidable (a = b)
-
-noncomputable instance : DiscreteIMetricSpace Channel where
-  __ := IMetricSpace.discrete
-instance : CompleteSpace Channel := DiscreteIMetricSpace.completeSpace
-
--- TODO(go-semantics): define `Store` mutually with `𝕍` instead of axiomatizing it.
-axiom Store : NonemptyType.{0}
-
-instance : Nonempty Store.type := Store.property
-
-@[instance]
-axiom Store_metricspace : IMetricSpace Store.type
-
-@[instance]
-axiom Store_ultrametricspace : IsUltrametricIDist Store.type
-
-@[instance]
-axiom Store_completespace : CompleteSpace Store.type
-
-open Classical in
-axiom Store_iso :
-  Store.type ≃ᵢ (Address →ᵤ Option (Value.𝕍 Store.type Channel Address Go.Typ).type) × List (String →ᵤ Option Address)
-
-noncomputable def Store.type.h : Store.type → Address → Option (Value.𝕍 Store.type Channel Address Go.Typ).type :=
-  Prod.fst ∘ ⇑Store_iso
-
-noncomputable def Store.type.ϙ : Store.type → List (String → Option Address) :=
-  Prod.snd ∘ ⇑Store_iso
-
-open Classical in
-noncomputable def Store.popϙ (σ : Store.type) : Option Store.type := match Store.type.ϙ σ with
-  | [] => .none
-  | _ :: ϙ => .some (⇑Store_iso.symm ⟨Store.type.h σ, ϙ⟩)
-
-noncomputable def Store.deref (σ : Store.type) (addr : Address) : Option (Value.𝕍 Store.type Channel Address Go.Typ).type :=
-  Store.type.h σ addr
-
-open Classical in
-noncomputable def Store.update (σ : Store.type) (addr : Address) (v : (Value.𝕍 Store.type Channel Address Go.Typ).type) : Option Store.type :=
-  -- Check that the address is allocated
-  Store.deref σ addr |>.bind λ _ ↦
-    let h' := Function.update (Store.type.h σ) addr (.some v)
-    pure (Store_iso.symm (h', Store.type.ϙ σ))
-
 noncomputable section
   open scoped Domain
 
@@ -116,7 +48,7 @@ noncomputable section
       v
 
   def array {α} (v : (Value.𝕍 Store.type Channel Address Go.Typ).type) (default : α)
-    (f : (n : ℕ) → (Fin n →ᵤ Address) → α) :
+    (f : (n : ℕ) → (Fin n →ᵤ (Value.𝕍 Store.type Channel Address Go.Typ).type) → α) :
       α :=
     Value.𝕍.casesOn (motive := λ _ ↦ α)
       (λ _ ↦ default)
@@ -189,7 +121,14 @@ noncomputable section
 
     theorem guard.is_branch {ξ ς e} : ∃ f, guard ξ ς e = Domain.branch f := by
       unfold guard
-      admit
+      apply Domain.bind_branch' (K := 1)
+      · rfl
+      · apply LipschitzWith.of_idist_le
+        intros v₁ v₂
+        rw [UniformFun.idist_eq_iSup]
+        admit
+      ·
+        admit
 
     def deref (σ : Store.type) (addr : Address) :
         Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) (Value.𝕍 Store.type Channel Address Go.Typ).type :=
@@ -211,6 +150,8 @@ noncomputable section
     protected def denotation (out : Channel) (ξ : List Channel) (ς : String → Option Channel) :
         List ComputableGo.Statement → Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) PUnit
       | [] => .branch λ σ ↦ {.next σ { val := .pure .unit }}
+      | .skip :: ss => Go.Statement.denotation out ξ ς ss ⬰ Domain.branch λ σ ↦ {.next σ ⟨Domain.pure .unit⟩}
+      | .expr e :: ss => Go.Statement.denotation out ξ ς ss ⬰ ((λ _ ↦ .unit) <$> Go.Expression.denotation ξ ς e)
       | .panic e :: ss => Go.Statement.denotation out ξ ς ss ⬰ (Go.Expression.denotation ξ ς e >>= λ _ ↦ Domain.abort)
       | .return es :: ss => match ss with
         | [] => match ξ with
@@ -222,8 +163,8 @@ noncomputable section
               else
                 .abort
             }}
-          | [] => .branch λ σ ↦ {.next σ { val := .abort }}
-        | _ => .branch λ σ ↦ {.next σ { val := .abort }}
+          | [] => .branch λ σ ↦ {.next σ { val := .abort }} -- empty call stack
+        | _ => .branch λ σ ↦ {.next σ { val := .abort }} -- some statements after a `return`
       | .print e :: ss =>
         Go.Statement.denotation out ξ ς ss ⬰ (Go.Expression.denotation ξ ς e >>= λ v ↦
           if h : Value.𝕍_isSend v then
@@ -235,31 +176,93 @@ noncomputable section
       | .for e S :: ss =>
         Go.Statement.denotation out ξ ς ss ⬰ Filter.lim (Filter.atTop.map (for_seq ξ ς e (Go.Statement.denotation out ξ ς S)))
       | .go S :: ss => (λ _ ↦ PUnit.unit) <$> (Go.Statement.denotation out ξ ς S ∥ Go.Statement.denotation out ξ ς ss)
-      | .send c e :: ss =>
-        Go.Expression.denotation ξ ς e >>= λ v ↦
-        Go.Expression.denotation ξ ς c >>= λ c ↦
+      | .var x τ :: ss =>
         Go.Statement.denotation out ξ ς ss ⬰ Domain.branch λ σ ↦
-          channel c (default := {.next σ { val := .abort }})
-            (λ len' τ buf closed? ↦
-              match (Store.deref σ closed?).bind λ closed? ↦ (Store.deref σ len').bind λ len ↦ (Store.deref σ buf).bind λ buf ↦ pure (closed?, len, buf) with
-              | .none => {.next σ { val := .abort }}
-              | .some (closed?, len, buf) =>
-                boolean closed? (default := {.next σ { val := .abort }})
-                  λ closed? ↦ integer len (default := {.next σ { val := .abort }})
-                  λ len ↦ array buf (default := {.next σ { val := .abort }})
-                  λ cap indices ↦
-                    if h : closed? ∧ len ≥ 0 ∧ len < cap then
-                      let i : Fin cap := ⟨len.toNat, propext (Int.toNat_lt h.2.1) ▸ h.2.2⟩
-                      let σ' := Store.update σ (indices i) v |>.bind λ σ ↦ Store.update σ len' (Value.𝕍.int <| len + 1)
-                      match σ' with
-                      | .some σ' => {.next σ' { val := .pure .unit }}
-                      | .none => {.next σ { val := .abort }}
-                    else if closed? ∧ len ≥ cap then
-                      ∅
-                    else
-                      {.next σ { val := .abort }}
-            )
-      | _ => sorry
+        if ∃ h : (Store.type.ϙ σ).length > 0, (Store.type.ϙ σ)[(Store.type.ϙ σ).length - 1] x matches .none then
+          let ⟨σ', v⟩ := zero σ τ
+          if let .some σ' := Store.newVar σ' x v.to𝕍 then
+            {.next σ' ⟨Domain.pure .unit⟩}
+          else
+            {.next σ ⟨Domain.abort⟩}
+        else
+          {.next σ ⟨Domain.abort⟩}
+      | .assign r e :: ss => sorry
+      | .make c τ cap :: ss => sorry
+      | .send c e :: ss =>
+        let async : Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) PUnit :=
+          Go.Expression.denotation ξ ς e >>= λ v ↦
+          Go.Expression.denotation ξ ς c >>= λ c ↦
+          Domain.branch λ σ ↦
+            channel c (default := {.next σ { val := .abort }})
+              (λ len' τ buf closed? ↦
+                match (Store.deref σ closed?).bind λ closed? ↦ (Store.deref σ len').bind λ len ↦ (Store.deref σ buf).bind λ buf ↦ pure (closed?, len, buf) with
+                | .none => {.next σ { val := .abort }}
+                | .some (closed?, len, buf') =>
+                  boolean closed? (default := {.next σ { val := .abort }})
+                    λ closed? ↦ integer len (default := {.next σ { val := .abort }})
+                    λ len ↦ array buf' (default := {.next σ { val := .abort }})
+                    λ cap indices ↦
+                      if h : closed? ∧ len ≥ 0 ∧ len < cap then
+                        let i : Fin cap := ⟨len.toNat, propext (Int.toNat_lt h.2.1) ▸ h.2.2⟩
+                        let σ' := Store.update σ buf (Value.𝕍.array cap (Function.update indices i v)) |>.bind λ σ ↦ Store.update σ len' (Value.𝕍.int <| len + 1)
+                        match σ' with
+                        | .some σ' => {.next σ' { val := .pure .unit }}
+                        | .none => {.next σ { val := .abort }}
+                      else if closed? ∧ len ≥ cap then
+                        ∅
+                      else
+                        {.next σ { val := .abort }}
+              )
+
+        Go.Statement.denotation out ξ ς ss ⬰ if let .var x := c then
+          if let .some c := ς x then
+            -- Synchronous case
+            Go.Expression.denotation ξ ς e >>= λ v ↦
+            Domain.branch λ σ ↦
+            if h : Value.𝕍_isSend v then
+              {.send c (Value.𝕍_extract v h) ⟨Domain.pure .unit⟩}
+            else
+              {.next σ ⟨Domain.abort⟩}
+          else
+            -- Asynchronous case
+            async
+        else
+          -- Asynchronous case
+          async
+      | .receive c r ok :: ss => sorry
+      | .close c :: ss =>
+        let async : Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) PUnit :=
+          Go.Expression.denotation ξ ς c >>= λ c ↦
+          Domain.branch λ σ ↦
+            channel c (default := {.next σ { val := .abort }})
+              (λ len' τ buf closed? ↦
+                match (Store.deref σ closed?).bind λ closed? ↦ (Store.deref σ len').bind λ len ↦ (Store.deref σ buf).bind λ buf ↦ pure (closed?, len, buf) with
+                | .none => {.next σ { val := .abort }}
+                | .some (closed?', len, buf) =>
+                  boolean closed?' (default := {.next σ { val := .abort }})
+                    λ closed?' ↦ integer len (default := {.next σ { val := .abort }})
+                    λ len ↦ array buf (default := {.next σ { val := .abort }})
+                    λ cap indices ↦
+                      if h : ¬closed?' ∧ cap > 0 then
+                        match Store.update σ closed? (Value.𝕍.bool true) with
+                        | .some σ' => {.next σ' { val := .pure .unit }}
+                        | .none => {.next σ { val := .abort }}
+                      else -- if closed? ∨ cap = 0 then
+                        {.next σ { val := .abort }}
+              )
+
+        Go.Statement.denotation out ξ ς ss ⬰ if let .var x := c then
+          if let .some c := ς x then
+            -- Synchronous case
+            Domain.branch λ σ ↦ {.close c ⟨Domain.pure .unit⟩}
+          else
+            -- Asynchronous case
+            async
+        else
+          -- Asynchronous case
+          async
+      | .switch e «cases» defaul :: ss => sorry
+      | .select «cases» defaul :: ss => sorry
 
       theorem for_seq_F_nonexpansive {ξ ς e q} :
           ∀ p p', edist (for_seq_F ξ ς e q p) (for_seq_F ξ ς e q p') ≤ (1/2) * edist p p' := by

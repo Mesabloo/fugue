@@ -19,6 +19,9 @@ import Extra.Set
 import Extra.Prop
 public import Mathlib.Topology.MetricSpace.Ultra.Basic
 public import Mathlib.Topology.Algebra.Monoid.Defs
+public import Mathlib.Topology.LocallyConstant.Basic
+import Mathlib.Data.Set.Image
+public import Core.Go.Syntax
 -- import Mathlib.Data.Part
 
 @[expose] public section
@@ -1459,21 +1462,34 @@ noncomputable section Domain
         change IMetric.hausdorffIDist (closure _) (closure _) = _
         rw [IMetric.hausdorffIDist_closure]
 
+      theorem Domain.idist_abort_branch {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (Domain «Σ» Γ α β))} :
+          idist Domain.abort (Domain.branch f) = ⊤ := by
+        unfold Domain.abort Domain.branch
+        rw [Isometry.to_idist_eq (IsometryEquiv.isometry _)]
+
+      theorem Domain.idist_branch_abort {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (Domain «Σ» Γ α β))} :
+          idist (Domain.branch f) Domain.abort = ⊤ := by
+        rw [idist_comm, Domain.idist_abort_branch]
+
       instance : Nonempty (Domain «Σ» Γ α β) := .intro .abort
 
-      theorem Domain.isOpen_singleton_abort :
-          IsOpen {Domain.abort («Σ» := «Σ») (Γ := Γ) (α := α) (β := β)} := by
-        unfold Domain.abort
-        rw [← IsometryEquiv.coe_toHomeomorph_symm, ← Set.image_singleton, Homeomorph.isOpen_image,
-            isOpen_sum_iff, isOpen_sum_iff]
+      omit [CompleteSpace «Σ»] [CompleteSpace Γ] [CompleteSpace α] [CompleteSpace β] in
+      theorem Domain.isOpen_singleton_abort' :
+          IsOpen {(Sum.inr (Sum.inl .unit) : β ⊕ PUnit.{x + 1} ⊕ («Σ» →ᵤ Closeds (Branch «Σ» Γ α (Domain «Σ» Γ α β))))} := by
+        rw [isOpen_sum_iff, isOpen_sum_iff]
         and_intros
         · convert isOpen_empty
           grind only [= Set.mem_empty_iff_false, = Set.mem_preimage, = Set.mem_singleton_iff]
         · convert isOpen_discrete {PUnit.unit}
-          · rfl
-          · grind only [= Set.mem_singleton_iff, = Set.mem_preimage]
+          grind only [= Set.mem_singleton_iff, = Set.mem_preimage]
         · convert isOpen_empty
           grind only [= Set.mem_empty_iff_false, = Set.mem_preimage, = Set.mem_singleton_iff]
+
+      theorem Domain.isOpen_singleton_abort :
+          IsOpen {Domain.abort («Σ» := «Σ») (Γ := Γ) (α := α) (β := β)} := by
+        unfold Domain.abort
+        rw [← IsometryEquiv.coe_toHomeomorph_symm, ← Set.image_singleton, Homeomorph.isOpen_image]
+        apply Domain.isOpen_singleton_abort'
 
       theorem Domain.exists_abort_eq :
           ∃ n, (Domain.abort : Domain «Σ» Γ α β) = UniformSpace.Completion.coe' (DomainUnion.mk (n := n) IterativeDomain.abort) := by
@@ -1564,9 +1580,9 @@ noncomputable section Domain
       | str (s : String)
       | slice (cap low high : ℕ) (arr : ℍ)
       | chan (len : ℍ) (τ : Typ) (arr closed? : ℍ)
-      | struct (fields : AList λ _ : String ↦ ℍ)
-      | array (len : ℕ) (indices : Fin len → ℍ)
-      | map (fields : List (Sigma λ _ : Send𝕍 ↦ ℍ)) (nil : Bool)
+      | struct (fields : List (String × Send𝕍))
+      | array (len : ℕ) (indices : Fin len → Send𝕍)
+      | map (fields : List (Send𝕍 × ℍ)) (nil : Bool)
       | tuple (fields : List Send𝕍)
 
     instance : DecidableEq (Send𝕍 ℍ Typ) :=
@@ -1589,9 +1605,9 @@ noncomputable section Domain
       -- chan
       ⊕ ℍ × Typ × ℍ × ℍ
       -- struct
-      ⊕ (String →ᵤ Option ℍ)
+      ⊕ (String →ᵤ Option 𝕍)
       -- array
-      ⊕ (Σ n : ℕ, Fin n →ᵤ ℍ)
+      ⊕ (Σ n : ℕ, Fin n →ᵤ 𝕍)
       -- map
       ⊕ (Restriction 𝕍 unitInterval.half →ᵤ Option ℍ) × Bool
       -- func
@@ -1659,10 +1675,10 @@ noncomputable section Domain
     def 𝕍.chan (length : ℍ) (τ : Typ) (array closed : ℍ) : (𝕍 «Σ» Γ ℍ Typ).type :=
       𝕍_iso.symm (.inr <| .inr <| .inr <| .inr <| .inl ⟨length, τ, array, closed⟩)
 
-    def 𝕍.struct (fields : String →ᵤ Option ℍ) : (𝕍 «Σ» Γ ℍ Typ).type :=
+    def 𝕍.struct (fields : String →ᵤ Option (𝕍 «Σ» Γ ℍ Typ).type) : (𝕍 «Σ» Γ ℍ Typ).type :=
       𝕍_iso.symm (.inr <| .inr <| .inr <| .inr <| .inr <| .inl fields)
 
-    def 𝕍.array (len : ℕ) (indices : Fin len →ᵤ ℍ) : (𝕍 «Σ» Γ ℍ Typ).type :=
+    def 𝕍.array (len : ℕ) (indices : Fin len →ᵤ (𝕍 «Σ» Γ ℍ Typ).type) : (𝕍 «Σ» Γ ℍ Typ).type :=
       𝕍_iso.symm (.inr <| .inr <| .inr <| .inr <| .inr <| .inr <| .inl ⟨len, indices⟩)
 
     def 𝕍.map (maps : (𝕍 «Σ» Γ ℍ Typ).type →ᵤ Option ℍ) (isNil : Bool) : (𝕍 «Σ» Γ ℍ Typ).type :=
@@ -1676,6 +1692,47 @@ noncomputable section Domain
 
 
     axiom 𝕍_isSend.tuple {vs : List (𝕍 «Σ» Γ ℍ Typ).type} (h : ∀ v ∈ vs, 𝕍_isSend v) : 𝕍_isSend (𝕍.tuple vs)
+
+    noncomputable def Send𝕍.to𝕍 : Send𝕍 ℍ Typ → (𝕍 «Σ» Γ ℍ Typ).type :=
+      Send𝕍.rec
+        (motive_1 := λ _ ↦ (𝕍 «Σ» Γ ℍ Typ).type) (motive_2 := λ _ ↦ List (String × (𝕍 «Σ» Γ ℍ Typ).type)) (motive_3 := λ _ ↦ List ((𝕍 «Σ» Γ ℍ Typ).type × ℍ))
+        (motive_4 := λ _ ↦ List (𝕍 «Σ» Γ ℍ Typ).type) (motive_5 := λ _ ↦ (𝕍 «Σ» Γ ℍ Typ).type) (motive_6 := λ _ ↦ (𝕍 «Σ» Γ ℍ Typ).type)
+        (λ b ↦ 𝕍.bool b)
+        (λ n ↦ 𝕍.int n)
+        (λ s ↦ 𝕍.str s)
+        (λ len low high arr ↦ 𝕍.slice len low high arr)
+        (λ len τ arr closed? ↦ 𝕍.chan len τ arr closed?)
+        (λ _ fs ↦ 𝕍.struct λ x ↦ List.lookup x fs)
+        (λ len _ idx ↦ 𝕍.array len idx)
+        (λ _ isNil fs ↦ 𝕍.map (λ x ↦ List.lookup x fs) isNil)
+        (λ _ vs ↦ 𝕍.tuple vs)
+        []
+        (λ ⟨x, _⟩ _ v vs ↦ ⟨x, v⟩ :: vs)
+        []
+        (λ ⟨_, h⟩ _ v vs ↦ ⟨v, h⟩ :: vs)
+        []
+        (λ _ _ v vs ↦ v :: vs)
+        (λ _ _ v ↦ v)
+        (λ _ _ v ↦ v)
+
+    /- def Send𝕍.to𝕍 : Send𝕍 ℍ Typ → (𝕍 «Σ» Γ ℍ Typ).type
+     -   | .bool b => 𝕍.bool b
+     -   | .int n => 𝕍.int n
+     -   | .str s => 𝕍.str s
+     -   | .slice len low high arr => 𝕍.slice len low high arr
+     -   | .chan len τ arr closed? => 𝕍.chan len τ arr closed?
+     -   | .struct fs => 𝕍.struct λ x ↦ Option.map (λ ⟨x, _⟩ ↦ Send𝕍.to𝕍 x) <| Option.attach <| List.lookup x fs
+     -     -- TODO: how to turn this into structuram recursion without turning the list int oa function?
+     -   | .array len idx => 𝕍.array len (λ i ↦ Send𝕍.to𝕍 (idx i))
+     -   | .map fs isNil => 𝕍.map (λ v ↦ if h : 𝕍_isSend v then List.lookup (𝕍_extract _ h) fs else failure) isNil
+     -   | .tuple vs => 𝕍.tuple (vs.attach.map λ ⟨x, _⟩ ↦ Send𝕍.to𝕍 x) -/
+    /- termination_by v => v
+     - decreasing_by
+     -   ·
+     -     admit
+     -   ·
+     -     admit
+     -   · decreasing_trivial  -/
 
 
     @[cases_eliminator]
@@ -1748,5 +1805,87 @@ noncomputable section Domain
         h' ▸ tuple (List.map Restriction.val vs)
   end Value
 end Domain
+
+open Classical in
+/-- `Go.Typ`'s equality, decided classically: nothing in the compiler pipeline computes it, it
+exists only to satisfy `IMetricSpace.discrete`'s constraint below. -/
+noncomputable instance : DecidableEq Go.Typ := λ a b ↦ propDecidable (a = b)
+
+/-- `Go.Typ`'s metric: discrete, since `Value.𝕍`'s `Typ` parameter is opaque throughout
+`Domains.lean` — nothing there inspects which two types are equal, only whether they are. -/
+noncomputable instance : DiscreteIMetricSpace Go.Typ where
+  __ := IMetricSpace.discrete
+
+instance : CompleteSpace Go.Typ := DiscreteIMetricSpace.completeSpace
+
+theorem ENNReal.toReal_two : ENNReal.toReal 2 = 2 := rfl
+
+abbrev Address : Type := PUnit ⊕ PUnit ⊕ ℕ
+
+abbrev nil : Address := .inl .unit
+abbrev dummy : Address := .inr (.inl .unit)
+instance : Coe ℕ Address := ⟨λ x ↦ .inr (.inr x)⟩
+
+def Channel := ℕ × Go.Typ
+
+open Classical in
+noncomputable instance : DecidableEq Channel := λ a b ↦ propDecidable (a = b)
+
+noncomputable instance : DiscreteIMetricSpace Channel where
+  __ := IMetricSpace.discrete
+instance : CompleteSpace Channel := DiscreteIMetricSpace.completeSpace
+
+-- TODO(go-semantics): define `Store` mutually with `𝕍` instead of axiomatizing it.
+axiom Store : NonemptyType.{0}
+
+instance : Nonempty Store.type := Store.property
+
+@[instance]
+axiom Store_metricspace : IMetricSpace Store.type
+
+@[instance]
+axiom Store_ultrametricspace : IsUltrametricIDist Store.type
+
+@[instance]
+axiom Store_completespace : CompleteSpace Store.type
+
+open Classical in
+axiom Store_iso :
+  Store.type ≃ᵢ (Address →ᵤ Option (Value.𝕍 Store.type Channel Address Go.Typ).type) × List (String →ᵤ Option Address)
+
+noncomputable def Store.type.h : Store.type → Address → Option (Value.𝕍 Store.type Channel Address Go.Typ).type :=
+  Prod.fst ∘ ⇑Store_iso
+
+noncomputable def Store.type.ϙ : Store.type → List (String → Option Address) :=
+  Prod.snd ∘ ⇑Store_iso
+
+open Classical in
+noncomputable def Store.popϙ (σ : Store.type) : Option Store.type := match Store.type.ϙ σ with
+  | [] => .none
+  | _ :: ϙ => .some (⇑Store_iso.symm ⟨Store.type.h σ, ϙ⟩)
+
+noncomputable def Store.deref (σ : Store.type) (addr : Address) : Option (Value.𝕍 Store.type Channel Address Go.Typ).type :=
+  Store.type.h σ addr
+
+open Classical in
+noncomputable def Store.update (σ : Store.type) (addr : Address) (v : (Value.𝕍 Store.type Channel Address Go.Typ).type) : Option Store.type :=
+  -- Check that the address is allocated
+  Store.deref σ addr |>.bind λ _ ↦
+    let h' := Function.update (Store.type.h σ) addr (.some v)
+    pure (Store_iso.symm (h', Store.type.ϙ σ))
+
+noncomputable def Store.freshAddr (σ : Store.type) : Address :=
+  Classical.epsilon λ a ↦ (Store_iso σ).fst a matches .none
+
+open Classical in
+noncomputable def Store.newVar (σ : Store.type) (x : String) (v : (Value.𝕍 Store.type Channel Address Go.Typ).type) : Option Store.type :=
+  let addr := Store.freshAddr σ
+  match Store.type.ϙ σ with
+  | [] => .none
+  | ϙ' :: ϙ's =>
+    .some <| Store_iso.symm ⟨
+      Function.update (Store.type.h σ) addr (.some v),
+      Function.update ϙ' x (.some addr) :: ϙ's
+    ⟩
 
 end

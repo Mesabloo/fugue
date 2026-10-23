@@ -9,13 +9,22 @@ renumber.
 
 ---
 
-### 9.1 Join Calculus: what happens after emission?
-Committed scope (§2/§5.6) is "emit a syntactically well-formed `.join` file implementing the
-thesis's compilation scheme." Open: (a) an interpreter for the guarded dialect (closest to
-"formally verified compiler" in spirit — far easier to relate to a Lean model than real Go
-concurrency), (b) a further lowering to something existing tooling runs (JoCaml-compatible
-encoding, with the performance caveat the thesis flags), or (c) nothing, treating the output
-purely as a verification artifact. Revisit once §5.6 exists.
+### 9.1 Join Calculus: which `-Xjoin-target` runtimes?
+Committed (§2/§5.6): `𝒞` produces the guarded-dialect IR; output chosen by
+`-Xjoin-target:<runtime>`, no default. Open: which runtimes exist. (a) an interpreter for the
+guarded dialect (closest to "formally verified compiler" in spirit — far easier to relate to a
+Lean model than real Go concurrency), (b) `jocaml` — un-guarding encoding, with the
+performance caveat the thesis flags, (c) `thesis` — pretty-print of the IR in a
+Fugue-invented concrete syntax, purely a verification artifact, no tool runs it, or (d)
+`chymyst` — lowering to Chymyst Core (Scala/JVM,
+`github.com/Chymyst/chymyst-core`), a chemical-machine library with native guarded reactions:
+guards over molecule values, including cross-molecule guards, so the guarded dialect maps
+across without the JoCaml un-guarding encoding. Matching per reaction site, no automata.
+Caveats: single-host only (README: "restricted to single-host, multi-core computations"), so
+`register`/`lookup` and cross-node sends need own transport (socket reader thread calling a
+molecule emitter per frame; emitters thread-safe, callable outside reactions, no
+backpressure). Alpha, tested only JDK 8 + Scala 2.11.8–2.12.6; current-toolchain build
+unverified. Revisit once §5.6 exists.
 
 ### 9.2 Known parser gaps
 Not blockers, none hit by §8's subset:
@@ -31,10 +40,8 @@ Not blockers, none hit by §8's subset:
   pre-Apalache dialect (`Channel[{type: string, agent: T}]`) is not.
 
 ### 9.3 CLI / UX — remaining details
-Flag surface settled (§2), `-X<name>` included. One thing left open:
-- **Join Calculus "flavors"** (`-t join[jocaml]`, `-t join[jerlang]`) — selecting between
-  lowerings for different Join Calculus runtimes; ties into §9.1. Possibly not worth the
-  complexity — don't build unless asked.
+Flag surface settled (§2), `-X<name>` included — Join Calculus runtime selection
+(`-Xjoin-target`) too. Nothing left open.
 
 Resolved: the Go package name is `-Xgo-pkg:<name>`, defaulting to `main` — a property of the
 output rather than of the compiler's behaviour, so `-X` rather than a `-p` of its own. `-o` names a

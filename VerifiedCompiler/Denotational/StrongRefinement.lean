@@ -610,6 +610,66 @@ namespace StrongRefinement
           -- transparency `using` matches at does not see through.
           simpa only [Nat.zero_add] using! habort m 0 (Nat.zero_add m)
 
+  /-- A stuttering refinement from a split of the target step into `T₁ ∪ T₂`: `T₁` matched step for
+  step by `stepₛ`, `T₂` by the source standing still (`Relation.Idle`), with every `T₂` step silent
+  and strictly decreasing `μ`. Both premises are plain `Terminating` squares; the measure is a
+  containment on `T₂`. -/
+  private theorem Stuttering.of_split {R : Rel α β} [T : Trace εₛ εₜ] {μ : β → ℕ}
+      {stepₛ : Set (α × εₛ × α)} {semₛ' : Set (α × εₛ)} {T₁ T₂ : Set (β × εₜ × β)}
+      (ref₁ : StrongRefinement.Terminating R R T.Rτ stepₛ semₛ' T₁)
+      (ref₂ : StrongRefinement.Terminating R R T.Rτ Relation.Idle semₛ' T₂)
+      (hμ : T₂ ⊆ {x | x.2.1 = 1 ∧ μ x.2.2 < μ x.1}) :
+        StrongRefinement.Stuttering R T.Rτ μ stepₛ semₛ' (T₁ ∪ T₂) := by
+    rintro σₜ σₜ' ε σₛ hR (hstep | hstep)
+    · obtain hmove | habort := ref₁ σₜ σₜ' ε σₛ hR hstep
+      · exact Or.inl hmove
+      · exact Or.inr (Or.inr habort)
+    · obtain ⟨hε, hlt⟩ := hμ hstep
+      obtain ⟨_, _, hR', -, rfl, rfl⟩ | habort := ref₂ σₜ σₜ' ε σₛ hR hstep
+      · exact Or.inr (Or.inl ⟨hR', hε, hlt⟩)
+      · exact Or.inr (Or.inr habort)
+
+  /-- Converse of `Stuttering.of_split` when `R` relates each target state to at most one source
+  state. The stutter steps are then a property of the target step alone, and `stepₜ` splits on
+  them. Without that hypothesis two source states related to the same `σₜ` may answer one target
+  step differently — one by a step, the other by standing still — and no split serves both. -/
+  private theorem Stuttering.split {R : Rel α β} [T : Trace εₛ εₜ] {μ : β → ℕ}
+      {stepₛ : Set (α × εₛ × α)} {semₛ' : Set (α × εₛ)} {stepₜ : Set (β × εₜ × β)}
+      (huniq : ∀ σₛ σₛ' σₜ, R σₛ σₜ → R σₛ' σₜ → σₛ = σₛ')
+      (ref : StrongRefinement.Stuttering R T.Rτ μ stepₛ semₛ' stepₜ) :
+        ∃ T₁ T₂ : Set (β × εₜ × β), stepₜ = T₁ ∪ T₂ ∧
+          StrongRefinement.Terminating R R T.Rτ stepₛ semₛ' T₁ ∧
+          StrongRefinement.Terminating R R T.Rτ Relation.Idle semₛ' T₂ ∧
+          T₂ ⊆ {x | x.2.1 = 1 ∧ μ x.2.2 < μ x.1} := by
+    let P : Set (β × εₜ × β) :=
+      {x | x.2.1 = 1 ∧ μ x.2.2 < μ x.1 ∧ ∀ σₛ, R σₛ x.1 → R σₛ x.2.2}
+    exists stepₜ \ P, stepₜ ∩ P
+    refine ⟨(Set.sdiff_union_inter stepₜ P).symm, ?_, ?_, λ _ h ↦ ⟨h.2.1, h.2.2.1⟩⟩
+    · rintro σₜ σₜ' ε σₛ hR ⟨hstep, hnot⟩
+      obtain hmove | ⟨hR', hε, hlt⟩ | habort := ref σₜ σₜ' ε σₛ hR hstep
+      · exact Or.inl hmove
+      · absurd hnot
+        refine ⟨hε, hlt, λ σₛ'' hR'' ↦ ?_⟩
+        obtain rfl := huniq σₛ σₛ'' σₜ hR hR''
+        exact hR'
+      · exact Or.inr habort
+    · rintro σₜ σₜ' ε σₛ hR ⟨-, rfl, -, hall⟩
+      exact Or.inl ⟨σₛ, 1, hall σₛ hR, T.Rτ_one, rfl, rfl⟩
+
+  /-- Divergence refinement of `Relation.omega (T₁ ∪ T₂)` from the split premises of
+  `Stuttering.of_split`: `Stuttering.omega` with its stutter disjunct read off the containment on
+  `T₂`. -/
+  private theorem Stuttering.omega_split {R : Rel α β} [ωMonoid εₛ] [ωMonoid εₜ]
+      [T : ωTrace εₛ εₜ] {μ : β → ℕ} {stepₛ : Set (α × εₛ × α)} {Yₛ : Set (α × εₛ)}
+      {T₁ T₂ : Set (β × εₜ × β)}
+      (ref₁ : StrongRefinement.Terminating R R T.Rτ stepₛ (Relation.star stepₛ ∘ᵣ₁ Yₛ) T₁)
+      (ref₂ : StrongRefinement.Terminating R R T.Rτ Relation.Idle
+        (Relation.star stepₛ ∘ᵣ₁ Yₛ) T₂)
+      (hμ : T₂ ⊆ {x | x.2.1 = 1 ∧ μ x.2.2 < μ x.1}) :
+        StrongRefinement.Diverging R T.Rτ (Relation.omega stepₛ) (Relation.star stepₛ ∘ᵣ₁ Yₛ)
+          (Relation.omega (T₁ ∪ T₂)) :=
+    Stuttering.omega (Stuttering.of_split ref₁ ref₂ hμ)
+
   /-- Divergence refinement for `Relation.star semₛ ∘ᵣ₁ Yₛ`: finitely many steps, then a
   divergence. With `Diverging.omega` it covers the general closed form — `gfp (λ x, Y ∪ X ∘ᵣ₁ x)`
   denotes `(X* ∘ᵣ₁ Y) ∪ X^∞`, and `omega` alone would force `Y = ∅`. -/

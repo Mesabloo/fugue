@@ -1,6 +1,7 @@
 module
 
 public import Core.Go.Semantics.Domains
+import Mathlib.Topology.LocallyConstant.Basic
 public import Extra.Sigma
 
 @[expose] public noncomputable section Domain
@@ -1842,8 +1843,8 @@ public import Extra.Sigma
         dsimp [DomainUnion.bind, DomainUnion.map, Sigma.map]
         rw [IterativeDomain.bind_pure_comp]
 
-      theorem DomainUnion.bind_uniform_continuous {K} {f : β →ᵤ Domain «Σ» Γ α γ} (hf : LipschitzWith K f) (hk : 1 ≤ K) :
-          UniformContinuous (DomainUnion.bind · f.toFun) :=
+      theorem DomainUnion.bind_uniform_continuous {K} {f : β → Domain «Σ» Γ α γ} (hf : LipschitzWith K f) (hk : 1 ≤ K) :
+          UniformContinuous (DomainUnion.bind · f) :=
         (DomainUnion.bind_lipschitz_left hf hk).uniformContinuous
 
       /-- Replace leaves of the tree with subtrees depending on the value of the leaves. -/
@@ -1856,8 +1857,8 @@ public import Extra.Sigma
         rw [UniformSpace.Completion.extension_coe]
         · apply DomainUnion.bind_uniform_continuous <;> assumption
 
-      theorem Domain.bind_lipschitz_left {K} (hk : 1 ≤ K) {f : β →ᵤ Domain «Σ» Γ α γ} (hf : LipschitzWith K f) :
-          LipschitzWith K λ p ↦ Domain.bind p f.toFun := by
+      theorem Domain.bind_lipschitz_left {K} (hk : 1 ≤ K) {f : β → Domain «Σ» Γ α γ} (hf : LipschitzWith K f) :
+          LipschitzWith K λ p ↦ Domain.bind p f := by
         apply LipschitzWith.completion_extension
         apply DomainUnion.bind_lipschitz_left hf hk
 
@@ -2056,6 +2057,146 @@ public import Extra.Sigma
                 · intros b b'
                   apply Branch.map_idist_le_right' hk λ p p' ↦ ?_
                   apply le_trans (Domain.bind_lipschitz_left hk hf |>.to_idist_le p p')
+                  rfl
+              · apply OrderBot.bot_le
+          · exact φ_uniform_continuous
+
+      theorem Domain.bind_branch' {K} (hk : 1 ≤ K) [CompleteSpace β] {p : Domain «Σ» Γ α β} {f : β →ᵤ «Σ» →ᵤ Set (Branch «Σ» Γ α (Domain «Σ» Γ α γ))} (hf : LipschitzWith K f) (hp : p ≠ Domain.abort) :
+          ∃ g, Domain.bind p (Domain.branch ∘ f) = Domain.branch g := by
+        let G : β ⊕ PUnit ⊕ («Σ» →ᵤ Closeds (Branch «Σ» Γ α (Domain «Σ» Γ α β))) → Domain «Σ» Γ α γ
+          | .inl v => Domain.branch (f v)
+          | .inr (.inl .unit) => Domain.abort
+          | .inr (.inr g) => Domain.branch λ σ ↦ Branch.map (Domain.bind · (Domain.branch ∘ f)) '' (g σ : Set _)
+
+        have hf' : LipschitzWith K (Domain.branch ∘ f) := by
+          erw [← one_mul (a := K)]
+          apply LipschitzWith.comp
+          · apply LipschitzWith.of_idist_le
+            intros g g'
+            erw [Domain.idist_branch_branch, UniformFun.idist_eq_iSup, one_mul]
+          · exact hf
+
+        have G_lipschitz : LipschitzWith K G := by
+          apply LipschitzWith.of_idist_le
+          rintro (_|_|_) (_|_|_)
+
+          case inl.inl v₁ v₂ =>
+            change (idist (Domain.branch (f v₁)) (Domain.branch (f v₂)) : ℝ) ≤ K * idist v₁ v₂
+            rw [Domain.idist_branch_branch]
+            apply le_trans ?_ (hf.to_idist_le v₁ v₂)
+            rw [Subtype.coe_le_coe, UniformFun.idist_eq_iSup]
+          case inr.inl.inr.inl =>
+            change (idist Domain.abort Domain.abort : ℝ) ≤ K * (0 : unitInterval).val
+            erw [Domain.idist_abort_abort, mul_zero]
+            rfl
+          case inr.inr.inr.inr h₁ h₂ =>
+            change (idist (Domain.branch _) (Domain.branch _) : ℝ) ≤ K * idist h₁ h₂
+            rw [Domain.idist_branch_branch, UniformFun.idist_eq_iSup]
+            apply unitInterval.coe_iSup_le ?_ λ σ ↦ ?_
+            · apply mul_nonneg
+              · exact NNReal.zero_le_coe
+              · apply unitInterval.nonneg
+            · apply le_trans (IMetric.hausdorffIDist_image_lipschitz' (k := K) ?_ ?_)
+              · apply mul_le_mul
+                · rfl
+                · rw [Subtype.coe_le_coe]
+                  apply le_iSup (f := λ x ↦ idist (h₁ x) (h₂ x))
+                · apply unitInterval.nonneg
+                · exact NNReal.zero_le_coe
+              · exact hk
+              · intros b b'
+                apply Branch.map_idist_le_right' hk λ p p' ↦ ?_
+                apply le_trans (Domain.bind_lipschitz_left hk ?_ |>.to_idist_le p p')
+                · rfl
+                · exact hf'
+
+          all:
+            change _ ≤ K * (1 : ℝ)
+            erw [mul_one]
+            trans 1
+            · apply unitInterval.le_one
+            · exact hk
+
+        unfold bind
+        rw [UniformSpace.Completion.extension_unique (g := G ∘ isSolution)]
+        · dsimp
+          replace hp : isSolution p ≠ Sum.inr (Sum.inl .unit) := by
+            induction p using UniformSpace.Completion.induction_on with
+            | hp =>
+              refine isClosed_imp ?_ ?_
+              · exact isOpen_ne
+              · apply IsClosed.preimage (f := isSolution) (t := {x | x ≠ Sum.inr (Sum.inl .unit)})
+                · exact IsometryEquiv.continuous isSolution
+                · refine isClosed_imp ?_ ?_
+                  · exact Domain.isOpen_singleton_abort'
+                  · exact isClosed_const
+            | ih p =>
+              let ⟨m, p⟩ := p
+              dsimp [isSolution]
+              rw [UniformSpace.Completion.extension_coe]
+              · match m, p with
+                | 0, IterativeDomain.leaf v | m + 1, IterativeDomain.leaf v | m + 1, IterativeDomain.branch g =>
+                  dsimp [φ]
+                  grind only
+                | 0, IterativeDomain.abort | m + 1, IterativeDomain.abort =>
+                  absurd hp
+                  apply_fun isSolution
+                  unfold Domain.abort
+                  rw [IsometryEquiv.apply_symm_apply]
+                  dsimp [isSolution]
+                  rw [UniformSpace.Completion.extension_coe]
+                  · rfl
+                  · exact φ_uniform_continuous
+              · exact φ_uniform_continuous
+
+          replace hp : G (isSolution p) ≠ Domain.abort := by
+            match isSolution p, hp with
+            | .inl v, _ | .inr (.inr g), _ =>
+              dsimp [G]
+              rw [← IMetricSpace.idist_eq_zero_iff, Domain.idist_branch_abort]
+              exact ne_zero_of_eq_one rfl
+
+          match isSolution p, hp with
+          | .inl v, _ =>
+            exists f v
+          | .inr (.inr g), _ =>
+            dsimp [G]
+            simp only [exists_apply_eq_apply']
+        · exact DomainUnion.bind_uniform_continuous hf' hk
+        · apply UniformContinuous.comp
+          · exact G_lipschitz.uniformContinuous
+          · apply Isometry.uniformContinuous
+            exact IsometryEquiv.isometry isSolution
+        · intro p
+          dsimp [isSolution]
+          rw [UniformSpace.Completion.extension_coe]
+          · let ⟨m, p⟩ := p
+            match m, p with
+            | 0, IterativeDomain.leaf v | m + 1, IterativeDomain.leaf v =>
+              dsimp [φ, G, DomainUnion.bind]
+              rw [IterativeDomain.bind_leaf]
+              rfl
+            | 0, IterativeDomain.abort | m + 1, IterativeDomain.abort =>
+              dsimp [φ, G, DomainUnion.bind]
+              rw [IterativeDomain.bind_abort]
+            | m + 1, IterativeDomain.branch g =>
+              dsimp [φ, G, DomainUnion.bind]
+              rw [IterativeDomain.bind_branch]
+              apply eq_of_idist_eq_zero
+              erw [Domain.idist_branch_branch, iSup_eq_bot]
+              intro σ
+              apply le_antisymm
+              · conv_lhs =>
+                  enter [1, 1, 1, p]
+                  rw [IterativeDomain.bind_eq_bind_embedAt hk hf']
+                  change ((λ x : Domain «Σ» Γ α β ↦ Domain.bind x (Domain.branch ∘ f)) ∘ embedAt m) p
+                rw [← Branch.map_comp, Set.image_comp]
+                apply le_trans (IMetric.hausdorffIDist_image_lipschitz' hk ?_)
+                · erw [IMetric.hausdorffIDist_closure_right, IMetric.hausdorffIDist_self, mul_zero]
+                  rfl
+                · intros b b'
+                  apply Branch.map_idist_le_right' hk λ p p' ↦ ?_
+                  apply le_trans (Domain.bind_lipschitz_left hk hf' |>.to_idist_le p p')
                   rfl
               · apply OrderBot.bot_le
           · exact φ_uniform_continuous

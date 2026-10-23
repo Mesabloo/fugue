@@ -145,5 +145,5 @@ one-line reason.
 ## Things not start without check in first
 
 - Go denotational semantics / domain theory work — research-level, out of near-term scope.
-- Join Calculus interpreter or further lowering — deliverable is a well-formed `.join` file;
-  what happens after is unresolved.
+- Join Calculus interpreter or any `-Xjoin-target` lowering — deliverable is the guarded-dialect
+  IR; which runtimes to lower to is unresolved (`OPEN_QUESTIONS.md` §9.1).
