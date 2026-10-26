@@ -1827,6 +1827,7 @@ abbrev dummy : Address := .inr (.inl .unit)
 instance : Coe ℕ Address := ⟨λ x ↦ .inr (.inr x)⟩
 
 def Channel := ℕ × Go.Typ
+  deriving Inhabited
 
 open Classical in
 noncomputable instance : DecidableEq Channel := λ a b ↦ propDecidable (a = b)
@@ -1868,11 +1869,14 @@ noncomputable def Store.deref (σ : Store.type) (addr : Address) : Option (Value
   Store.type.h σ addr
 
 open Classical in
+noncomputable def Store.insert (σ : Store.type) (addr : Address) (v : (Value.𝕍 Store.type Channel Address Go.Typ).type) : Store.type :=
+  let h' := Function.update (Store.type.h σ) addr (.some v)
+  Store_iso.symm (h', Store.type.ϙ σ)
+
+open Classical in
 noncomputable def Store.update (σ : Store.type) (addr : Address) (v : (Value.𝕍 Store.type Channel Address Go.Typ).type) : Option Store.type :=
   -- Check that the address is allocated
-  Store.deref σ addr |>.bind λ _ ↦
-    let h' := Function.update (Store.type.h σ) addr (.some v)
-    pure (Store_iso.symm (h', Store.type.ϙ σ))
+  Store.deref σ addr |>.bind λ _ ↦ pure (Store.insert σ addr v)
 
 noncomputable def Store.freshAddr (σ : Store.type) : Address :=
   Classical.epsilon λ a ↦ (Store_iso σ).fst a matches .none
@@ -1883,9 +1887,12 @@ noncomputable def Store.newVar (σ : Store.type) (x : String) (v : (Value.𝕍 S
   match Store.type.ϙ σ with
   | [] => .none
   | ϙ' :: ϙ's =>
-    .some <| Store_iso.symm ⟨
-      Function.update (Store.type.h σ) addr (.some v),
-      Function.update ϙ' x (.some addr) :: ϙ's
-    ⟩
+    if ϙ' x matches none then
+      .some <| Store_iso.symm ⟨
+        Function.update (Store.type.h σ) addr (.some v),
+        Function.update ϙ' x (.some addr) :: ϙ's
+      ⟩
+    else
+      .none
 
 end

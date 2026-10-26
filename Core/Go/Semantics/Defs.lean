@@ -187,7 +187,29 @@ noncomputable section
         else
           {.next σ ⟨Domain.abort⟩}
       | .assign r e :: ss => sorry
-      | .make c τ cap :: ss => sorry
+      | .make c τ cap :: ss =>
+        (cap.elim (Domain.pure <| Value.𝕍.int 0) (Go.Expression.denotation ξ ς)) >>= λ cap ↦
+          integer cap (default := Domain.branch λ σ ↦ {.next σ ⟨Domain.abort⟩})
+            (λ cap ↦
+              if cap < 0 then
+                Domain.branch λ σ ↦ {.next σ ⟨Domain.abort⟩}
+              else if cap = 0 then
+                let γc : Channel := Classical.epsilon λ γ ↦ (∀ c, ς c ≠ .some γ) ∧ γ ∉ ξ
+                Go.Statement.denotation out ξ (Function.update ς c (.some γc)) ss ∖ γc
+              else -- if cap > 0 then
+                Go.Statement.denotation out ξ ς ss ⬰ Domain.branch λ σ ↦
+                  let ⟨σ, array⟩ := zero σ (.array cap.toNat τ)
+                  let addr₁ := Store.freshAddr σ
+                  let σ := Store.insert σ addr₁ array.to𝕍
+                  let addr₂ := Store.freshAddr σ
+                  let σ := Store.insert σ addr₂ (Value.𝕍.bool false)
+                  let addr₃ := Store.freshAddr σ
+                  let σ := Store.insert σ addr₃ (Value.𝕍.int 0)
+                  if let .some σ := Store.newVar σ c (Value.𝕍.chan addr₃ τ addr₁ addr₂) then
+                    {.next σ ⟨Domain.pure .unit⟩}
+                  else
+                    {.next σ ⟨Domain.abort⟩}
+            )
       | .send c e :: ss =>
         let async : Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) PUnit :=
           Go.Expression.denotation ξ ς e >>= λ v ↦
