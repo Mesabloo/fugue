@@ -21,7 +21,7 @@ public import Extra.Sigma
       /-! ## Functor -/
 
       def IterativeDomain.map {β'} [IMetricSpace β'] (f : β →ᵤ β') {n} :
-          (IterativeDomain «Σ» Γ α β n).carrier → (IterativeDomain «Σ» Γ α β' n).carrier := match n with
+          IterativeDomain «Σ» Γ α β n → IterativeDomain «Σ» Γ α β' n := match n with
         | 0 => Sum.map f id
         | _ + 1 =>
           Sum.map f <|
@@ -36,17 +36,17 @@ public import Extra.Sigma
           map f (abort («Σ» := «Σ») (Γ := Γ) (α := α) (β := β) (n := n)) = abort := by
         cases n with rfl
 
-      theorem IterativeDomain.map_branch {β'} [IMetricSpace β'] {f : β →ᵤ β'} {n} {g : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n).carrier)} :
+      theorem IterativeDomain.map_branch {β'} [IMetricSpace β'] {f : β →ᵤ β'} {n} {g : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n))} :
           map f (branch g) = branch λ σ ↦ Branch.map (IterativeDomain.map f) '' g σ := by
         rfl
 
-      theorem IterativeDomain.map_cast {m n} (h : m = n) {f : β →ᵤ γ} {p : (IterativeDomain «Σ» Γ α β m).carrier} :
+      theorem IterativeDomain.map_cast {m n} (h : m = n) {f : β →ᵤ γ} {p : IterativeDomain «Σ» Γ α β m} :
           IterativeDomain.map f (h ▸ p) = h ▸ IterativeDomain.map f p := by
         cases h
         rfl
 
       theorem IterativeDomain.map_lift {β'} [IMetricSpace β'] (f : β →ᵤ β')
-        {m n} (h : m ≤ n) (x : (IterativeDomain «Σ» Γ α β m).carrier) :
+        {m n} (h : m ≤ n) (x : IterativeDomain «Σ» Γ α β m) :
           lift h (map f x) = map f (lift h x) := by
         match m, n with
         | 0, 0 => rfl
@@ -68,7 +68,7 @@ public import Extra.Sigma
             change lift _ (map f x) = map f (lift _ x)
             erw [map_lift]
 
-      theorem IterativeDomain.map_id {n} {p : (IterativeDomain «Σ» Γ α β n).carrier} : map id p = p := by
+      theorem IterativeDomain.map_id {n} {p : IterativeDomain «Σ» Γ α β n} : map id p = p := by
         match n, p with
         | 0, IterativeDomain.leaf v => rfl
         | 0, IterativeDomain.abort => rfl
@@ -81,7 +81,7 @@ public import Extra.Sigma
           conv_lhs => enter [1, x]; rw [map_id]
           apply Branch.map_id
 
-      theorem IterativeDomain.map_idist_le {n} {q : (IterativeDomain «Σ» Γ α β n).carrier} {f f' : β →ᵤ γ} :
+      theorem IterativeDomain.map_idist_le {n} {q : IterativeDomain «Σ» Γ α β n} {f f' : β →ᵤ γ} :
           idist (map f q) (map f' q) ≤ idist f f' := by
         match n, q with
         | 0, IterativeDomain.leaf v
@@ -106,7 +106,7 @@ public import Extra.Sigma
             · exact IterativeDomain.map_idist_le
           }
 
-      theorem IterativeDomain.map_idist_le' {n K} {q q' : (IterativeDomain «Σ» Γ α β n).carrier} {f : β →ₗ[K] γ} (hk : 1 ≤ K) :
+      theorem IterativeDomain.map_idist_le' {n K} {q q' : IterativeDomain «Σ» Γ α β n} {f : β →ₗ[K] γ} (hk : 1 ≤ K) :
           (idist (map f.toFun q) (map f.toFun q') : ℝ) ≤ K * (idist q q' : ℝ) := by
         match n, q, q' with
         | 0, IterativeDomain.leaf vx, IterativeDomain.leaf vy
@@ -168,7 +168,7 @@ public import Extra.Sigma
               · apply unitInterval.coe_le_iSup (f := λ σ ↦ IMetric.hausdorffIDist (gx σ) (gy σ))
               · exact NNReal.zero_le_coe
 
-      theorem IterativeDomain.map_idist_le'' {K} {β'} [IMetricSpace β'] {m} {p : (IterativeDomain «Σ» Γ α β m).carrier} {f g : β →ₗ[K] β'} :
+      theorem IterativeDomain.map_idist_le'' {K} {β'} [IMetricSpace β'] {m} {p : IterativeDomain «Σ» Γ α β m} {f g : β →ₗ[K] β'} :
           idist (IterativeDomain.map f.toFun p) (IterativeDomain.map g.toFun p) ≤ idist f g := by
         match m, p with
         | 0, IterativeDomain.leaf v | m + 1, IterativeDomain.leaf v =>
@@ -195,7 +195,7 @@ public import Extra.Sigma
         funext p
         apply IterativeDomain.map_id
 
-      theorem IterativeDomain.map_map {γ'} [IMetricSpace γ'] {n} {f : β →ᵤ γ} {g : γ →ᵤ γ'} {p : (IterativeDomain «Σ» Γ α β n).carrier} :
+      theorem IterativeDomain.map_map {γ'} [IMetricSpace γ'] {n} {f : β →ᵤ γ} {g : γ →ᵤ γ'} {p : IterativeDomain «Σ» Γ α β n} :
           map g (map f p) = map (g ∘ f) p := by
         match n, p with
         | 0, IterativeDomain.leaf v => rfl
@@ -238,7 +238,7 @@ public import Extra.Sigma
           DomainUnion «Σ» Γ α β → DomainUnion «Σ» Γ α β' :=
         Sigma.map id λ _ ↦ IterativeDomain.map f
 
-      theorem DomainUnion.map_mk {n} {p : (IterativeDomain «Σ» Γ α β n).carrier} {f : β →ᵤ γ} :
+      theorem DomainUnion.map_mk {n} {p : IterativeDomain «Σ» Γ α β n} {f : β →ᵤ γ} :
           DomainUnion.map f (DomainUnion.mk p) = DomainUnion.mk (IterativeDomain.map f p) := by
         rfl
 
@@ -518,7 +518,7 @@ public import Extra.Sigma
       lemma reorder {m n : ℕ} : m + 1 + n = m + n + 1 := by
         simp +arith only
 
-      def IterativeDomain.pure {n} (v : β) : (IterativeDomain «Σ» Γ α β n).carrier := match n with
+      def IterativeDomain.pure {n} (v : β) : IterativeDomain «Σ» Γ α β n := match n with
         | 0 | _ + 1 => .inl v
 
       def Domain.pure (v : β) : Domain «Σ» Γ α β :=
@@ -537,8 +537,8 @@ public import Extra.Sigma
         lipschitz := Domain.pure_lipschitz
 
       mutual
-        def Branch.ap {m n K} (p' : (IterativeDomain «Σ» Γ α β n).carrier) :
-            Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier → Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ (m + n)).carrier :=
+        def Branch.ap {m n K} (p' : IterativeDomain «Σ» Γ α β n) :
+            Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m) → Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ (m + n)) :=
           Sum.map (Prod.map id (Pi.map λ _ ↦ Pi.map λ _ ↦ Restriction.map (IterativeDomain.ap · p'))) <|
           Sum.map (Prod.map id <| Prod.map id <| Restriction.map (IterativeDomain.ap · p')) <|
           Sum.map (Prod.map id <| Restriction.map (IterativeDomain.ap · p')) <|
@@ -546,7 +546,8 @@ public import Extra.Sigma
                   (Prod.map id <| Restriction.map (IterativeDomain.ap · p'))
 
         def IterativeDomain.ap {m n K} :
-            (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier → (IterativeDomain «Σ» Γ α β n).carrier → (IterativeDomain «Σ» Γ α γ (m + n)).carrier := match m with
+            IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m → IterativeDomain «Σ» Γ α β n → IterativeDomain «Σ» Γ α γ (m + n) :=
+          match m with
           | 0 => Sum.elim
               (λ f t ↦ IterativeDomain.map f ((Nat.zero_add n).symm ▸ t))
               (λ _ _ ↦ IterativeDomain.abort)
@@ -557,7 +558,7 @@ public import Extra.Sigma
                 (λ g t ↦ IterativeDomain.branch λ σ ↦ Branch.ap t '' g σ))
       end
 
-      theorem IterativeDomain.ap_leaf {K} {v : β →ₗ[K] γ} {m n} {q : (IterativeDomain «Σ» Γ α β n).carrier} :
+      theorem IterativeDomain.ap_leaf {K} {v : β →ₗ[K] γ} {m n} {q : IterativeDomain «Σ» Γ α β n} :
           ap (leaf (n := m) v) q = map v (lift (Nat.le_add_left _ _) q) := by
         cases m with unfold ap
         | zero =>
@@ -567,7 +568,7 @@ public import Extra.Sigma
         | succ n =>
           rfl
 
-      theorem IterativeDomain.ap_abort {m n K} {q : (IterativeDomain «Σ» Γ α β n).carrier} :
+      theorem IterativeDomain.ap_abort {m n K} {q : IterativeDomain «Σ» Γ α β n} :
           ap (abort (β := β →ₗ[K] γ) (n := m)) q = abort := by
         cases m with (unfold ap)
         | zero =>
@@ -576,38 +577,38 @@ public import Extra.Sigma
           rw! [reorder]
           rfl
 
-      theorem IterativeDomain.ap_branch {m n K} {g : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier)} {q : (IterativeDomain «Σ» Γ α β n).carrier} :
+      theorem IterativeDomain.ap_branch {m n K} {g : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m))} {q : IterativeDomain «Σ» Γ α β n} :
           ap (branch g) q = reorder ▸ branch λ σ ↦ Branch.ap q '' g σ := by
         unfold ap
         rw! [reorder]
         rfl
 
-      theorem Branch.ap_recv {c : Γ} {m n K} {π : α →ᵤ Bool →ᵤ Restriction (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier unitInterval.half} {q : (IterativeDomain «Σ» Γ α β n).carrier} :
+      theorem Branch.ap_recv {c : Γ} {m n K} {π : α →ᵤ Bool →ᵤ Restriction (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m) unitInterval.half} {q : IterativeDomain «Σ» Γ α β n} :
           Branch.ap q (Branch.recv c π) = Branch.recv c λ v ok ↦ Restriction.map (IterativeDomain.ap · q) (π v ok) := by
         unfold ap
         rfl
 
-      theorem Branch.ap_send {c : Γ} {v : α} {m n K} {p : Restriction (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier unitInterval.half} {q : (IterativeDomain «Σ» Γ α β n).carrier} :
+      theorem Branch.ap_send {c : Γ} {v : α} {m n K} {p : Restriction (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m) unitInterval.half} {q : IterativeDomain «Σ» Γ α β n} :
           Branch.ap q (Branch.send c v p) = Branch.send c v (Restriction.map (IterativeDomain.ap · q) p) := by
         unfold ap
         rfl
 
-      theorem Branch.ap_close {c : Γ} {m n K} {p : Restriction (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier unitInterval.half} {q : (IterativeDomain «Σ» Γ α β n).carrier} :
+      theorem Branch.ap_close {c : Γ} {m n K} {p : Restriction (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m) unitInterval.half} {q : IterativeDomain «Σ» Γ α β n} :
           Branch.ap q (Branch.close c p) = Branch.close c (Restriction.map (IterativeDomain.ap · q) p) := by
         unfold ap
         rfl
 
-      theorem Branch.ap_sync {c : Γ} {m n K} {p : Restriction (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier unitInterval.half} {q : (IterativeDomain «Σ» Γ α β n).carrier} :
+      theorem Branch.ap_sync {c : Γ} {m n K} {p : Restriction (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m) unitInterval.half} {q : IterativeDomain «Σ» Γ α β n} :
           Branch.ap q (Branch.sync c p) = Branch.sync c (Restriction.map (IterativeDomain.ap · q) p) := by
         unfold ap
         rfl
 
-      theorem Branch.ap_next {σ : «Σ»} {m n K} {p : Restriction (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier unitInterval.half} {q : (IterativeDomain «Σ» Γ α β n).carrier} :
+      theorem Branch.ap_next {σ : «Σ»} {m n K} {p : Restriction (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m) unitInterval.half} {q : IterativeDomain «Σ» Γ α β n} :
           Branch.ap q (Branch.next σ p) = Branch.next σ (Restriction.map (IterativeDomain.ap · q) p) := by
         unfold ap
         rfl
 
-      theorem Branch.ap_eq_map {K} {m n} {q : (IterativeDomain «Σ» Γ α β n).carrier} {b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier} :
+      theorem Branch.ap_eq_map {K} {m n} {q : IterativeDomain «Σ» Γ α β n} {b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m)} :
           Branch.ap q b = Branch.map (IterativeDomain.ap · q) b := by
         cases b with
         | recv c π =>
@@ -622,7 +623,7 @@ public import Extra.Sigma
           rw [Branch.ap_next, Branch.map_next]
 
       mutual
-        theorem Branch.ap_idist_le_left {m n K} {b b' : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier} {q : (IterativeDomain «Σ» Γ α β n).carrier} :
+        theorem Branch.ap_idist_le_left {m n K} {b b' : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m)} {q : IterativeDomain «Σ» Γ α β n} :
             idist (Branch.ap q b) (Branch.ap q b') ≤ idist b b' := by
           cases b <;> cases b'
           case recv.recv v π v' π' =>
@@ -667,7 +668,7 @@ public import Extra.Sigma
             change _ ≤ ⊤
             apply OrderTop.le_top
 
-        theorem IterativeDomain.ap_idist_le_left {m n K} {x y : (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier} {q : (IterativeDomain «Σ» Γ α β n).carrier} :
+        theorem IterativeDomain.ap_idist_le_left {m n K} {x y : IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m} {q : IterativeDomain «Σ» Γ α β n} :
             idist (IterativeDomain.ap x q) (IterativeDomain.ap y q) ≤ idist x y := by
           match m, x, y with
           | 0, IterativeDomain.leaf vx, IterativeDomain.leaf vy
@@ -706,8 +707,8 @@ public import Extra.Sigma
             apply Branch.ap_idist_le_left
       end
 
-      theorem IterativeDomain.ap_lipschitz_left {m n K} {q : (IterativeDomain «Σ» Γ α β n).carrier} :
-          LipschitzWith 1 λ (p : (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier) ↦ ap p q := by
+      theorem IterativeDomain.ap_lipschitz_left {m n K} {q : IterativeDomain «Σ» Γ α β n} :
+          LipschitzWith 1 λ (p : IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m) ↦ ap p q := by
         intros x y
         erw [one_mul, PseudoIMetricSpace.edist_eq, PseudoIMetricSpace.edist_eq]
         apply ENNReal.ofReal_le_ofReal
@@ -715,7 +716,7 @@ public import Extra.Sigma
         apply IterativeDomain.ap_idist_le_left
 
       mutual
-        theorem Branch.ap_idist_le_right {m n K} {b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier} {q q' : (IterativeDomain «Σ» Γ α β n).carrier} (hk : 1 ≤ K) :
+        theorem Branch.ap_idist_le_right {m n K} {b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m)} {q q' : IterativeDomain «Σ» Γ α β n} (hk : 1 ≤ K) :
             (idist (Branch.ap q b) (Branch.ap q' b) : ℝ) ≤ K * idist q q' := by
           cases b with
           | recv c π =>
@@ -759,7 +760,7 @@ public import Extra.Sigma
               exact unitInterval.half_mul_le_self
             · apply IterativeDomain.ap_idist_le_right hk
 
-        theorem IterativeDomain.ap_idist_le_right {m n K} {q q' : (IterativeDomain «Σ» Γ α β n).carrier} {p : (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier} (hk : 1 ≤ K) :
+        theorem IterativeDomain.ap_idist_le_right {m n K} {q q' : IterativeDomain «Σ» Γ α β n} {p : IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m} (hk : 1 ≤ K) :
             (idist (IterativeDomain.ap p q) (IterativeDomain.ap p q') : ℝ) ≤ K * idist q q' := by
           match m, p with
           | 0, IterativeDomain.leaf v
@@ -790,7 +791,7 @@ public import Extra.Sigma
                 apply Branch.ap_idist_le_right hk
       end
 
-      theorem IterativeDomain.ap_lipschitz_right {m n K} (hk : 1 ≤ K) {p : (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier} :
+      theorem IterativeDomain.ap_lipschitz_right {m n K} (hk : 1 ≤ K) {p : IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m} :
           LipschitzWith K (ap (n := n) p) := by
         intros q q'
 
@@ -801,7 +802,7 @@ public import Extra.Sigma
         apply ENNReal.ofReal_le_ofReal
         apply IterativeDomain.ap_idist_le_right hk
 
-      theorem IterativeDomain.pure_ap {m n K} {f : β →ₗ[K] γ} {q : (IterativeDomain «Σ» Γ α β n).carrier} :
+      theorem IterativeDomain.pure_ap {m n K} {f : β →ₗ[K] γ} {q : IterativeDomain «Σ» Γ α β n} :
           IterativeDomain.ap (IterativeDomain.pure (n := m) f) q = IterativeDomain.lift (Nat.le_add_left n m) (IterativeDomain.map f q) := by
         cases m with erw [ap_leaf, map_lift]
 
@@ -816,28 +817,28 @@ public import Extra.Sigma
           UniformContinuous₂ (IterativeDomain.ap (K := K) («Σ» := «Σ») (Γ := Γ) (α := α) (β := β) (γ := γ) (m := m) (n := n)) :=
         (IterativeDomain.ap_lipschitz hk).uniformContinuous
 
-      theorem IterativeDomain.ap_cast_left {m n o K} (h : m = o) {p : (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier} {q : (IterativeDomain «Σ» Γ α β n).carrier} :
+      theorem IterativeDomain.ap_cast_left {m n o K} (h : m = o) {p : IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m} {q : IterativeDomain «Σ» Γ α β n} :
           IterativeDomain.ap (h ▸ p) q = h ▸ IterativeDomain.ap p q := by
         cases h
         rfl
 
-      theorem IterativeDomain.ap_cast_right {m n o K} (h : n = o) {p : (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier} {q : (IterativeDomain «Σ» Γ α β n).carrier} :
+      theorem IterativeDomain.ap_cast_right {m n o K} (h : n = o) {p : IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m} {q : IterativeDomain «Σ» Γ α β n} :
           IterativeDomain.ap p (h ▸ q) = h ▸ IterativeDomain.ap p q := by
         cases h
         rfl
 
-      private theorem cast_image {m n} {f : δ → Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier} {s : Set δ} (h : m = n) :
+      private theorem cast_image {m n} {f : δ → Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m)} {s : Set δ} (h : m = n) :
           h ▸ f '' s = (λ x ↦ h ▸ f x) '' s := by
         cases h
         rfl
 
-      private theorem cast_setOf {m n} {p : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier → Prop} (h : m = n) :
+      private theorem cast_setOf {m n} {p : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m) → Prop} (h : m = n) :
           h ▸ {x | p x} = {x | p (h.symm ▸ x)} := by
         cases h
         rfl
 
       mutual
-        theorem Branch.ap_lift_left {m n o K} (h : m + n ≤ o) {b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier} {q : (IterativeDomain «Σ» Γ α β n).carrier} :
+        theorem Branch.ap_lift_left {m n o K} (h : m + n ≤ o) {b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m)} {q : IterativeDomain «Σ» Γ α β n} :
             Branch.map (IterativeDomain.lift h) (Branch.ap q b) =
               Nat.sub_add_cancel (Nat.le_of_add_left_le h) ▸
                 Branch.ap q (Branch.map (IterativeDomain.lift (Nat.le_sub_of_add_le h)) b) := by
@@ -869,7 +870,7 @@ public import Extra.Sigma
             unfold Restriction.map
             erw [IterativeDomain.ap_lift_left]
 
-        theorem IterativeDomain.ap_lift_left {m n o K} (h : m + n ≤ o) {p : (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier} {q} :
+        theorem IterativeDomain.ap_lift_left {m n o K} (h : m + n ≤ o) {p : IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m} {q} :
             IterativeDomain.lift h (IterativeDomain.ap p q) =
               Nat.sub_add_cancel (Nat.le_of_add_left_le h) ▸
                 IterativeDomain.ap (IterativeDomain.lift (Nat.le_sub_of_add_le h) p) q := by
@@ -909,7 +910,7 @@ public import Extra.Sigma
       end
 
       mutual
-        theorem Branch.ap_lift_right {m n o K} (h : m + n ≤ o) {b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier} {q : (IterativeDomain «Σ» Γ α β n).carrier} :
+        theorem Branch.ap_lift_right {m n o K} (h : m + n ≤ o) {b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m)} {q : IterativeDomain «Σ» Γ α β n} :
             Branch.map (IterativeDomain.lift h) (Branch.ap q b) =
               (by grind only : m + (o - m) = o) ▸
                 Branch.ap (IterativeDomain.lift (Nat.le_sub_of_add_le' h) q) b := by
@@ -940,7 +941,7 @@ public import Extra.Sigma
             unfold Restriction.map
             rw [IterativeDomain.ap_lift_right]
 
-        theorem IterativeDomain.ap_lift_right {m n o K} (h : m + n ≤ o) {p : (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier} {q} :
+        theorem IterativeDomain.ap_lift_right {m n o K} (h : m + n ≤ o) {p : IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m} {q} :
             IterativeDomain.lift h (IterativeDomain.ap p q) =
               Nat.add_sub_of_le (Nat.le_of_add_right_le h) ▸ IterativeDomain.ap p (IterativeDomain.lift (Nat.le_sub_of_add_le' h) q) := by
           match m, p with
@@ -980,7 +981,7 @@ public import Extra.Sigma
       end
 
       mutual
-        theorem Branch.ap_pure {K} {x : β} {m n} {b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier} :
+        theorem Branch.ap_pure {K} {x : β} {m n} {b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m)} :
             Branch.ap (IterativeDomain.pure x) b = Branch.map (IterativeDomain.lift (Nat.le_add_right m n) ∘ IterativeDomain.map λ f ↦ f x) b := by
           cases b with
           | recv c π =>
@@ -1010,7 +1011,7 @@ public import Extra.Sigma
             rw [IterativeDomain.ap_pure]
             rfl
 
-        theorem IterativeDomain.ap_pure {K} {x : β} {m n} {p : (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier} :
+        theorem IterativeDomain.ap_pure {K} {x : β} {m n} {p : IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m} :
             IterativeDomain.ap p (IterativeDomain.pure (n := n) x) = IterativeDomain.lift (Nat.le_add_right m n) (IterativeDomain.map (λ f ↦ f x) p) := by
           match m, p with
           | 0, IterativeDomain.leaf g | m + 1, IterativeDomain.leaf g =>
@@ -1034,7 +1035,7 @@ public import Extra.Sigma
       end
 
       mutual
-        theorem Branch.map_ap {f : γ →ᵤ δ} [IMetricSpace δ] {K₁ K₂} {m n} {b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β →ₗ[K₁] γ) m).carrier} {q : (IterativeDomain «Σ» Γ α β n).carrier} (hf : LipschitzWith K₂ f) :
+        theorem Branch.map_ap {f : γ →ᵤ δ} [IMetricSpace δ] {K₁ K₂} {m n} {b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β →ₗ[K₁] γ) m)} {q : IterativeDomain «Σ» Γ α β n} (hf : LipschitzWith K₂ f) :
             Branch.map (IterativeDomain.map f) (Branch.ap q b) = Branch.ap q (Branch.map (IterativeDomain.map λ g ↦ { toFun := f, lipschitz := hf : LipschitzMap _ _ _ }.comp g) b) := by
           cases b with
           | recv c π =>
@@ -1069,7 +1070,7 @@ public import Extra.Sigma
             congr 2
             rw [IterativeDomain.map_ap]
 
-        theorem IterativeDomain.map_ap {f : γ →ᵤ δ} [IMetricSpace δ] {K₁ K₂} {m n} {p : (IterativeDomain «Σ» Γ α (β →ₗ[K₁] γ) m).carrier} {q : (IterativeDomain «Σ» Γ α β n).carrier} (hf : LipschitzWith K₂ f) :
+        theorem IterativeDomain.map_ap {f : γ →ᵤ δ} [IMetricSpace δ] {K₁ K₂} {m n} {p : IterativeDomain «Σ» Γ α (β →ₗ[K₁] γ) m} {q : IterativeDomain «Σ» Γ α β n} (hf : LipschitzWith K₂ f) :
             IterativeDomain.map f (IterativeDomain.ap p q) = IterativeDomain.ap (IterativeDomain.map (λ g ↦ LipschitzMap.comp ⟨f, hf⟩ g) p) q := by
           match m, p with
           | 0, IterativeDomain.leaf g | m + 1, IterativeDomain.leaf g =>
@@ -1096,8 +1097,8 @@ public import Extra.Sigma
       -- not goals the script addresses by name.
       set_option linter.fugue.bulletSubgoals false in
       mutual
-        theorem Branch.ap_assoc {K₁ K₂} [IMetricSpace δ] {m n o} {b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (γ →ₗ[K₂] β) m).carrier}
-          {q : (IterativeDomain «Σ» Γ α (δ →ₗ[K₁] γ) n).carrier} {r : (IterativeDomain «Σ» Γ α δ o).carrier} :
+        theorem Branch.ap_assoc {K₁ K₂} [IMetricSpace δ] {m n o} {b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (γ →ₗ[K₂] β) m)}
+          {q : IterativeDomain «Σ» Γ α (δ →ₗ[K₁] γ) n} {r : IterativeDomain «Σ» Γ α δ o} :
             Branch.ap (IterativeDomain.ap q r) b =
               Nat.add_assoc m n o ▸
                 Branch.ap r (Branch.ap q (Branch.map (IterativeDomain.map λ f ↦ { toFun := f.comp, lipschitz := LipschitzMap.lipschitz_comp_right }) b)) := by
@@ -1138,8 +1139,8 @@ public import Extra.Sigma
             congr 1
             rw [IterativeDomain.ap_assoc]
 
-        theorem IterativeDomain.ap_assoc {K₁ K₂} [IMetricSpace δ] {m n o} {p : (IterativeDomain «Σ» Γ α (γ →ₗ[K₂] β) m).carrier}
-          {q : (IterativeDomain «Σ» Γ α (δ →ₗ[K₁] γ) n).carrier} {r : (IterativeDomain «Σ» Γ α δ o).carrier} :
+        theorem IterativeDomain.ap_assoc {K₁ K₂} [IMetricSpace δ] {m n o} {p : IterativeDomain «Σ» Γ α (γ →ₗ[K₂] β) m}
+          {q : IterativeDomain «Σ» Γ α (δ →ₗ[K₁] γ) n} {r : IterativeDomain «Σ» Γ α δ o} :
             IterativeDomain.ap p (IterativeDomain.ap q r) =
               Nat.add_assoc m n o ▸
                 IterativeDomain.ap (IterativeDomain.ap (IterativeDomain.map (λ f ↦ { toFun := f.comp, lipschitz := LipschitzMap.lipschitz_comp_right }) p) q) r := by
@@ -1442,8 +1443,7 @@ public import Extra.Sigma
         exact Function.curry_uncurry g
 
       theorem IterativeDomain.embedAt_ap {K} (hk : 1 ≤ K)
-        [CompleteSpace «Σ»] [CompleteSpace Γ] [CompleteSpace α] [CompleteSpace β] [CompleteSpace γ]
-        {m n} {q : (IterativeDomain «Σ» Γ α β n).carrier} {p : (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier} :
+        {m n} {q : IterativeDomain «Σ» Γ α β n} {p : IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m} :
           embedAt (m + n) (IterativeDomain.ap p q) = (embedAt m p).ap (DomainUnion.mk q) := by
         unfold embedAt
         rw [Domain.ap_coe_coe hk, DomainUnion.ap]
@@ -1614,7 +1614,7 @@ public import Extra.Sigma
       variable [CompleteSpace «Σ»] [CompleteSpace Γ] [CompleteSpace α] [CompleteSpace γ]
 
       mutual
-        def Branch.bind {n} (f : β →ᵤ Domain «Σ» Γ α γ) (b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n).carrier) :
+        def Branch.bind {n} (f : β →ᵤ Domain «Σ» Γ α γ) (b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n)) :
             Branch «Σ» Γ α (Domain «Σ» Γ α γ) :=
           match b with
           | Branch.recv c π => Branch.recv c λ v ok ↦ ⟨IterativeDomain.bind (π v ok).val f⟩
@@ -1623,7 +1623,7 @@ public import Extra.Sigma
           | Branch.sync c p => Branch.sync c ⟨IterativeDomain.bind p.val f⟩
           | Branch.next σ p => Branch.next σ ⟨IterativeDomain.bind p.val f⟩
 
-        def IterativeDomain.bind {n} (p : (IterativeDomain «Σ» Γ α β n).carrier) (f : β →ᵤ Domain «Σ» Γ α γ) :
+        def IterativeDomain.bind {n} (p : IterativeDomain «Σ» Γ α β n) (f : β →ᵤ Domain «Σ» Γ α γ) :
             Domain «Σ» Γ α γ :=
           match n, p with
           | 0, IterativeDomain.leaf v | _ + 1, IterativeDomain.leaf v => f v
@@ -1631,7 +1631,8 @@ public import Extra.Sigma
           | n + 1, IterativeDomain.branch g => Domain.branch λ σ ↦ Branch.bind f '' g σ
       end
 
-      theorem Branch.bind_eq_map {m} {b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier} {f : β →ᵤ Domain «Σ» Γ α γ} :
+      omit [IMetricSpace β] in
+      theorem Branch.bind_eq_map {m} {b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m)} {f : β →ᵤ Domain «Σ» Γ α γ} :
           Branch.bind f b = Branch.map (IterativeDomain.bind · f) b := by
         cases b with
           unfold bind
@@ -1641,6 +1642,7 @@ public import Extra.Sigma
         | sync c p => rw [Branch.map_sync]
         | next σ p => rw [Branch.map_next]
 
+      omit [IMetricSpace β] in
       theorem IterativeDomain.bind_leaf {n} {v : β} {f : β →ᵤ Domain «Σ» Γ α γ} :
           IterativeDomain.bind (IterativeDomain.leaf v (n := n)) f = f v := by
         match n with
@@ -1648,6 +1650,7 @@ public import Extra.Sigma
           unfold IterativeDomain.bind
           rfl
 
+      omit [IMetricSpace β] in
       theorem IterativeDomain.bind_abort {n} {f : β →ᵤ Domain «Σ» Γ α γ} :
           IterativeDomain.bind (IterativeDomain.abort (n := n)) f = Domain.abort := by
         match n with
@@ -1655,17 +1658,20 @@ public import Extra.Sigma
           unfold IterativeDomain.bind
           rfl
 
-      theorem IterativeDomain.bind_branch {n} {f : β →ᵤ Domain «Σ» Γ α γ} {g : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n).carrier)} :
+      omit [IMetricSpace β] in
+      theorem IterativeDomain.bind_branch {n} {f : β →ᵤ Domain «Σ» Γ α γ} {g : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n))} :
           IterativeDomain.bind (IterativeDomain.branch g) f = Domain.branch λ σ ↦ Branch.map (IterativeDomain.bind · f) '' g σ := by
         conv_lhs => unfold IterativeDomain.bind
         conv_lhs => enter [1, σ, 1, b]; rw [Branch.bind_eq_map]
 
-      theorem IterativeDomain.bind_cast_left {m n} {p : (IterativeDomain «Σ» Γ α β m).carrier} {f : β →ᵤ Domain «Σ» Γ α γ} (h : m = n) :
+      omit [IMetricSpace β] in
+      theorem IterativeDomain.bind_cast_left {m n} {p : IterativeDomain «Σ» Γ α β m} {f : β →ᵤ Domain «Σ» Γ α γ} (h : m = n) :
           IterativeDomain.bind (h ▸ p) f = IterativeDomain.bind p f := by
         cases h
         rfl
 
-      theorem IterativeDomain.bind_lift {m n} {p : (IterativeDomain «Σ» Γ α β m).carrier} {f : β →ᵤ Domain «Σ» Γ α γ} (h : m ≤ n) :
+      omit [IMetricSpace β] in
+      theorem IterativeDomain.bind_lift {m n} {p : IterativeDomain «Σ» Γ α β m} {f : β →ᵤ Domain «Σ» Γ α γ} (h : m ≤ n) :
           IterativeDomain.bind p f = IterativeDomain.bind (IterativeDomain.lift h p) f := by
         match m, p with
         | 0, IterativeDomain.leaf v | m + 1, IterativeDomain.leaf v =>
@@ -1682,7 +1688,7 @@ public import Extra.Sigma
           congr 1 with p : 1
           rw [Function.comp_def, IterativeDomain.bind_lift]
 
-      theorem IterativeDomain.bind_lipschitz_left' {K} {n} {p q : (IterativeDomain «Σ» Γ α β n).carrier} {f : β →ᵤ Domain «Σ» Γ α γ} (hf : LipschitzWith K f) (hk : 1 ≤ K) :
+      theorem IterativeDomain.bind_lipschitz_left' {K} {n} {p q : IterativeDomain «Σ» Γ α β n} {f : β →ᵤ Domain «Σ» Γ α γ} (hf : LipschitzWith K f) (hk : 1 ≤ K) :
           (idist (IterativeDomain.bind p f) (IterativeDomain.bind q f.toFun) : ℝ) ≤ K * (idist p q : ℝ) := by
         match n, p, q with
         | 0, IterativeDomain.leaf v, IterativeDomain.leaf v' | n + 1, IterativeDomain.leaf v, IterativeDomain.leaf v' =>
@@ -1739,7 +1745,7 @@ public import Extra.Sigma
               · intros p q
                 exact IterativeDomain.bind_lipschitz_left' hf hk
 
-      theorem IterativeDomain.bind_lipschitz_right' {K} {f g : β →ₗ[K] Domain «Σ» Γ α γ} {m} {p : (IterativeDomain «Σ» Γ α β m).carrier} :
+      theorem IterativeDomain.bind_lipschitz_right' {K} {f g : β →ₗ[K] Domain «Σ» Γ α γ} {m} {p : IterativeDomain «Σ» Γ α β m} :
           idist (IterativeDomain.bind p f.toFun) (IterativeDomain.bind p g.toFun) ≤ idist f g := by
         match m, p with
         | 0, IterativeDomain.leaf v | m + 1, IterativeDomain.leaf v =>
@@ -1761,7 +1767,7 @@ public import Extra.Sigma
             grw [IterativeDomain.bind_lipschitz_right']
             exact unitInterval.half_mul_le_self
 
-      theorem IterativeDomain.bind_pure_comp {f : β →ᵤ γ} {m : ℕ} {p : (IterativeDomain «Σ» Γ α β m).carrier} :
+      theorem IterativeDomain.bind_pure_comp {f : β →ᵤ γ} {m : ℕ} {p : IterativeDomain «Σ» Γ α β m} :
           IterativeDomain.bind p (Domain.pure ∘ f) = (DomainUnion.mk (IterativeDomain.map f p) : Domain «Σ» Γ α γ) := by
         match m, p with
         | 0, IterativeDomain.leaf v | m + 1, IterativeDomain.leaf v =>
@@ -1787,7 +1793,7 @@ public import Extra.Sigma
           · intros σ
             rfl
 
-      theorem IterativeDomain.bind_map {K} (hk : 1 ≤ K) {m n} {p : (IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m).carrier} {q : (IterativeDomain «Σ» Γ α β n).carrier} :
+      theorem IterativeDomain.bind_map {K} (hk : 1 ≤ K) {m n} {p : IterativeDomain «Σ» Γ α (β →ₗ[K] γ) m} {q : IterativeDomain «Σ» Γ α β n} :
           IterativeDomain.bind p (λ f ↦ (DomainUnion.mk (IterativeDomain.map f.toFun q) : Domain ..)) =
             (DomainUnion.mk (IterativeDomain.ap p q) : Domain «Σ» Γ α γ) := by
         match m, p with
@@ -1832,6 +1838,7 @@ public import Extra.Sigma
         apply le_trans (IterativeDomain.bind_lipschitz_left' hf hk)
         rfl
 
+      omit [IMetricSpace β] in
       theorem DomainUnion.pure_bind {n} {v : β} {f : β →ᵤ Domain «Σ» Γ α γ} :
           (DomainUnion.mk (n := n) (IterativeDomain.pure v)).bind f = f v := by
         unfold IterativeDomain.pure DomainUnion.bind
@@ -1953,7 +1960,7 @@ public import Extra.Sigma
         obtain ⟨m, h₁⟩ := Domain.exists_abort_eq («Σ» := «Σ») (Γ := Γ) (α := α) (β := β)
         rw [h₁, Domain.bind_coe hf hk, DomainUnion.mk, DomainUnion.bind, IterativeDomain.bind_abort]
 
-      theorem IterativeDomain.bind_eq_bind_embedAt {K} (hk : 1 ≤ K) {m} {p : (IterativeDomain «Σ» Γ α β m).carrier} {f : β →ᵤ Domain «Σ» Γ α γ} (hf : LipschitzWith K f) :
+      theorem IterativeDomain.bind_eq_bind_embedAt {K} (hk : 1 ≤ K) {m} {p : IterativeDomain «Σ» Γ α β m} {f : β →ᵤ Domain «Σ» Γ α γ} (hf : LipschitzWith K f) :
           IterativeDomain.bind p f = Domain.bind (embedAt _ p) f := by
         unfold embedAt
         rw [Domain.bind_coe]
@@ -2202,7 +2209,7 @@ public import Extra.Sigma
           · exact φ_uniform_continuous
 
       theorem IterativeDomain.bind_assoc {K₁ K₂} [IMetricSpace δ] [CompleteSpace δ] {f : β →ᵤ Domain «Σ» Γ α γ} (hf : LipschitzWith K₁ f)
-        {g : γ →ᵤ Domain «Σ» Γ α δ} (hg : LipschitzWith K₂ g) (hk₂ : 1 ≤ K₂) {m} {p : (IterativeDomain «Σ» Γ α β m).carrier} :
+        {g : γ →ᵤ Domain «Σ» Γ α δ} (hg : LipschitzWith K₂ g) (hk₂ : 1 ≤ K₂) {m} {p : IterativeDomain «Σ» Γ α β m} :
           (IterativeDomain.bind p f).bind g = IterativeDomain.bind p (λ x ↦ (f x).bind g) := by
         match m, p with
         | 0, IterativeDomain.leaf v | m + 1, IterativeDomain.leaf v =>
@@ -2239,14 +2246,14 @@ public import Extra.Sigma
 
     section Sequence
       mutual
-        def Branch.seq {m n} (q : (IterativeDomain «Σ» Γ α PUnit n).carrier) : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α PUnit.{x + 1} m).carrier → Branch «Σ» Γ α (IterativeDomain «Σ» Γ α PUnit.{x + 1} (m + n)).carrier :=
+        def Branch.seq {m n} (q : IterativeDomain «Σ» Γ α PUnit n) : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α PUnit.{x + 1} m) → Branch «Σ» Γ α (IterativeDomain «Σ» Γ α PUnit.{x + 1} (m + n)) :=
           Sum.map (Prod.map id (Pi.map λ _ ↦ Pi.map λ _ ↦ Restriction.map (IterativeDomain.seq · q))) <|
           Sum.map (Prod.map id (Prod.map id (Restriction.map (IterativeDomain.seq · q)))) <|
           Sum.map (Prod.map id (Restriction.map (IterativeDomain.seq · q))) <|
           Sum.map (Prod.map id (Restriction.map (IterativeDomain.seq · q))) <|
           Prod.map id (Restriction.map (IterativeDomain.seq · q))
 
-        def IterativeDomain.seq {m n} : (IterativeDomain «Σ» Γ α PUnit.{x + 1} m).carrier → (IterativeDomain «Σ» Γ α PUnit.{x + 1} n).carrier → (IterativeDomain «Σ» Γ α PUnit.{x + 1} (m + n)).carrier :=
+        def IterativeDomain.seq {m n} : IterativeDomain «Σ» Γ α PUnit.{x + 1} m → IterativeDomain «Σ» Γ α PUnit.{x + 1} n → IterativeDomain «Σ» Γ α PUnit.{x + 1} (m + n) :=
           match m with
           | 0 => Sum.elim (λ _ t ↦ Nat.zero_add _ ▸ t) (λ _ _ ↦ IterativeDomain.abort)
           | m + 1 =>
@@ -2255,7 +2262,7 @@ public import Extra.Sigma
             λ g t ↦ reorder ▸ IterativeDomain.branch λ σ ↦ Branch.seq t '' g σ
       end
 
-      theorem IterativeDomain.seq_leaf {v} {m n} {q : (IterativeDomain «Σ» Γ α PUnit n).carrier} :
+      theorem IterativeDomain.seq_leaf {v} {m n} {q : IterativeDomain «Σ» Γ α PUnit n} :
           IterativeDomain.seq (leaf (n := m) v) q = IterativeDomain.lift (Nat.le_add_left _ _) q := by
         cases m with unfold seq
         | zero =>
@@ -2264,7 +2271,7 @@ public import Extra.Sigma
         | succ n =>
           rfl
 
-      theorem IterativeDomain.seq_abort {m n} {q : (IterativeDomain «Σ» Γ α PUnit n).carrier} :
+      theorem IterativeDomain.seq_abort {m n} {q : IterativeDomain «Σ» Γ α PUnit n} :
           IterativeDomain.seq (abort (n := m)) q = abort := by
         cases m with unfold seq
         | zero =>
@@ -2273,38 +2280,38 @@ public import Extra.Sigma
         | succ n =>
           rfl
 
-      theorem IterativeDomain.seq_branch {m n} {g : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α PUnit m).carrier)} {q : (IterativeDomain «Σ» Γ α PUnit n).carrier} :
+      theorem IterativeDomain.seq_branch {m n} {g : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α PUnit m))} {q : IterativeDomain «Σ» Γ α PUnit n} :
           seq (branch g) q = reorder ▸ branch λ σ ↦ Branch.seq q '' g σ := by
         unfold seq
         rfl
 
-      theorem Branch.seq_recv {m n} {c : Γ} {π : α →ᵤ Bool →ᵤ Restriction (IterativeDomain «Σ» Γ α PUnit m).carrier unitInterval.half} {q : (IterativeDomain «Σ» Γ α PUnit n).carrier} :
+      theorem Branch.seq_recv {m n} {c : Γ} {π : α →ᵤ Bool →ᵤ Restriction (IterativeDomain «Σ» Γ α PUnit m) unitInterval.half} {q : IterativeDomain «Σ» Γ α PUnit n} :
           Branch.seq q (Branch.recv c π) = Branch.recv c λ v ok ↦ (Restriction.map (IterativeDomain.seq · q) (π v ok)) := by
         unfold seq
         rfl
 
-      theorem Branch.seq_send {m n} {c : Γ} {v : α} {p : Restriction (IterativeDomain «Σ» Γ α PUnit m).carrier unitInterval.half} {q : (IterativeDomain «Σ» Γ α PUnit n).carrier} :
+      theorem Branch.seq_send {m n} {c : Γ} {v : α} {p : Restriction (IterativeDomain «Σ» Γ α PUnit m) unitInterval.half} {q : IterativeDomain «Σ» Γ α PUnit n} :
           Branch.seq q (Branch.send c v p) = Branch.send c v (Restriction.map (IterativeDomain.seq · q) p) := by
         unfold seq
         rfl
 
-      theorem Branch.seq_close {m n} {c : Γ} {p : Restriction (IterativeDomain «Σ» Γ α PUnit m).carrier unitInterval.half} {q : (IterativeDomain «Σ» Γ α PUnit n).carrier} :
+      theorem Branch.seq_close {m n} {c : Γ} {p : Restriction (IterativeDomain «Σ» Γ α PUnit m) unitInterval.half} {q : IterativeDomain «Σ» Γ α PUnit n} :
           Branch.seq q (Branch.close c p) = Branch.close c (Restriction.map (IterativeDomain.seq · q) p) := by
         unfold seq
         rfl
 
-      theorem Branch.seq_sync {m n} {c : Γ} {p : Restriction (IterativeDomain «Σ» Γ α PUnit m).carrier unitInterval.half} {q : (IterativeDomain «Σ» Γ α PUnit n).carrier} :
+      theorem Branch.seq_sync {m n} {c : Γ} {p : Restriction (IterativeDomain «Σ» Γ α PUnit m) unitInterval.half} {q : IterativeDomain «Σ» Γ α PUnit n} :
           Branch.seq q (Branch.sync c p) = Branch.sync c (Restriction.map (IterativeDomain.seq · q) p) := by
         unfold seq
         rfl
 
-      theorem Branch.seq_next {m n} {σ : «Σ»} {p : Restriction (IterativeDomain «Σ» Γ α PUnit m).carrier unitInterval.half} {q : (IterativeDomain «Σ» Γ α PUnit n).carrier} :
+      theorem Branch.seq_next {m n} {σ : «Σ»} {p : Restriction (IterativeDomain «Σ» Γ α PUnit m) unitInterval.half} {q : IterativeDomain «Σ» Γ α PUnit n} :
           Branch.seq q (Branch.next σ p) = Branch.next σ (Restriction.map (IterativeDomain.seq · q) p) := by
         unfold seq
         rfl
 
       mutual
-        theorem Branch.seq_eq_app {m n} {b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α PUnit m).carrier} {q : (IterativeDomain «Σ» Γ α PUnit n).carrier} :
+        theorem Branch.seq_eq_app {m n} {b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α PUnit m)} {q : IterativeDomain «Σ» Γ α PUnit n} :
             Branch.seq q b =
               (Branch.ap q ∘ Branch.map (IterativeDomain.map (β' := PUnit.{x + 1} →ₗ[1] PUnit.{x + 1}) (λ _ ↦ { toFun := λ _ ↦ PUnit.unit, lipschitz := λ x y ↦ by erw [one_mul] }))) b := by
           cases b using Branch.casesOn with
@@ -2336,7 +2343,7 @@ public import Extra.Sigma
             congr 2 with p : 1
             apply IterativeDomain.seq_eq_app
 
-        theorem IterativeDomain.seq_eq_app {m n} {p : (IterativeDomain «Σ» Γ α PUnit m).carrier} {q : (IterativeDomain «Σ» Γ α PUnit n).carrier} :
+        theorem IterativeDomain.seq_eq_app {m n} {p : IterativeDomain «Σ» Γ α PUnit m} {q : IterativeDomain «Σ» Γ α PUnit n} :
             IterativeDomain.seq p q = IterativeDomain.ap (IterativeDomain.map (β' := PUnit.{x + 1} →ₗ[1] PUnit.{x + 1}) (λ _ ↦ { toFun := λ _ ↦ PUnit.unit, lipschitz := λ x y ↦ by erw [one_mul] }) p) q := by
           match m, p with
           | 0, IterativeDomain.leaf v | m + 1, IterativeDomain.leaf v =>
@@ -2564,7 +2571,7 @@ public import Extra.Sigma
 
       mutual
         def Branch.syncClose {n} (c : Γ) (σ : «Σ») :
-            (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n).carrier) → (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n).carrier) :=
+            (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n)) → (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n)) :=
           Sum.elim (λ (c', π) ↦ if c = c' then .next (zero c σ).1 ⟨IterativeDomain.syncClose c (π (zero c σ).2 false).val⟩
                                 else .recv c' (λ v ok ↦ ⟨IterativeDomain.syncClose c (π v ok).val⟩)) <|
           Sum.elim (λ (c', v, p) ↦ if c = c' then .next σ ⟨IterativeDomain.abort⟩ else .send c' v ⟨IterativeDomain.syncClose c p.val⟩) <|
@@ -2573,7 +2580,7 @@ public import Extra.Sigma
                     (λ (σ, p) ↦ .next σ ⟨IterativeDomain.syncClose c p.val⟩)
 
         def IterativeDomain.syncClose {n} (c : Γ) :
-            (IterativeDomain «Σ» Γ α β n).carrier → (IterativeDomain «Σ» Γ α β n).carrier := match n with
+            IterativeDomain «Σ» Γ α β n → IterativeDomain «Σ» Γ α β n := match n with
           | 0 => id
           | n + 1 => Sum.map id (Sum.map id (Pi.map λ σ ↦ Set.image (Branch.syncClose c σ)))
       end
@@ -2586,18 +2593,18 @@ public import Extra.Sigma
           IterativeDomain.syncClose zero c (IterativeDomain.abort («Σ» := «Σ») (Γ := Γ) (α := α) (β := β) (n := n)) = IterativeDomain.abort := by
         cases n with (unfold syncClose; rfl)
 
-      theorem IterativeDomain.syncClose_branch {c : Γ} {n} {f : «Σ» → Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n).carrier)} :
+      theorem IterativeDomain.syncClose_branch {c : Γ} {n} {f : «Σ» → Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n))} :
           IterativeDomain.syncClose zero c (IterativeDomain.branch f) = IterativeDomain.branch λ σ ↦ Branch.syncClose zero c σ '' f σ := by
         unfold syncClose
         rfl
 
       @[push_cast]
-      theorem IterativeDomain.syncClose_cast {c : Γ} {m n} {p : (IterativeDomain «Σ» Γ α β m).carrier} (h : m = n) :
+      theorem IterativeDomain.syncClose_cast {c : Γ} {m n} {p : IterativeDomain «Σ» Γ α β m} (h : m = n) :
           h ▸ IterativeDomain.syncClose zero c p = IterativeDomain.syncClose zero c (h ▸ p) := by
         cases h
         rfl
 
-      theorem Branch.syncClose_recv {m} {c c' : Γ} {σ : «Σ»} {π : α →ᵤ Bool →ᵤ Restriction (IterativeDomain «Σ» Γ α β m).carrier unitInterval.half} :
+      theorem Branch.syncClose_recv {m} {c c' : Γ} {σ : «Σ»} {π : α →ᵤ Bool →ᵤ Restriction (IterativeDomain «Σ» Γ α β m) unitInterval.half} :
           Branch.syncClose zero c σ (Branch.recv c' π) =
             if c = c'
             then Branch.next (zero c σ).1 { val := IterativeDomain.syncClose zero c (π (zero c σ).2 false).val }
@@ -2605,7 +2612,7 @@ public import Extra.Sigma
         unfold Branch.syncClose
         rfl
 
-      theorem Branch.syncClose_send {m} {c c' : Γ} {σ : «Σ»} {v : α} {p : Restriction (IterativeDomain «Σ» Γ α β m).carrier unitInterval.half} :
+      theorem Branch.syncClose_send {m} {c c' : Γ} {σ : «Σ»} {v : α} {p : Restriction (IterativeDomain «Σ» Γ α β m) unitInterval.half} :
           Branch.syncClose zero c σ (Branch.send c' v p) =
             if c = c'
             then Branch.next σ { val := IterativeDomain.abort }
@@ -2613,7 +2620,7 @@ public import Extra.Sigma
         unfold Branch.syncClose
         rfl
 
-      theorem Branch.syncClose_sync {m} {c c' : Γ} {σ : «Σ»} {p : Restriction (IterativeDomain «Σ» Γ α β m).carrier unitInterval.half} :
+      theorem Branch.syncClose_sync {m} {c c' : Γ} {σ : «Σ»} {p : Restriction (IterativeDomain «Σ» Γ α β m) unitInterval.half} :
           Branch.syncClose zero c σ (Branch.sync c' p) =
             if c = c'
             then Branch.next σ { val := IterativeDomain.abort }
@@ -2621,7 +2628,7 @@ public import Extra.Sigma
         unfold Branch.syncClose
         rfl
 
-      theorem Branch.syncClose_close {m} {c c' : Γ} {σ : «Σ»} {p : Restriction (IterativeDomain «Σ» Γ α β m).carrier unitInterval.half} :
+      theorem Branch.syncClose_close {m} {c c' : Γ} {σ : «Σ»} {p : Restriction (IterativeDomain «Σ» Γ α β m) unitInterval.half} :
           Branch.syncClose zero c σ (Branch.close c' p) =
             if c = c'
             then Branch.next σ { val := IterativeDomain.abort }
@@ -2629,13 +2636,13 @@ public import Extra.Sigma
         unfold Branch.syncClose
         rfl
 
-      theorem Branch.syncClose_next {m} {c : Γ} {σ σ' : «Σ»} {p : Restriction (IterativeDomain «Σ» Γ α β m).carrier unitInterval.half} :
+      theorem Branch.syncClose_next {m} {c : Γ} {σ σ' : «Σ»} {p : Restriction (IterativeDomain «Σ» Γ α β m) unitInterval.half} :
           Branch.syncClose zero c σ (Branch.next σ' p) = Branch.next σ' { val := IterativeDomain.syncClose zero c p.val } := by
         unfold Branch.syncClose
         rfl
 
       mutual
-        theorem Branch.syncClose_lift {m n} {c : Γ} {σ : «Σ»} (h : m ≤ n) {b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier} :
+        theorem Branch.syncClose_lift {m n} {c : Γ} {σ : «Σ»} (h : m ≤ n) {b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m)} :
             Branch.map (IterativeDomain.lift h) (Branch.syncClose zero c σ b) =
               Branch.syncClose zero c σ (Branch.map (IterativeDomain.lift h) b) := by
           cases b with
@@ -2668,7 +2675,7 @@ public import Extra.Sigma
             rw [Branch.syncClose_next, Branch.map_next, Branch.map_next, Branch.syncClose_next,
                 ← IterativeDomain.syncClose_lift]
 
-        theorem IterativeDomain.syncClose_lift {m n} {c : Γ} (h : m ≤ n) {p : (IterativeDomain «Σ» Γ α β m).carrier} :
+        theorem IterativeDomain.syncClose_lift {m n} {c : Γ} (h : m ≤ n) {p : IterativeDomain «Σ» Γ α β m} :
             IterativeDomain.lift h (IterativeDomain.syncClose zero c p) =
               IterativeDomain.syncClose zero c (IterativeDomain.lift h p) := by
           match m, p with
@@ -2690,7 +2697,7 @@ public import Extra.Sigma
       end
 
       mutual
-        theorem Branch.syncClose_idist_le {c : Γ} {σ : «Σ»} {n} {b b' : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n).carrier} :
+        theorem Branch.syncClose_idist_le {c : Γ} {σ : «Σ»} {n} {b b' : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n)} :
             idist (Branch.syncClose zero c σ b) (Branch.syncClose zero c σ b') ≤ idist b b' := by
           cases b <;> cases b'
 
@@ -2782,7 +2789,7 @@ public import Extra.Sigma
           all:
             apply OrderTop.le_top
 
-        theorem IterativeDomain.syncClose_idist_le {c : Γ} {n} {p q : (IterativeDomain «Σ» Γ α β n).carrier} :
+        theorem IterativeDomain.syncClose_idist_le {c : Γ} {n} {p q : IterativeDomain «Σ» Γ α β n} :
             idist (IterativeDomain.syncClose zero c p) (IterativeDomain.syncClose zero c q) ≤ idist p q := by
           match n, p, q with
           | 0, IterativeDomain.leaf v, IterativeDomain.leaf v'
@@ -2863,8 +2870,8 @@ public import Extra.Sigma
     end Close
 
     section Choice
-      def IterativeDomain.choice {m n} (p : (IterativeDomain «Σ» Γ α PUnit.{x + 1} m).carrier) (q : (IterativeDomain «Σ» Γ α PUnit.{x + 1} n).carrier) :
-          (IterativeDomain «Σ» Γ α PUnit (m ⊔ n)).carrier :=
+      def IterativeDomain.choice {m n} (p : IterativeDomain «Σ» Γ α PUnit.{x + 1} m) (q : IterativeDomain «Σ» Γ α PUnit.{x + 1} n) :
+          IterativeDomain «Σ» Γ α PUnit (m ⊔ n) :=
         match m, n, p, q with
         | 0, _, .inl _, q | _ + 1, _, .inl _, q => IterativeDomain.lift (Nat.le_max_right _ _) q
         | _, 0, p, .inl _ | _, _ + 1, p, .inl _ => IterativeDomain.lift (Nat.le_max_left _ _) p
@@ -2875,7 +2882,7 @@ public import Extra.Sigma
             (Branch.map (IterativeDomain.lift (le_max_left m n)) '' g σ) ∪
             (Branch.map (IterativeDomain.lift (le_max_right m n)) '' g' σ)
 
-      theorem IterativeDomain.choice_leaf {m n} {p : (IterativeDomain «Σ» Γ α PUnit m).carrier} {v : PUnit} :
+      theorem IterativeDomain.choice_leaf {m n} {p : IterativeDomain «Σ» Γ α PUnit m} {v : PUnit} :
           IterativeDomain.choice p (IterativeDomain.leaf (n := n) v) = IterativeDomain.lift (le_max_left m n) p := by
         cases m <;> cases n <;> unfold choice
         1,2:
@@ -2888,7 +2895,7 @@ public import Extra.Sigma
           | IterativeDomain.abort => rfl
           | IterativeDomain.branch _ => rfl
 
-      theorem IterativeDomain.leaf_choice {m n} {q : (IterativeDomain «Σ» Γ α PUnit n).carrier} {v : PUnit} :
+      theorem IterativeDomain.leaf_choice {m n} {q : IterativeDomain «Σ» Γ α PUnit n} {v : PUnit} :
           IterativeDomain.choice (IterativeDomain.leaf (n := m) v) q = IterativeDomain.lift (le_max_right m n) q := by
         cases m <;> cases n <;> unfold choice
         1,3:
@@ -2901,7 +2908,7 @@ public import Extra.Sigma
           | IterativeDomain.abort => rfl
           | IterativeDomain.branch _ => rfl
 
-      theorem IterativeDomain.choice_abort {m n} {p : (IterativeDomain «Σ» Γ α PUnit m).carrier} :
+      theorem IterativeDomain.choice_abort {m n} {p : IterativeDomain «Σ» Γ α PUnit m} :
           IterativeDomain.choice p (IterativeDomain.abort (n := n)) = IterativeDomain.abort := by
         cases m <;> cases n <;> unfold choice
         1,2:
@@ -2914,7 +2921,7 @@ public import Extra.Sigma
           | IterativeDomain.abort => rfl
           | IterativeDomain.branch _ => rfl
 
-      theorem IterativeDomain.abort_choice {m n} {q : (IterativeDomain «Σ» Γ α PUnit n).carrier} :
+      theorem IterativeDomain.abort_choice {m n} {q : IterativeDomain «Σ» Γ α PUnit n} :
           IterativeDomain.choice (IterativeDomain.abort (n := m)) q = IterativeDomain.abort := by
         cases m <;> cases n <;> unfold choice
         1,3:
@@ -2927,22 +2934,22 @@ public import Extra.Sigma
           | IterativeDomain.abort => rfl
           | IterativeDomain.branch _ => rfl
 
-      theorem IterativeDomain.choice_branch_branch {m n} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α PUnit m).carrier)} {f' : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α PUnit n).carrier)} :
+      theorem IterativeDomain.choice_branch_branch {m n} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α PUnit m))} {f' : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α PUnit n))} :
           IterativeDomain.choice (IterativeDomain.branch f) (IterativeDomain.branch f') = max_succ ▸ IterativeDomain.branch λ σ ↦
             (Branch.map (IterativeDomain.lift (le_max_left m n)) '' f σ) ∪ (Branch.map (IterativeDomain.lift (le_max_right m n)) '' f' σ) := by
           rfl
 
-      theorem IterativeDomain.choice_cast_left {m n o} {h : m = o} {q : (IterativeDomain «Σ» Γ α PUnit n).carrier} {p : (IterativeDomain «Σ» Γ α PUnit m).carrier} :
+      theorem IterativeDomain.choice_cast_left {m n o} {h : m = o} {q : IterativeDomain «Σ» Γ α PUnit n} {p : IterativeDomain «Σ» Γ α PUnit m} :
           h ▸ IterativeDomain.choice p q = IterativeDomain.choice (h ▸ p) q := by
         cases h
         rfl
 
-      theorem IterativeDomain.choice_cast_right {m n o} {h : n = o} {q : (IterativeDomain «Σ» Γ α PUnit n).carrier} {p : (IterativeDomain «Σ» Γ α PUnit m).carrier} :
+      theorem IterativeDomain.choice_cast_right {m n o} {h : n = o} {q : IterativeDomain «Σ» Γ α PUnit n} {p : IterativeDomain «Σ» Γ α PUnit m} :
           h ▸ IterativeDomain.choice p q = IterativeDomain.choice p (h ▸ q) := by
         cases h
         rfl
 
-      theorem IterativeDomain.choice_lipschitz_left' {m n} {q : (IterativeDomain «Σ» Γ α PUnit n).carrier} {p p' : (IterativeDomain «Σ» Γ α PUnit m).carrier} :
+      theorem IterativeDomain.choice_lipschitz_left' {m n} {q : IterativeDomain «Σ» Γ α PUnit n} {p p' : IterativeDomain «Σ» Γ α PUnit m} :
           idist (choice p q) (choice p' q) ≤ idist p p' := by
         match n, q with
         | 0, IterativeDomain.leaf v
@@ -2988,8 +2995,8 @@ public import Extra.Sigma
               rw [Branch.map_isometry' λ p p' ↦ ?_]
               rw [IterativeDomain.lift_isometry']
 
-      theorem IterativeDomain.choice_lipschitz_left {m n} {q : (IterativeDomain «Σ» Γ α PUnit n).carrier} :
-          LipschitzWith 1 λ p : (IterativeDomain «Σ» Γ α PUnit m).carrier ↦ IterativeDomain.choice p q := by
+      theorem IterativeDomain.choice_lipschitz_left {m n} {q : IterativeDomain «Σ» Γ α PUnit n} :
+          LipschitzWith 1 λ p : IterativeDomain «Σ» Γ α PUnit m ↦ IterativeDomain.choice p q := by
         intros p p'
 
         erw [one_mul, PseudoIMetricSpace.edist_eq, PseudoIMetricSpace.edist_eq]
@@ -2997,7 +3004,7 @@ public import Extra.Sigma
         apply Subtype.coe_le_coe.mpr
         apply IterativeDomain.choice_lipschitz_left'
 
-      theorem IterativeDomain.choice_lipschitz_right' {m n} {q q' : (IterativeDomain «Σ» Γ α PUnit n).carrier} {p : (IterativeDomain «Σ» Γ α PUnit m).carrier} :
+      theorem IterativeDomain.choice_lipschitz_right' {m n} {q q' : IterativeDomain «Σ» Γ α PUnit n} {p : IterativeDomain «Σ» Γ α PUnit m} :
           idist (choice p q) (choice p q') ≤ idist q q' := by
         match m, p with
         | 0, IterativeDomain.leaf v
@@ -3043,7 +3050,7 @@ public import Extra.Sigma
               rw [Branch.map_isometry' λ p p' ↦ ?_]
               rw [IterativeDomain.lift_isometry']
 
-      theorem IterativeDomain.choice_lipschitz_right {m n} {p : (IterativeDomain «Σ» Γ α PUnit m).carrier} :
+      theorem IterativeDomain.choice_lipschitz_right {m n} {p : IterativeDomain «Σ» Γ α PUnit m} :
           LipschitzWith 1 (IterativeDomain.choice (n := n) p) := by
         intros q q'
 
@@ -3066,7 +3073,7 @@ public import Extra.Sigma
         IterativeDomain.choice_lipschitz.uniformContinuous
 
 
-      theorem IterativeDomain.lift_choice_left' {m n o} (h : m ≤ o) {p : (IterativeDomain «Σ» Γ α PUnit m).carrier} {q : (IterativeDomain «Σ» Γ α PUnit n).carrier} :
+      theorem IterativeDomain.lift_choice_left' {m n o} (h : m ≤ o) {p : IterativeDomain «Σ» Γ α PUnit m} {q : IterativeDomain «Σ» Γ α PUnit n} :
           IterativeDomain.choice (IterativeDomain.lift h p) q =
             IterativeDomain.lift (sup_le_sup_right h n) (IterativeDomain.choice p q) := by
         match m, p with
@@ -3104,13 +3111,13 @@ public import Extra.Sigma
               rfl
             · grind only [= max_def]
 
-      theorem IterativeDomain.lift_choice_left {m n o} (h : m ⊔ n ≤ o) {p : (IterativeDomain «Σ» Γ α PUnit m).carrier} {q : (IterativeDomain «Σ» Γ α PUnit n).carrier} :
+      theorem IterativeDomain.lift_choice_left {m n o} (h : m ⊔ n ≤ o) {p : IterativeDomain «Σ» Γ α PUnit m} {q : IterativeDomain «Σ» Γ α PUnit n} :
           IterativeDomain.lift h (IterativeDomain.choice p q) =
             max_eq_left (le_of_max_le_right h) ▸
               IterativeDomain.choice (IterativeDomain.lift (le_of_max_le_left h) p) q := by
         grind only [IterativeDomain.lift_choice_left']
 
-      theorem IterativeDomain.lift_choice_right' {m n o} (h : n ≤ o) {p : (IterativeDomain «Σ» Γ α PUnit m).carrier} {q : (IterativeDomain «Σ» Γ α PUnit n).carrier} :
+      theorem IterativeDomain.lift_choice_right' {m n o} (h : n ≤ o) {p : IterativeDomain «Σ» Γ α PUnit m} {q : IterativeDomain «Σ» Γ α PUnit n} :
           IterativeDomain.choice p (IterativeDomain.lift h q) =
             IterativeDomain.lift (sup_le_sup_left h m) (IterativeDomain.choice p q) := by
         match m, p with
@@ -3147,14 +3154,13 @@ public import Extra.Sigma
               rfl
             · grind only [= max_def]
 
-      theorem IterativeDomain.lift_choice_right {m n o} (h : m ⊔ n ≤ o) {p : (IterativeDomain «Σ» Γ α PUnit m).carrier} {q : (IterativeDomain «Σ» Γ α PUnit n).carrier} :
+      theorem IterativeDomain.lift_choice_right {m n o} (h : m ⊔ n ≤ o) {p : IterativeDomain «Σ» Γ α PUnit m} {q : IterativeDomain «Σ» Γ α PUnit n} :
           IterativeDomain.lift h (IterativeDomain.choice p q) =
             max_eq_right (le_of_max_le_left h) ▸
               IterativeDomain.choice p (IterativeDomain.lift (le_of_max_le_right h) q) := by
         grind only [IterativeDomain.lift_choice_right']
 
-      theorem IterativeDomain.choice_assoc {m n o} {p : (IterativeDomain «Σ» Γ α PUnit m).carrier}
-        {q : (IterativeDomain «Σ» Γ α PUnit n).carrier} {r : (IterativeDomain «Σ» Γ α PUnit o).carrier} :
+      theorem IterativeDomain.choice_assoc {m n o} {p : IterativeDomain «Σ» Γ α PUnit m} {q : IterativeDomain «Σ» Γ α PUnit n} {r : IterativeDomain «Σ» Γ α PUnit o} :
           IterativeDomain.choice p (IterativeDomain.choice q r) =
             Nat.max_assoc m n o ▸ IterativeDomain.choice (IterativeDomain.choice p q) r := by
         match m, p with
@@ -3216,7 +3222,7 @@ public import Extra.Sigma
               rw! [Nat.max_assoc m n o]
               rfl
 
-      theorem IterativeDomain.choice_comm {m n} {p : (IterativeDomain «Σ» Γ α PUnit m).carrier} {q : (IterativeDomain «Σ» Γ α PUnit n).carrier} :
+      theorem IterativeDomain.choice_comm {m n} {p : IterativeDomain «Σ» Γ α PUnit m} {q : IterativeDomain «Σ» Γ α PUnit n} :
           IterativeDomain.choice p q = Nat.max_comm n m ▸ IterativeDomain.choice q p := by
         match m, p with
         | 0, IterativeDomain.leaf v | m + 1, IterativeDomain.leaf v =>
@@ -3604,14 +3610,14 @@ public import Extra.Sigma
 
       open Classical in
       mutual
-        def Branch.hide (σ : «Σ») (c : Γ) {n} : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n).carrier → Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n).carrier) :=
+        def Branch.hide (σ : «Σ») (c : Γ) {n} : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n) → Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n)) :=
           Sum.elim (λ (c', π) ↦ if c = c' then ∅ else {Branch.recv c' λ v ok ↦ Restriction.map (IterativeDomain.hide c) (π v ok)}) <|
           Sum.elim (λ (c', v, p) ↦ if c = c' then ∅ else {Branch.send c' v (Restriction.map (IterativeDomain.hide c) p)}) <|
           Sum.elim (λ (c', p) ↦ if c = c' then {Branch.next σ (Restriction.map (IterativeDomain.syncClose zero c) p)} else {Branch.close c' (Restriction.map (IterativeDomain.hide c) p)}) <|
           Sum.elim (λ (c', p) ↦ if c = c' then {Branch.next σ (Restriction.map (IterativeDomain.hide c) p)} else {Branch.sync c' (Restriction.map (IterativeDomain.hide c) p)}) <|
           λ (σ, p) ↦ {Branch.next σ (Restriction.map (IterativeDomain.hide c) p)}
 
-        def IterativeDomain.hide (c : Γ) {n} : (IterativeDomain «Σ» Γ α β n).carrier → (IterativeDomain «Σ» Γ α β n).carrier :=
+        def IterativeDomain.hide (c : Γ) {n} : IterativeDomain «Σ» Γ α β n → IterativeDomain «Σ» Γ α β n :=
           match n with
           | 0 => id
           | n + 1 =>
@@ -3631,38 +3637,38 @@ public import Extra.Sigma
         cases n with (unfold hide; rfl)
 
       open Classical in
-      theorem IterativeDomain.hide_branch {c : Γ} {n} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n).carrier)} :
+      theorem IterativeDomain.hide_branch {c : Γ} {n} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n))} :
           IterativeDomain.hide zero c (IterativeDomain.branch f) = IterativeDomain.branch λ σ ↦
             (⋃ b ∈ f σ, Branch.hide zero σ c b) ∪ if (⋃ b ∈ f σ, Branch.hide zero σ c b) = ∅ ∧ f σ ≠ ∅ then {Branch.next σ ⟨IterativeDomain.abort⟩} else ∅ := by
           unfold hide
           rfl
 
-      theorem Branch.hide_recv {σ : «Σ»} {c c' : Γ} {n} {π : α →ᵤ Bool →ᵤ Restriction (IterativeDomain «Σ» Γ α β n).carrier unitInterval.half} :
+      theorem Branch.hide_recv {σ : «Σ»} {c c' : Γ} {n} {π : α →ᵤ Bool →ᵤ Restriction (IterativeDomain «Σ» Γ α β n) unitInterval.half} :
           Branch.hide zero σ c (Branch.recv c' π) = if c = c' then ∅ else {Branch.recv c' λ v ok ↦ Restriction.map (IterativeDomain.hide zero c) (π v ok)} := by
         unfold Branch.hide
         rfl
 
-      theorem Branch.hide_send {σ : «Σ»} {c c' : Γ} {v : α} {n} {p : Restriction (IterativeDomain «Σ» Γ α β n).carrier unitInterval.half} :
+      theorem Branch.hide_send {σ : «Σ»} {c c' : Γ} {v : α} {n} {p : Restriction (IterativeDomain «Σ» Γ α β n) unitInterval.half} :
           Branch.hide zero σ c (Branch.send c' v p) = if c = c' then ∅ else {Branch.send c' v (Restriction.map (IterativeDomain.hide zero c) p)} := by
         unfold Branch.hide
         rfl
 
-      theorem Branch.hide_close {σ : «Σ»} {c c' : Γ} {n} {p : Restriction (IterativeDomain «Σ» Γ α β n).carrier unitInterval.half} :
+      theorem Branch.hide_close {σ : «Σ»} {c c' : Γ} {n} {p : Restriction (IterativeDomain «Σ» Γ α β n) unitInterval.half} :
           Branch.hide zero σ c (Branch.close c' p) = if c = c' then {Branch.next σ (Restriction.map (IterativeDomain.syncClose zero c) p)} else {Branch.close c' (Restriction.map (IterativeDomain.hide zero c) p)} := by
         unfold Branch.hide
         rfl
 
-      theorem Branch.hide_sync {σ : «Σ»} {c c' : Γ} {n} {p : Restriction (IterativeDomain «Σ» Γ α β n).carrier unitInterval.half} :
+      theorem Branch.hide_sync {σ : «Σ»} {c c' : Γ} {n} {p : Restriction (IterativeDomain «Σ» Γ α β n) unitInterval.half} :
           Branch.hide zero σ c (Branch.sync c' p) = if c = c' then {Branch.next σ (Restriction.map (IterativeDomain.hide zero c) p)} else {Branch.sync c' (Restriction.map (IterativeDomain.hide zero c) p)} := by
         unfold Branch.hide
         rfl
 
-      theorem Branch.hide_next {σ σ' : «Σ»} {c : Γ} {n} {p : Restriction (IterativeDomain «Σ» Γ α β n).carrier unitInterval.half} :
+      theorem Branch.hide_next {σ σ' : «Σ»} {c : Γ} {n} {p : Restriction (IterativeDomain «Σ» Γ α β n) unitInterval.half} :
           Branch.hide zero σ' c (Branch.next σ p) = {Branch.next σ (Restriction.map (IterativeDomain.hide zero c) p)} := by
         unfold Branch.hide
         rfl
 
-      private lemma Branch.hide_empty_nonempty_idist_top {σ : «Σ»} {c : Γ} {n} {b b' : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n).carrier}
+      private lemma Branch.hide_empty_nonempty_idist_top {σ : «Σ»} {c : Γ} {n} {b b' : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n)}
         (hb : Branch.hide zero σ c b = ∅) (hb' : Branch.hide zero σ c b' ≠ ∅) :
           idist b b' = ⊤ := by
         cases b <;> cases b'
@@ -3694,7 +3700,7 @@ public import Extra.Sigma
         all: rfl
 
       mutual
-        theorem Branch.hide_idist_le {σ : «Σ»} {c : Γ} {n} {b b' : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n).carrier} :
+        theorem Branch.hide_idist_le {σ : «Σ»} {c : Γ} {n} {b b' : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n)} :
             IMetric.hausdorffIDist (Branch.hide zero σ c b) (Branch.hide zero σ c b') ≤ idist b b' := by
           cases b <;> cases b'
 
@@ -3779,7 +3785,7 @@ public import Extra.Sigma
             change _ ≤ ⊤
             apply OrderTop.le_top
 
-        theorem IterativeDomain.hide_idist_le {c : Γ} {n} {p p' : (IterativeDomain «Σ» Γ α β n).carrier} :
+        theorem IterativeDomain.hide_idist_le {c : Γ} {n} {p p' : IterativeDomain «Σ» Γ α β n} :
             idist (IterativeDomain.hide zero c p) (IterativeDomain.hide zero c p') ≤ idist p p' := by
           match n, p, p' with
           | 0, IterativeDomain.leaf v, IterativeDomain.leaf v'
@@ -3888,13 +3894,13 @@ public import Extra.Sigma
           UniformContinuous (IterativeDomain.hide («Σ» := «Σ») (α := α) (β := β) (n := n) zero c) :=
         (IterativeDomain.hide_lipschitz zero).uniformContinuous
 
-      theorem IterativeDomain.hide_cast {c : Γ} {m n} {h : m = n} {p : (IterativeDomain «Σ» Γ α β m).carrier} :
+      theorem IterativeDomain.hide_cast {c : Γ} {m n} {h : m = n} {p : IterativeDomain «Σ» Γ α β m} :
           h ▸ IterativeDomain.hide zero c p = IterativeDomain.hide zero c (h ▸ p) := by
         cases h
         rfl
 
       mutual
-        theorem Branch.hide_lift {σ : «Σ»} {c : Γ} {m n} (h : m ≤ n) {b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier} :
+        theorem Branch.hide_lift {σ : «Σ»} {c : Γ} {m n} (h : m ≤ n) {b : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m)} :
             Branch.map (IterativeDomain.lift h) '' Branch.hide zero σ c b = Branch.hide zero σ c (Branch.map (IterativeDomain.lift h) b) := by
           cases b with
           | recv c' π =>
@@ -3929,7 +3935,7 @@ public import Extra.Sigma
             rw [Branch.hide_next, Set.image_singleton, Branch.map_next, Branch.map_next, Branch.hide_next, Restriction.map,
                 Restriction.map, Restriction.map, Restriction.map, IterativeDomain.hide_lift]
 
-        theorem IterativeDomain.hide_lift {c : Γ} {m n} (h : m ≤ n) {p : (IterativeDomain «Σ» Γ α β m).carrier} :
+        theorem IterativeDomain.hide_lift {c : Γ} {m n} (h : m ≤ n) {p : IterativeDomain «Σ» Γ α β m} :
             IterativeDomain.lift h (IterativeDomain.hide zero c p) = IterativeDomain.hide zero c (IterativeDomain.lift h p) := by
           match m, p with
           | 0, IterativeDomain.leaf v
@@ -4012,23 +4018,23 @@ public import Extra.Sigma
       /-! ## Parallel composition -/
 
       mutual
-        def Branch.parallel_left {m n} (p' : (IterativeDomain «Σ» Γ α γ n).carrier) :
-            Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier → Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β × γ) (m + n)).carrier :=
+        def Branch.parallel_left {m n} (p' : IterativeDomain «Σ» Γ α γ n) :
+            Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m) → Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β × γ) (m + n)) :=
           Sum.map (Prod.map id (Pi.map λ _ ↦ Pi.map λ _ ↦ Restriction.map (IterativeDomain.parallel · p'))) <|
           Sum.map (Prod.map id (Prod.map id (Restriction.map (IterativeDomain.parallel · p')))) <|
           Sum.map (Prod.map id (Restriction.map (IterativeDomain.parallel · p'))) <|
           Sum.map (Prod.map id (Restriction.map (IterativeDomain.parallel · p'))) <|
                   (Prod.map id (Restriction.map (IterativeDomain.parallel · p')))
 
-        def Branch.parallel_right {m n} (p : (IterativeDomain «Σ» Γ α β m).carrier) :
-            Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier → Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β × γ) (m + n)).carrier :=
+        def Branch.parallel_right {m n} (p : IterativeDomain «Σ» Γ α β m) :
+            Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n) → Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β × γ) (m + n)) :=
           Sum.map (Prod.map id (Pi.map λ _ ↦ Pi.map λ _ ↦ Restriction.map (IterativeDomain.parallel p))) <|
           Sum.map (Prod.map id (Prod.map id (Restriction.map (IterativeDomain.parallel p)))) <|
           Sum.map (Prod.map id (Restriction.map (IterativeDomain.parallel p))) <|
           Sum.map (Prod.map id (Restriction.map (IterativeDomain.parallel p))) <|
                   (Prod.map id (Restriction.map (IterativeDomain.parallel p)))
 
-        def IterativeDomain.parallel {m n} (p : (IterativeDomain «Σ» Γ α β m).carrier) (p' : (IterativeDomain «Σ» Γ α γ n).carrier) : (IterativeDomain «Σ» Γ α (β × γ) (m + n)).carrier :=
+        def IterativeDomain.parallel {m n} (p : IterativeDomain «Σ» Γ α β m) (p' : IterativeDomain «Σ» Γ α γ n) : IterativeDomain «Σ» Γ α (β × γ) (m + n) :=
           match m, n, p, p' with
           | 0, _, IterativeDomain.leaf v, p' | m + 1, _, IterativeDomain.leaf v, p' =>
             IterativeDomain.lift (by grind only) <| IterativeDomain.map (v, ·) p'
@@ -4046,7 +4052,7 @@ public import Extra.Sigma
             ∪ {p | ∃ v γ p' π', .send γ v ⟨p'⟩ ∈ g' σ ∧ .recv γ π' ∈ g σ ∧ p = .sync γ ⟨IterativeDomain.lift (by grind only) (IterativeDomain.parallel (π' v true).val p')⟩}
       end
 
-      theorem IterativeDomain.leaf_parallel {m n} {v : β} {q : (IterativeDomain «Σ» Γ α γ n).carrier} :
+      theorem IterativeDomain.leaf_parallel {m n} {v : β} {q : IterativeDomain «Σ» Γ α γ n} :
           IterativeDomain.parallel (IterativeDomain.leaf (n := m) v) q = IterativeDomain.lift (Nat.le_add_left n m) (IterativeDomain.map (v, ·) q) := by
         match n, q with
         | 0, IterativeDomain.leaf v
@@ -4057,7 +4063,7 @@ public import Extra.Sigma
           unfold parallel
           cases m with rfl
 
-      theorem IterativeDomain.parallel_leaf {m n} {v : β} {p : (IterativeDomain «Σ» Γ α γ m).carrier} :
+      theorem IterativeDomain.parallel_leaf {m n} {v : β} {p : IterativeDomain «Σ» Γ α γ m} :
           IterativeDomain.parallel p (IterativeDomain.leaf (n := n) v) = IterativeDomain.lift (Nat.le_add_right m n) (IterativeDomain.map (·, v) p) := by
         match m, p with
         | 0, IterativeDomain.leaf v'
@@ -4070,7 +4076,7 @@ public import Extra.Sigma
           unfold parallel
           cases n with rfl
 
-      theorem IterativeDomain.abort_parallel {m n} {q : (IterativeDomain «Σ» Γ α γ n).carrier} :
+      theorem IterativeDomain.abort_parallel {m n} {q : IterativeDomain «Σ» Γ α γ n} :
           IterativeDomain.parallel (IterativeDomain.abort (n := m) (β := β)) q = IterativeDomain.abort := by
         match n, q with
         | 0, IterativeDomain.leaf v
@@ -4081,7 +4087,7 @@ public import Extra.Sigma
           unfold parallel
           cases m with rfl
 
-      theorem IterativeDomain.parallel_abort {m n} {q : (IterativeDomain «Σ» Γ α γ n).carrier} :
+      theorem IterativeDomain.parallel_abort {m n} {q : IterativeDomain «Σ» Γ α γ n} :
           IterativeDomain.parallel q (IterativeDomain.abort (n := m) (β := β)) = IterativeDomain.abort := by
         match n, q with
         | 0, IterativeDomain.leaf v
@@ -4092,7 +4098,7 @@ public import Extra.Sigma
           unfold parallel
           cases m with rfl
 
-      theorem IterativeDomain.parallel_branch_branch {m n} {g : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)} {g' : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)} :
+      theorem IterativeDomain.parallel_branch_branch {m n} {g : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))} {g' : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))} :
           IterativeDomain.parallel (IterativeDomain.branch g) (IterativeDomain.branch g') =
             IterativeDomain.branch (n := (m + 1) + n) λ σ ↦
                 ({(Nat.succ_add_eq_add_succ m n).symm ▸ Branch.parallel_left (IterativeDomain.branch (n := n) g') b | b ∈ g σ})
@@ -4102,32 +4108,32 @@ public import Extra.Sigma
               := by
         conv_lhs => unfold parallel
 
-      theorem Branch.parallel_left_recv {m n} {q : (IterativeDomain «Σ» Γ α γ n).carrier} {c : Γ} {π : α →ᵤ Bool →ᵤ Restriction (IterativeDomain «Σ» Γ α β m).carrier unitInterval.half} :
+      theorem Branch.parallel_left_recv {m n} {q : IterativeDomain «Σ» Γ α γ n} {c : Γ} {π : α →ᵤ Bool →ᵤ Restriction (IterativeDomain «Σ» Γ α β m) unitInterval.half} :
           Branch.parallel_left q (Branch.recv c π) = Branch.recv c λ v ok ↦ Restriction.map (IterativeDomain.parallel · q) (π v ok) := by
         unfold parallel_left
         rfl
 
-      theorem Branch.parallel_left_send {m n} {q : (IterativeDomain «Σ» Γ α γ n).carrier} {c : Γ} {v : α} {p : Restriction (IterativeDomain «Σ» Γ α β m).carrier unitInterval.half} :
+      theorem Branch.parallel_left_send {m n} {q : IterativeDomain «Σ» Γ α γ n} {c : Γ} {v : α} {p : Restriction (IterativeDomain «Σ» Γ α β m) unitInterval.half} :
           Branch.parallel_left q (Branch.send c v p) = Branch.send c v (Restriction.map (IterativeDomain.parallel · q) p) := by
         unfold parallel_left
         rfl
 
-      theorem Branch.parallel_left_close {m n} {q : (IterativeDomain «Σ» Γ α γ n).carrier} {c : Γ} {p : Restriction (IterativeDomain «Σ» Γ α β m).carrier unitInterval.half} :
+      theorem Branch.parallel_left_close {m n} {q : IterativeDomain «Σ» Γ α γ n} {c : Γ} {p : Restriction (IterativeDomain «Σ» Γ α β m) unitInterval.half} :
           Branch.parallel_left q (Branch.close c p) = Branch.close c (Restriction.map (IterativeDomain.parallel · q) p) := by
         unfold parallel_left
         rfl
 
-      theorem Branch.parallel_left_sync {m n} {q : (IterativeDomain «Σ» Γ α γ n).carrier} {c : Γ} {p : Restriction (IterativeDomain «Σ» Γ α β m).carrier unitInterval.half} :
+      theorem Branch.parallel_left_sync {m n} {q : IterativeDomain «Σ» Γ α γ n} {c : Γ} {p : Restriction (IterativeDomain «Σ» Γ α β m) unitInterval.half} :
           Branch.parallel_left q (Branch.sync c p) = Branch.sync c (Restriction.map (IterativeDomain.parallel · q) p) := by
         unfold parallel_left
         rfl
 
-      theorem Branch.parallel_left_next {m n} {q : (IterativeDomain «Σ» Γ α γ n).carrier} {σ : «Σ»} {p : Restriction (IterativeDomain «Σ» Γ α β m).carrier unitInterval.half} :
+      theorem Branch.parallel_left_next {m n} {q : IterativeDomain «Σ» Γ α γ n} {σ : «Σ»} {p : Restriction (IterativeDomain «Σ» Γ α β m) unitInterval.half} :
           Branch.parallel_left q (Branch.next σ p) = Branch.next σ (Restriction.map (IterativeDomain.parallel · q) p) := by
         unfold parallel_left
         rfl
 
-      theorem Branch.parallel_left_eq_map {m n} {q : (IterativeDomain «Σ» Γ α γ n).carrier} :
+      theorem Branch.parallel_left_eq_map {m n} {q : IterativeDomain «Σ» Γ α γ n} :
           Branch.parallel_left (β := β) (m := m) q = Branch.map (IterativeDomain.parallel · q) := by
         funext b
         cases b with
@@ -4142,32 +4148,32 @@ public import Extra.Sigma
         | next σ p =>
           rw [Branch.map_next, Branch.parallel_left_next]
 
-      theorem Branch.parallel_right_recv {m n} {p : (IterativeDomain «Σ» Γ α β m).carrier} {c : Γ} {π : α →ᵤ Bool →ᵤ Restriction (IterativeDomain «Σ» Γ α γ n).carrier unitInterval.half} :
+      theorem Branch.parallel_right_recv {m n} {p : IterativeDomain «Σ» Γ α β m} {c : Γ} {π : α →ᵤ Bool →ᵤ Restriction (IterativeDomain «Σ» Γ α γ n) unitInterval.half} :
           Branch.parallel_right p (Branch.recv c π) = Branch.recv c λ v ok ↦ Restriction.map (IterativeDomain.parallel p) (π v ok) := by
         unfold parallel_right
         rfl
 
-      theorem Branch.parallel_right_send {m n} {p : (IterativeDomain «Σ» Γ α β m).carrier} {c : Γ} {v : α} {q : Restriction (IterativeDomain «Σ» Γ α γ n).carrier unitInterval.half} :
+      theorem Branch.parallel_right_send {m n} {p : IterativeDomain «Σ» Γ α β m} {c : Γ} {v : α} {q : Restriction (IterativeDomain «Σ» Γ α γ n) unitInterval.half} :
           Branch.parallel_right p (Branch.send c v q) = Branch.send c v (Restriction.map (IterativeDomain.parallel p) q) := by
         unfold parallel_right
         rfl
 
-      theorem Branch.parallel_right_close {m n} {p : (IterativeDomain «Σ» Γ α β m).carrier} {c : Γ} {q : Restriction (IterativeDomain «Σ» Γ α γ n).carrier unitInterval.half} :
+      theorem Branch.parallel_right_close {m n} {p : IterativeDomain «Σ» Γ α β m} {c : Γ} {q : Restriction (IterativeDomain «Σ» Γ α γ n) unitInterval.half} :
           Branch.parallel_right p (Branch.close c q) = Branch.close c (Restriction.map (IterativeDomain.parallel p) q) := by
         unfold parallel_right
         rfl
 
-      theorem Branch.parallel_right_sync {m n} {p : (IterativeDomain «Σ» Γ α β m).carrier} {c : Γ} {q : Restriction (IterativeDomain «Σ» Γ α γ n).carrier unitInterval.half} :
+      theorem Branch.parallel_right_sync {m n} {p : IterativeDomain «Σ» Γ α β m} {c : Γ} {q : Restriction (IterativeDomain «Σ» Γ α γ n) unitInterval.half} :
           Branch.parallel_right p (Branch.sync c q) = Branch.sync c (Restriction.map (IterativeDomain.parallel p) q) := by
         unfold parallel_right
         rfl
 
-      theorem Branch.parallel_right_next {m n} {p : (IterativeDomain «Σ» Γ α β m).carrier} {σ : «Σ»} {q : Restriction (IterativeDomain «Σ» Γ α γ n).carrier unitInterval.half} :
+      theorem Branch.parallel_right_next {m n} {p : IterativeDomain «Σ» Γ α β m} {σ : «Σ»} {q : Restriction (IterativeDomain «Σ» Γ α γ n) unitInterval.half} :
           Branch.parallel_right p (Branch.next σ q) = Branch.next σ (Restriction.map (IterativeDomain.parallel p) q) := by
         unfold parallel_right
         rfl
 
-      theorem Branch.parallel_right_eq_map {m n} {p : (IterativeDomain «Σ» Γ α β m).carrier} :
+      theorem Branch.parallel_right_eq_map {m n} {p : IterativeDomain «Σ» Γ α β m} :
           Branch.parallel_right (γ := γ) (n := n) p = Branch.map (IterativeDomain.parallel p) := by
         funext b
         cases b with
@@ -4182,12 +4188,12 @@ public import Extra.Sigma
         | next σ p =>
           rw [Branch.map_next, Branch.parallel_right_next]
 
-      private theorem cast_union {m n} {s t : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)} (h : m = n) :
+      private theorem cast_union {m n} {s t : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))} (h : m = n) :
           h ▸ (s ∪ t) = (h ▸ s) ∪ (h ▸ t) := by
         cases h
         rfl
 
-      theorem IterativeDomain.parallel_comm {m n} {p : (IterativeDomain «Σ» Γ α β m).carrier} {q : (IterativeDomain «Σ» Γ α γ n).carrier} :
+      theorem IterativeDomain.parallel_comm {m n} {p : IterativeDomain «Σ» Γ α β m} {q : IterativeDomain «Σ» Γ α γ n} :
           IterativeDomain.parallel p q = Nat.add_comm _ _ ▸ IterativeDomain.map Prod.swap (IterativeDomain.parallel q p) := by
         match m, p with
         | 0, IterativeDomain.leaf v
@@ -4270,7 +4276,7 @@ public import Extra.Sigma
                 enter [p, 1, v, 1, c, 1, p', 2, 1, π, 2, 2, 2, 1, 2]; rw [IterativeDomain.parallel_comm]
               grind only
 
-      theorem IterativeDomain.parallel_idist_le_left {m n} {p p' : (IterativeDomain «Σ» Γ α β m).carrier} {q : (IterativeDomain «Σ» Γ α γ n).carrier} :
+      theorem IterativeDomain.parallel_idist_le_left {m n} {p p' : IterativeDomain «Σ» Γ α β m} {q : IterativeDomain «Σ» Γ α γ n} :
           idist (IterativeDomain.parallel p q) (IterativeDomain.parallel p' q) ≤ idist p p' := by
         match n, q with
         | 0, IterativeDomain.leaf v
@@ -4350,8 +4356,8 @@ public import Extra.Sigma
                 · apply IterativeDomain.parallel_idist_le_left
             · apply le_trans (b := IMetric.hausdorffIDist (f σ) (f' σ))
               · -- Rewrite the set into a more convenient set
-                have h (A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)) {h₁ : m + n ≤ m + 1 + n} :
-                    {p : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β × γ) (m + 1 + n)).carrier |
+                have h (A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))) {h₁ : m + n ≤ m + 1 + n} :
+                    {p : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β × γ) (m + 1 + n)) |
                       ∃ v c p' π', Branch.send c v ⟨p'⟩ ∈ A ∧ Branch.recv c π' ∈ f'' σ ∧ p = Branch.sync c ⟨lift h₁ (parallel p' (π' v true).val)⟩} =
                     ⋃ b ∈ A, match (motive := Branch .. → Set _) b with
                       | Branch.send c v ⟨p'⟩ => {p | ∃ π', Branch.recv c π' ∈ f'' σ ∧ p = Branch.sync c ⟨lift h₁ (parallel p' (π' v true).val)⟩}
@@ -4376,8 +4382,8 @@ public import Extra.Sigma
                   rw [Branch.idist_send_send]
                   dsimp
 
-                  have h' (c v) (p' : (IterativeDomain «Σ» Γ α β m).carrier) {h₁ : m + n ≤ m + 1 + n} :
-                      {p : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β × γ) (m + 1 + n)).carrier |
+                  have h' (c v) (p' : IterativeDomain «Σ» Γ α β m) {h₁ : m + n ≤ m + 1 + n} :
+                      {p : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β × γ) (m + 1 + n)) |
                         ∃ π', Branch.recv c π' ∈ f'' σ ∧ p = Branch.sync c ⟨lift h₁ (parallel p' (π' v true).val)⟩} =
                       ⋃ p'' ∈ f'' σ, match (motive := Branch .. → Set _) p'' with
                         | Branch.recv c' π' => if c = c' then {Branch.sync c ⟨lift h₁ (parallel p' (π' v true).val)⟩} else ∅
@@ -4454,8 +4460,8 @@ public import Extra.Sigma
               · apply le_iSup (f := λ σ ↦ IMetric.hausdorffIDist (f σ) (f' σ))
             · apply le_trans (b := IMetric.hausdorffIDist (f σ) (f' σ))
               · -- Rewrite the set into a more convenient set
-                have h (A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)) {h₁ : m + n ≤ m + 1 + n} :
-                    {p : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β × γ) (m + 1 + n)).carrier |
+                have h (A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))) {h₁ : m + n ≤ m + 1 + n} :
+                    {p : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β × γ) (m + 1 + n)) |
                       ∃ v c p' π', Branch.send c v ⟨p'⟩ ∈ f'' σ ∧ Branch.recv c π' ∈ A ∧ p = Branch.sync c ⟨lift h₁ (parallel (π' v true).val p')⟩} =
                     ⋃ b ∈ A, match (motive := Branch .. → Set _) b with
                       | Branch.recv c π' => {p | ∃ v p', Branch.send c v ⟨p'⟩ ∈ f'' σ ∧ p = Branch.sync c ⟨lift h₁ (parallel (π' v true).val p')⟩}
@@ -4483,8 +4489,8 @@ public import Extra.Sigma
                     rw [bot_sup_eq, UniformFun.idist_eq_iSup₂]
                     dsimp only
 
-                    have h' (c) (π' : α →ᵤ Bool →ᵤ Restriction (IterativeDomain «Σ» Γ α β m).carrier unitInterval.half) {h₁ : m + n ≤ m + 1 + n} :
-                        {p : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β × γ) (m + 1 + n)).carrier |
+                    have h' (c) (π' : α →ᵤ Bool →ᵤ Restriction (IterativeDomain «Σ» Γ α β m) unitInterval.half) {h₁ : m + n ≤ m + 1 + n} :
+                        {p : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β × γ) (m + 1 + n)) |
                           ∃ v p', Branch.send c v ⟨p'⟩ ∈ f'' σ ∧ p = Branch.sync c ⟨lift h₁ (parallel (π' v true).val p')⟩} =
                         ⋃ p'' ∈ f'' σ, match (motive := Branch .. → Set _) p'' with
                           | Branch.send c' v p' => if c = c' then {Branch.sync c ⟨lift h₁ (parallel (π' v true).val p'.val)⟩} else ∅
@@ -4542,15 +4548,15 @@ public import Extra.Sigma
                   apply OrderBot.bot_le
               · apply le_iSup (f := λ σ ↦ IMetric.hausdorffIDist (f σ) (f' σ))
 
-      theorem IterativeDomain.parallel_lipschitz_left {m n} {q : (IterativeDomain «Σ» Γ α γ n).carrier} :
-          LipschitzWith 1 λ p : (IterativeDomain «Σ» Γ α β m).carrier ↦ parallel p q := by
+      theorem IterativeDomain.parallel_lipschitz_left {m n} {q : IterativeDomain «Σ» Γ α γ n} :
+          LipschitzWith 1 λ p : IterativeDomain «Σ» Γ α β m ↦ parallel p q := by
         intros p p'
         erw [one_mul, PseudoIMetricSpace.edist_eq, PseudoIMetricSpace.edist_eq]
         apply ENNReal.ofReal_le_ofReal
         apply Subtype.coe_le_coe.mpr
         apply IterativeDomain.parallel_idist_le_left
 
-      theorem IterativeDomain.parallel_idist_le_right {m n} {p : (IterativeDomain «Σ» Γ α β m).carrier} {q q' : (IterativeDomain «Σ» Γ α γ n).carrier} :
+      theorem IterativeDomain.parallel_idist_le_right {m n} {p : IterativeDomain «Σ» Γ α β m} {q q' : IterativeDomain «Σ» Γ α γ n} :
           idist (IterativeDomain.parallel p q) (IterativeDomain.parallel p q') ≤ idist q q' := by
         rw [IterativeDomain.parallel_comm (q := q), IterativeDomain.parallel_comm (q := q'),
             ← IterativeDomain.idist_cast, ← Subtype.coe_le_coe, ← one_mul (idist q q' : ℝ)]
@@ -4562,8 +4568,8 @@ public import Extra.Sigma
         · erw [one_mul, one_mul, Subtype.coe_le_coe]
           apply IterativeDomain.parallel_idist_le_left
 
-      theorem IterativeDomain.parallel_lipschitz_right {m n} {p : (IterativeDomain «Σ» Γ α β m).carrier} :
-          LipschitzWith 1 (parallel p : (IterativeDomain «Σ» Γ α γ n).carrier → _) := by
+      theorem IterativeDomain.parallel_lipschitz_right {m n} {p : IterativeDomain «Σ» Γ α β m} :
+          LipschitzWith 1 (parallel p : IterativeDomain «Σ» Γ α γ n → _) := by
         intros q q'
         erw [one_mul, PseudoIMetricSpace.edist_eq, PseudoIMetricSpace.edist_eq]
         apply ENNReal.ofReal_le_ofReal
@@ -4583,17 +4589,17 @@ public import Extra.Sigma
           UniformContinuous₂ (IterativeDomain.parallel («Σ» := «Σ») (Γ := Γ) (α := α) (β := β) (γ := γ) (m := m) (n := n)) :=
         IterativeDomain.parallel_lipschitz.uniformContinuous
 
-      theorem IterativeDomain.parallel_cast_left {m n o} (h : m = o) {p : (IterativeDomain «Σ» Γ α β m).carrier} {q : (IterativeDomain «Σ» Γ α γ n).carrier} :
+      theorem IterativeDomain.parallel_cast_left {m n o} (h : m = o) {p : IterativeDomain «Σ» Γ α β m} {q : IterativeDomain «Σ» Γ α γ n} :
           h ▸ IterativeDomain.parallel p q = IterativeDomain.parallel (h ▸ p) q := by
         cases h
         rfl
 
-      theorem IterativeDomain.parallel_cast_right {m n o} (h : n = o) {p : (IterativeDomain «Σ» Γ α β m).carrier} {q : (IterativeDomain «Σ» Γ α γ n).carrier} :
+      theorem IterativeDomain.parallel_cast_right {m n o} (h : n = o) {p : IterativeDomain «Σ» Γ α β m} {q : IterativeDomain «Σ» Γ α γ n} :
           h ▸ IterativeDomain.parallel p q = IterativeDomain.parallel p (h ▸ q) := by
         cases h
         rfl
 
-      theorem IterativeDomain.parallel_lift_left {m n o} (h : m + n ≤ o) {p : (IterativeDomain «Σ» Γ α β m).carrier} {q : (IterativeDomain «Σ» Γ α γ n).carrier} :
+      theorem IterativeDomain.parallel_lift_left {m n o} (h : m + n ≤ o) {p : IterativeDomain «Σ» Γ α β m} {q : IterativeDomain «Σ» Γ α γ n} :
           IterativeDomain.lift h (IterativeDomain.parallel p q) =
             Nat.sub_add_cancel (Nat.le_of_add_left_le h) ▸
               IterativeDomain.parallel (IterativeDomain.lift (Nat.le_sub_of_add_le h) p) q := by
@@ -4702,12 +4708,12 @@ public import Extra.Sigma
                 erw [Branch.map_sync, Restriction.map, IterativeDomain.lift_lift', IterativeDomain.parallel_lift_left,
                       IterativeDomain.parallel_lift_left, IterativeDomain.lift_lift']
 
-      theorem IterativeDomain.parallel_lift_left' {m n o} (h : m ≤ o) {p : (IterativeDomain «Σ» Γ α β m).carrier} {q : (IterativeDomain «Σ» Γ α γ n).carrier} :
+      theorem IterativeDomain.parallel_lift_left' {m n o} (h : m ≤ o) {p : IterativeDomain «Σ» Γ α β m} {q : IterativeDomain «Σ» Γ α γ n} :
           IterativeDomain.lift (Nat.add_le_add_right h n) (IterativeDomain.parallel p q) =
             IterativeDomain.parallel (IterativeDomain.lift h p) q := by
         grind only [IterativeDomain.parallel_lift_left]
 
-      theorem IterativeDomain.parallel_lift_right {m n o} (h : m + n ≤ o) {p : (IterativeDomain «Σ» Γ α β m).carrier} {q : (IterativeDomain «Σ» Γ α γ n).carrier} :
+      theorem IterativeDomain.parallel_lift_right {m n o} (h : m + n ≤ o) {p : IterativeDomain «Σ» Γ α β m} {q : IterativeDomain «Σ» Γ α γ n} :
           IterativeDomain.lift h (IterativeDomain.parallel p q) =
             (by grind only : m + (o - m) = o) ▸
               IterativeDomain.parallel p (IterativeDomain.lift (Nat.le_sub_of_add_le' h) q) := by
@@ -4716,13 +4722,12 @@ public import Extra.Sigma
         erw [IterativeDomain.map_lift, IterativeDomain.parallel_lift_left]
         grind only
 
-      theorem IterativeDomain.parallel_lift_right' {m n o} (h : n ≤ o) {p : (IterativeDomain «Σ» Γ α β m).carrier} {q : (IterativeDomain «Σ» Γ α γ n).carrier} :
+      theorem IterativeDomain.parallel_lift_right' {m n o} (h : n ≤ o) {p : IterativeDomain «Σ» Γ α β m} {q : IterativeDomain «Σ» Γ α γ n} :
           IterativeDomain.lift (Nat.add_le_add_left h m) (IterativeDomain.parallel p q) =
             IterativeDomain.parallel p (IterativeDomain.lift h q) := by
         grind only [IterativeDomain.parallel_lift_right]
 
-      theorem IterativeDomain.parallel_map_left [IMetricSpace δ] {f : β → δ} {m n}
-        {p : (IterativeDomain «Σ» Γ α β m).carrier} {q : (IterativeDomain «Σ» Γ α γ n).carrier} :
+      theorem IterativeDomain.parallel_map_left [IMetricSpace δ] {f : β → δ} {m n} {p : IterativeDomain «Σ» Γ α β m} {q : IterativeDomain «Σ» Γ α γ n} :
           IterativeDomain.parallel (IterativeDomain.map f p) q = IterativeDomain.map (Prod.map f id) (IterativeDomain.parallel p q) := by
         match m, p with
         | 0, IterativeDomain.leaf v | m + 1, IterativeDomain.leaf v =>
@@ -4792,19 +4797,19 @@ public import Extra.Sigma
         rfl
 
       theorem IterativeDomain.parallel_map_right [IMetricSpace δ] {f : γ → δ} {m n}
-        {p : (IterativeDomain «Σ» Γ α β m).carrier} {q : (IterativeDomain «Σ» Γ α γ n).carrier} :
+        {p : IterativeDomain «Σ» Γ α β m} {q : IterativeDomain «Σ» Γ α γ n} :
           IterativeDomain.parallel p (IterativeDomain.map f q) = IterativeDomain.map (Prod.map id f) (IterativeDomain.parallel p q) := by
         rw [IterativeDomain.parallel_comm, IterativeDomain.parallel_map_left, IterativeDomain.parallel_comm, IterativeDomain.map_map,
             IterativeDomain.map_cast, IterativeDomain.map_map]
         conv_lhs => enter [1, 1, 1]; simp only [Function.comp_def, Prod.swap_map, Prod.swap_swap]
         grind only
 
-      private theorem left_cast_eq_iff_right_cast_eq {m n} (h : m = n) {p : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier} {q : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n).carrier} :
+      private theorem left_cast_eq_iff_right_cast_eq {m n} (h : m = n) {p : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m)} {q : Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n)} :
           (h ▸ p) = q ↔ p = (h ▸ q) := by
         cases h
         rfl
 
-      private theorem left_cast_eq_iff_right_cast_eq' {m n} (h : m = n) {p : (IterativeDomain «Σ» Γ α β m).carrier} {q : (IterativeDomain «Σ» Γ α β n).carrier} :
+      private theorem left_cast_eq_iff_right_cast_eq' {m n} (h : m = n) {p : IterativeDomain «Σ» Γ α β m} {q : IterativeDomain «Σ» Γ α β n} :
           (h ▸ p) = q ↔ p = (h ▸ q) := by
         cases h
         rfl
@@ -4815,27 +4820,27 @@ public import Extra.Sigma
           (∃ x ∈ s ∪ t, p x) ↔ (∃ x ∈ s, p x) ∨ (∃ x ∈ t, p x) := by
         simp_rw [Set.mem_union, or_and_right, exists_or]
 
-      private def Il {m n} (f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)) (S : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)) :
-          Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β × γ) (m + 1 + n)).carrier) :=
+      private def Il {m n} (f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))) (S : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))) :
+          Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β × γ) (m + 1 + n))) :=
         {(Nat.succ_add_eq_add_succ m n).symm ▸ Branch.parallel_left (IterativeDomain.branch f) b | b ∈ S}
 
-      private theorem Il_eq {m n} (f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)) (S : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)) :
+      private theorem Il_eq {m n} (f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))) (S : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))) :
           Il f S = {(Nat.succ_add_eq_add_succ m n).symm ▸ Branch.map (IterativeDomain.parallel · (IterativeDomain.branch f)) b | b ∈ S} := by
         simp only [Il, Branch.parallel_left_eq_map]
 
       @[simp]
-      private theorem Il_union_right {m n} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)} (A B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)) :
+      private theorem Il_union_right {m n} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))} (A B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))) :
           Il (f := f) (A ∪ B) = Il (f := f) A ∪ Il (f := f) B := by
         simp only [Il, Set.exists_mem_union, ← Set.setOf_or]
 
-      private theorem Il_image_right [IMetricSpace δ] {m n} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)} {g : β → δ} :
+      private theorem Il_image_right [IMetricSpace δ] {m n} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))} {g : β → δ} :
           Il f (Branch.map (IterativeDomain.map g) '' A) = Branch.map (IterativeDomain.map (Prod.map g id)) '' Il f A := by
         erw [Il_eq, Il_eq, Set.image_image]
         simp only [Set.mem_image, Nat.succ_eq_add_one, exists_exists_and_eq_and, IterativeDomain.Branch.map_cast_right, Branch.map_comp',
                    Function.comp_def, IterativeDomain.map_cast, IterativeDomain.parallel_map_left]
         rfl
 
-      private theorem Il_cast_right {m n o} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)} {h : m = o} :
+      private theorem Il_cast_right {m n o} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))} {h : m = o} :
           Il f (h ▸ A) = h ▸ Il f A := by
         cases h
         rfl
@@ -4869,20 +4874,20 @@ public import Extra.Sigma
  -
  -         admit -/
 
-      private def Ir {m n} (f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n).carrier)) (S : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ m).carrier)) :
-          Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β × γ) (n + 1 + m)).carrier) :=
+      private def Ir {m n} (f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n))) (S : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ m))) :
+          Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β × γ) (n + 1 + m))) :=
         {Branch.parallel_right (IterativeDomain.branch f) b' | b' ∈ S}
 
-      private theorem Ir_eq {m n} (f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n).carrier)) (S : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ m).carrier)) :
+      private theorem Ir_eq {m n} (f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n))) (S : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ m))) :
           Ir f S = {Branch.map (IterativeDomain.parallel (IterativeDomain.branch f)) b' | b' ∈ S} := by
         simp only [Ir, Branch.parallel_right_eq_map]
 
       @[simp]
-      private theorem Ir_union_right {m n} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n).carrier)} (A B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ m).carrier)) :
+      private theorem Ir_union_right {m n} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n))} (A B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ m))) :
           Ir (f := f) (A ∪ B) = Ir (f := f) A ∪ Ir (f := f) B := by
         simp only [Ir, Set.exists_mem_union, ← Set.setOf_or]
 
-      private theorem Ir_eq_Il {m n} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n).carrier)} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ m).carrier)} :
+      private theorem Ir_eq_Il {m n} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β n))} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ m))} :
           Ir f A = (by grind only : m + 1 + n = n + 1 + m) ▸ Branch.map (IterativeDomain.map Prod.swap) '' Il f A := by
         simp only [Ir_eq, Il_eq]
         conv_rhs => enter [1, 2, 1, x, 1, b, 2, 1, 1, 1, p]; rw [IterativeDomain.parallel_comm]
@@ -4894,46 +4899,46 @@ public import Extra.Sigma
         rw! [p₂, p₃]
         rfl
 
-      private def Sl {m n} (S₁ : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)) (S₂ : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)) :
-          Set  (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β × γ) (m + 1 + n)).carrier) :=
+      private def Sl {m n} (S₁ : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))) (S₂ : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))) :
+          Set  (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β × γ) (m + 1 + n))) :=
         {p | ∃ v γ p' π', .send γ v ⟨p'⟩ ∈ S₁ ∧ .recv γ π' ∈ S₂ ∧ p = Branch.sync γ ⟨IterativeDomain.lift (by grind only : m + n ≤ m + 1 + n) (IterativeDomain.parallel p' (π' v true).val)⟩}
 
-      private theorem Sl_eq {m n} (S₁ : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)) (S₂ : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)) :
+      private theorem Sl_eq {m n} (S₁ : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))) (S₂ : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))) :
           Sl S₁ S₂ = {p | ∃ v γ p' π', .send γ v ⟨p'⟩ ∈ S₁ ∧ .recv γ π' ∈ S₂ ∧ p = Branch.sync γ ⟨IterativeDomain.lift (by grind only : m + n ≤ m + 1 + n) (IterativeDomain.parallel p' (π' v true).val)⟩} := by
         rfl
 
       @[simp]
-      private theorem Sl_union_left {m n} (A B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)) (C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)) :
+      private theorem Sl_union_left {m n} (A B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))) (C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))) :
           Sl (A ∪ B) C = Sl A C ∪ Sl B C := by
         simp only [Sl, ← Set.setOf_or, Set.mem_union, or_and_right, ← exists_or]
 
       @[simp]
-      private theorem Sl_union_right {m n} (A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)) (B C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)) :
+      private theorem Sl_union_right {m n} (A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))) (B C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))) :
           Sl A (B ∪ C) = Sl A B ∪ Sl A C := by
         simp only [Sl, ← Set.setOf_or, Set.mem_union, or_and_right, ← exists_or, and_or_left]
 
-      private def Sr {m n} (S₁ : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)) (S₂ : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)) :
-          Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β × γ) (m + 1 + n)).carrier) :=
+      private def Sr {m n} (S₁ : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))) (S₂ : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))) :
+          Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α (β × γ) (m + 1 + n))) :=
         {p | ∃ v γ p' π', .send γ v ⟨p'⟩ ∈ S₂ ∧ .recv γ π' ∈ S₁ ∧ p = Branch.sync γ ⟨IterativeDomain.lift (by grind only : m + n ≤ m + 1 + n) (IterativeDomain.parallel (π' v true).val p')⟩}
 
-      private theorem Sr_eq {m n} (S₁ : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)) (S₂ : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)) :
+      private theorem Sr_eq {m n} (S₁ : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))) (S₂ : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))) :
           Sr S₁ S₂ = {p | ∃ v γ p' π', .send γ v ⟨p'⟩ ∈ S₂ ∧ .recv γ π' ∈ S₁ ∧ p = Branch.sync γ ⟨IterativeDomain.lift (by grind only : m + n ≤ m + 1 + n) (IterativeDomain.parallel (π' v true).val p')⟩} := by
         rfl
 
       @[simp]
-      private theorem Sr_union_right {m n} (A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)) (B C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)) :
+      private theorem Sr_union_right {m n} (A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))) (B C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))) :
           Sr A (B ∪ C) = Sr A B ∪ Sr A C := by
         simp only [Sr, ← Set.setOf_or, Set.mem_union, or_and_right, ← exists_or]
 
       @[simp]
-      private theorem Sr_union_left {m n} (A B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)) (C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)) :
+      private theorem Sr_union_left {m n} (A B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))) (C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))) :
           Sr (A ∪ B) C = Sr A C ∪ Sr B C := by
         simp only [Sr, ← Set.setOf_or, Set.mem_union, or_and_right, ← exists_or, and_or_left]
 
       /-- Sl (Il f' A) B ≃ Sl A (Ir f' B) -/
-      private theorem Sl_Il_eq [IMetricSpace δ] {m n o} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)} {f' : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)}
-        {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o).carrier)}
-        (assoc : ∀ (p : (IterativeDomain «Σ» Γ α β m).carrier) (q : (IterativeDomain «Σ» Γ α γ (n + 1)).carrier) (r : (IterativeDomain «Σ» Γ α δ o).carrier),
+      private theorem Sl_Il_eq [IMetricSpace δ] {m n o} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))} {f' : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))}
+        {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o))}
+        (assoc : ∀ (p : IterativeDomain «Σ» Γ α β m) (q : IterativeDomain «Σ» Γ α γ (n + 1)) (r : IterativeDomain «Σ» Γ α δ o),
           IterativeDomain.parallel (IterativeDomain.parallel p q) r = Nat.add_assoc m (n + 1) o ▸ IterativeDomain.map (λ (x, y, z) ↦ ((x, y), z)) (IterativeDomain.parallel p (IterativeDomain.parallel q r))) :
           Sl (Il f' A) B =
             (by grind only : m + 1 + (n + 1 + o) = m + 1 + n + 1 + o) ▸ Branch.map (IterativeDomain.map (λ (x, y, z) ↦ ((x, y), z))) '' Sl A (Ir f' B) := by
@@ -4964,10 +4969,10 @@ public import Extra.Sigma
             grind only
 
       /-- Il f'' (Ir f A) ≃ Ir f (Il f'' A) -/
-      private theorem Il_Ir_eq [IMetricSpace δ] {m n o} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)} {f'' : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o).carrier)}
-        {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)}
-        (assoc : ∀ (p : (IterativeDomain «Σ» Γ α β (m + 1)).carrier) (q : (IterativeDomain «Σ» Γ α γ n).carrier) (r : (IterativeDomain «Σ» Γ α δ (o + 1)).carrier),
-        IterativeDomain.parallel (IterativeDomain.parallel p q) r = Nat.add_assoc (m + 1) n (o + 1) ▸ IterativeDomain.map (λ (x, y, z) ↦ ((x, y), z)) (IterativeDomain.parallel p (IterativeDomain.parallel q r))) :
+      private theorem Il_Ir_eq [IMetricSpace δ] {m n o} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))} {f'' : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o))}
+        {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))}
+        (assoc : ∀ (p : IterativeDomain «Σ» Γ α β (m + 1)) (q : IterativeDomain «Σ» Γ α γ n) (r : IterativeDomain «Σ» Γ α δ (o + 1)),
+          IterativeDomain.parallel (IterativeDomain.parallel p q) r = Nat.add_assoc (m + 1) n (o + 1) ▸ IterativeDomain.map (λ (x, y, z) ↦ ((x, y), z)) (IterativeDomain.parallel p (IterativeDomain.parallel q r))) :
           Il f'' (Ir f A) =
             (by grind only : m + 1 + (n + 1 + o) = m + 1 + n + 1 + o) ▸ Branch.map (IterativeDomain.map (λ (x, y, z) ↦ ((x, y), z))) '' Ir f (Il f'' A) := by
         ext b
@@ -4984,10 +4989,10 @@ public import Extra.Sigma
         }
 
       /-- Il f (Sl A B) ≃ Sl A (Il f B) -/
-      private theorem Il_Sl_eq [IMetricSpace δ] {m n o} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o).carrier)}
-        {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)} {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)}
-        (assoc : ∀ (p : (IterativeDomain «Σ» Γ α β m).carrier) (q : (IterativeDomain «Σ» Γ α γ n).carrier) (r : (IterativeDomain «Σ» Γ α δ (o + 1)).carrier),
-      IterativeDomain.parallel (IterativeDomain.parallel p q) r = Nat.add_assoc m n (o + 1) ▸ IterativeDomain.map (λ (x, y, z) ↦ ((x, y), z)) (IterativeDomain.parallel p (IterativeDomain.parallel q r))) :
+      private theorem Il_Sl_eq [IMetricSpace δ] {m n o} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o))}
+        {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))} {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))}
+        (assoc : ∀ (p : IterativeDomain «Σ» Γ α β m) (q : IterativeDomain «Σ» Γ α γ n) (r : IterativeDomain «Σ» Γ α δ (o + 1)),
+          IterativeDomain.parallel (IterativeDomain.parallel p q) r = Nat.add_assoc m n (o + 1) ▸ IterativeDomain.map (λ (x, y, z) ↦ ((x, y), z)) (IterativeDomain.parallel p (IterativeDomain.parallel q r))) :
           Il f (Sl A B) =
              (by grind only : m + 1 + (n + 1 + o) = m + 1 + n + 1 + o) ▸ Branch.map (IterativeDomain.map (λ (x, y, z) ↦ ((x, y), z))) '' Sl A (Il f B) := by
         ext b
@@ -5027,9 +5032,9 @@ public import Extra.Sigma
           · grind only
 
       /-- Il f (Sr A B) ≃ Sr A (Il f B) -/
-      private theorem Il_Sr_eq [IMetricSpace δ] {m n o} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o).carrier)}
-        {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)} {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)}
-        (assoc : ∀ (p : (IterativeDomain «Σ» Γ α β m).carrier) (q : (IterativeDomain «Σ» Γ α γ n).carrier) (r : (IterativeDomain «Σ» Γ α δ (o + 1)).carrier),
+      private theorem Il_Sr_eq [IMetricSpace δ] {m n o} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o))}
+        {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))} {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))}
+        (assoc : ∀ (p : IterativeDomain «Σ» Γ α β m) (q : IterativeDomain «Σ» Γ α γ n) (r : IterativeDomain «Σ» Γ α δ (o + 1)),
            IterativeDomain.parallel (IterativeDomain.parallel p q) r = Nat.add_assoc m n (o + 1) ▸ IterativeDomain.map (λ (x, y, z) ↦ ((x, y), z)) (IterativeDomain.parallel p (IterativeDomain.parallel q r))) :
           Il f (Sr A B) =
             (by grind only : m + 1 + (n + 1 + o) = m + 1 + n + 1 + o) ▸ Branch.map (IterativeDomain.map (λ (x, y, z) ↦ ((x, y), z))) '' Sr A (Il f B) := by
@@ -5062,9 +5067,9 @@ public import Extra.Sigma
           · grind only
 
       /-- Sl (Ir f A) B ≃ Ir f (Sl A B) -/
-      private theorem Sl_Ir_eq [IMetricSpace δ] {m n o} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)}
-        {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)} {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o).carrier)}
-        (assoc : ∀ (p : (IterativeDomain «Σ» Γ α β (m + 1)).carrier) (q : (IterativeDomain «Σ» Γ α γ n).carrier) (r : (IterativeDomain «Σ» Γ α δ o).carrier),
+      private theorem Sl_Ir_eq [IMetricSpace δ] {m n o} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))}
+        {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))} {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o))}
+        (assoc : ∀ (p : IterativeDomain «Σ» Γ α β (m + 1)) (q : IterativeDomain «Σ» Γ α γ n) (r : IterativeDomain «Σ» Γ α δ o),
            IterativeDomain.parallel (IterativeDomain.parallel p q) r = Nat.add_assoc (m + 1) n o ▸ IterativeDomain.map (λ (x, y, z) ↦ ((x, y), z)) (IterativeDomain.parallel p (IterativeDomain.parallel q r))) :
           Sl (Ir f A) B =
             (by grind only : m + 1 + (n + 1 + o) = m + 1 + n + 1 + o) ▸ Branch.map (IterativeDomain.map (λ (x, y, z) ↦ ((x, y), z))) '' Ir f (Sl A B) := by
@@ -5088,9 +5093,9 @@ public import Extra.Sigma
             grind only
 
       /-- Sr (Il f' A) B ≃ Sr A (Ir f' B) -/
-      private theorem Sr_Il_eq [IMetricSpace δ] {m n o} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)}
-        {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)} {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o).carrier)}
-        (assoc : ∀ (p : (IterativeDomain «Σ» Γ α β m).carrier) (q : (IterativeDomain «Σ» Γ α γ (n + 1)).carrier) (r : (IterativeDomain «Σ» Γ α δ o).carrier),
+      private theorem Sr_Il_eq [IMetricSpace δ] {m n o} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))}
+        {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))} {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o))}
+        (assoc : ∀ (p : IterativeDomain «Σ» Γ α β m) (q : IterativeDomain «Σ» Γ α γ (n + 1)) (r : IterativeDomain «Σ» Γ α δ o),
            IterativeDomain.parallel (IterativeDomain.parallel p q) r = Nat.add_assoc m (n + 1) o ▸ IterativeDomain.map (λ (x, y, z) ↦ ((x, y), z)) (IterativeDomain.parallel p (IterativeDomain.parallel q r))) :
           Sr (Il f A) B =
             (by grind only : m + 1 + (n + 1 + o) = m + 1 + n + 1 + o) ▸ Branch.map (IterativeDomain.map (λ (x, y, z) ↦ ((x, y), z))) '' Sr A (Ir f B) := by
@@ -5125,9 +5130,9 @@ public import Extra.Sigma
             grind only
 
       /-- Sr (Ir f A) B ≃ Ir f (Sr A B) -/
-      private theorem Sr_Ir_eq [IMetricSpace δ] {m n o} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)}
-        {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)} {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o).carrier)}
-        (assoc : ∀ (p : (IterativeDomain «Σ» Γ α β (m + 1)).carrier) (q : (IterativeDomain «Σ» Γ α γ n).carrier) (r : (IterativeDomain «Σ» Γ α δ o).carrier),
+      private theorem Sr_Ir_eq [IMetricSpace δ] {m n o} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))}
+        {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))} {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o))}
+        (assoc : ∀ (p : IterativeDomain «Σ» Γ α β (m + 1)) (q : IterativeDomain «Σ» Γ α γ n) (r : IterativeDomain «Σ» Γ α δ o),
            IterativeDomain.parallel (IterativeDomain.parallel p q) r = Nat.add_assoc (m + 1) n o ▸ IterativeDomain.map (λ (x, y, z) ↦ ((x, y), z)) (IterativeDomain.parallel p (IterativeDomain.parallel q r))) :
           Sr (Ir f A) B =
             (by grind only : m + 1 + (n + 1 + o) = m + 1 + n + 1 + o) ▸ Branch.map (IterativeDomain.map (λ (x, y, z) ↦ ((x, y), z))) '' Ir f (Sr A B) := by
@@ -5146,10 +5151,10 @@ public import Extra.Sigma
             grind only
 
       /-- Il f'' (Il f' (f σ)) ≃ Il (fun σ ↦ Il f'' (f' σ) ∪ Ir f' (f'' σ) ∪ Sl (f' σ) (f'' σ) ∪ Sr (f' σ) (f'' σ)) (f σ) -/
-      private theorem Il_Il_eq [IMetricSpace δ] {m n o} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)}
-        {f' : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)} {f'' : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o).carrier)}
+      private theorem Il_Il_eq [IMetricSpace δ] {m n o} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))}
+        {f' : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))} {f'' : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o))}
         {σ : «Σ»}
-        (assoc : ∀ (p : (IterativeDomain «Σ» Γ α β m).carrier) (q : (IterativeDomain «Σ» Γ α γ (n + 1)).carrier) (r : (IterativeDomain «Σ» Γ α δ (o + 1)).carrier),
+        (assoc : ∀ (p : IterativeDomain «Σ» Γ α β m) (q : IterativeDomain «Σ» Γ α γ (n + 1)) (r : IterativeDomain «Σ» Γ α δ (o + 1)),
            IterativeDomain.parallel (IterativeDomain.parallel p q) r = Nat.add_assoc m (n + 1) (o + 1) ▸ IterativeDomain.map (λ (x, y, z) ↦ ((x, y), z)) (IterativeDomain.parallel p (IterativeDomain.parallel q r))) :
           Il f'' (Il f' (f σ)) =
             (by grind only : m + 1 + (n + 1 + o) = m + 1 + n + 1 + o) ▸ Branch.map (IterativeDomain.map (λ (x, y, z) ↦ ((x, y), z))) ''
@@ -5167,10 +5172,10 @@ public import Extra.Sigma
         grind only
 
       /-- Ir (fun σ ↦ Il f' (f σ) ∪ Ir f (f' σ) ∪ Sl (f σ) (f' σ) ∪ Sr (f' σ) (f σ)) (f'' σ) ≃ Ir f (Ir f' (f'' σ)) -/
-      private theorem Ir_Ir_eq [IMetricSpace δ] {m n o} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)}
-        {f' : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)} {f'' : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o).carrier)}
+      private theorem Ir_Ir_eq [IMetricSpace δ] {m n o} {f : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))}
+        {f' : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))} {f'' : «Σ» →ᵤ Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o))}
         {σ : «Σ»}
-        (assoc : ∀ (p : (IterativeDomain «Σ» Γ α β (m + 1)).carrier) (q : (IterativeDomain «Σ» Γ α γ (n + 1)).carrier) (r : (IterativeDomain «Σ» Γ α δ o).carrier),
+        (assoc : ∀ (p : IterativeDomain «Σ» Γ α β (m + 1)) (q : IterativeDomain «Σ» Γ α γ (n + 1)) (r : IterativeDomain «Σ» Γ α δ o),
            IterativeDomain.parallel (IterativeDomain.parallel p q) r = Nat.add_assoc (m + 1) (n + 1) o ▸ IterativeDomain.map (λ (x, y, z) ↦ ((x, y), z)) (IterativeDomain.parallel p (IterativeDomain.parallel q r))) :
           Ir (λ σ ↦ Il f' (f σ) ∪ Ir f (f' σ) ∪ Sl (f σ) (f' σ) ∪ Sr (f σ) (f' σ)) (f'' σ) =
             (by grind only : m + 1 + (n + 1 + o) = m + 1 + n + 1 + o) ▸ Branch.map (IterativeDomain.map (λ (x, y, z) ↦ ((x, y), z))) '' Ir f (Ir f' (f'' σ)) := by
@@ -5187,70 +5192,70 @@ public import Extra.Sigma
                    exists_and_left]
 
       /-- Sl (Sl A B) C ≃ ∅ -/
-      private theorem Sl_Sl_empty [IMetricSpace δ] {m n o} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)}
-        {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)} {C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o).carrier)} :
+      private theorem Sl_Sl_empty [IMetricSpace δ] {m n o} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))}
+        {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))} {C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o))} :
           Sl (Sl A B) C = ∅ := by
         ext b
         simp only [Sl_eq, exists_and_left, Set.mem_setOf_eq]
         iff_rintro ⟨_, _, _, ⟨_, _, _, _, _, _, _, _|_⟩, _, _, _, rfl⟩ ⟨⟩
 
       /-- Sl (Sr A B) C ≃ ∅ -/
-      private theorem Sl_Sr_empty [IMetricSpace δ] {m n o} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)}
-        {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)} {C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o).carrier)} :
+      private theorem Sl_Sr_empty [IMetricSpace δ] {m n o} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))}
+        {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))} {C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o))} :
           Sl (Sr A B) C = ∅ := by
         ext b
         simp only [Sl_eq, Sr_eq, exists_and_left, Set.mem_setOf_eq]
         iff_rintro ⟨_, _, _, ⟨_, _, _, _, _, _, _, _|_⟩, _, _, _, rfl⟩ ⟨⟩
 
       /-- Sr (Sl A B) C ≃ ∅ -/
-      private theorem Sr_Sl_empty [IMetricSpace δ] {m n o} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)}
-        {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)} {C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o).carrier)} :
+      private theorem Sr_Sl_empty [IMetricSpace δ] {m n o} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))}
+        {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))} {C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o))} :
           Sr (Sl A B) C = ∅ := by
         ext b
         simp only [Sl_eq, Sr_eq, exists_and_left, Set.mem_setOf_eq]
         iff_rintro ⟨_, _, _, _, _, ⟨_, _, _, _, _, _, _|_⟩, rfl⟩ ⟨⟩
 
       /-- Sr (Sr A B) C ≃ ∅ -/
-      private theorem Sr_Sr_empty [IMetricSpace δ] {m n o} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)}
-        {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)} {C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o).carrier)} :
+      private theorem Sr_Sr_empty [IMetricSpace δ] {m n o} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))}
+        {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))} {C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o))} :
           Sr (Sr A B) C = ∅ := by
         ext b
         simp only [Sr_eq, exists_and_left, Set.mem_setOf_eq]
         iff_rintro ⟨_, _, _, _, _, ⟨_, _, _, _, _, _, _|_⟩, rfl⟩ ⟨⟩
 
       /-- Sl A (Sl B C) ≃ ∅ -/
-      private theorem Sl_Sl_empty' [IMetricSpace δ] {m n o} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)}
-        {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)} {C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o).carrier)} :
+      private theorem Sl_Sl_empty' [IMetricSpace δ] {m n o} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))}
+        {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))} {C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o))} :
           Sl A (Sl B C) = ∅ := by
         ext b
         simp only [Sl_eq, exists_and_left, Set.mem_setOf_eq]
         iff_rintro ⟨_, _, _, _, _, ⟨_, _, _, _, _, _, _, _|_⟩, _, _, _, rfl⟩ ⟨⟩
 
       /-- Sl A (Sr B C) ≃ ∅ -/
-      private theorem Sl_Sr_empty' [IMetricSpace δ] {m n o} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)}
-        {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)} {C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o).carrier)} :
+      private theorem Sl_Sr_empty' [IMetricSpace δ] {m n o} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))}
+        {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))} {C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o))} :
           Sl A (Sr B C) = ∅ := by
         ext b
         simp only [Sl_eq, Sr_eq, exists_and_left, Set.mem_setOf_eq]
         iff_rintro ⟨_, _, _, _, _, ⟨_, _, _, _, _, _, _, _|_⟩, _, _, _, rfl⟩ ⟨⟩
 
       /-- Sr A (Sl B C) ≃ ∅ -/
-      private theorem Sr_Sl_empty' [IMetricSpace δ] {m n o} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)}
-        {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)} {C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o).carrier)} :
+      private theorem Sr_Sl_empty' [IMetricSpace δ] {m n o} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))}
+        {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))} {C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o))} :
           Sr A (Sl B C) = ∅ := by
         ext b
         simp only [Sl_eq, Sr_eq, exists_and_left, Set.mem_setOf_eq]
         iff_rintro ⟨_, _, _, ⟨_, _, _, _, _, _, _|_⟩, _, _, _, _, rfl⟩ ⟨⟩
 
       /-- Sr A (Sr B C) ≃ ∅ -/
-      private theorem Sr_Sr_empty' [IMetricSpace δ] {m n o} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m).carrier)}
-        {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n).carrier)} {C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o).carrier)} :
+      private theorem Sr_Sr_empty' [IMetricSpace δ] {m n o} {A : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α β m))}
+        {B : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α γ n))} {C : Set (Branch «Σ» Γ α (IterativeDomain «Σ» Γ α δ o))} :
           Sr A (Sr B C) = ∅ := by
         ext b
         simp only [Sr_eq, exists_and_left, Set.mem_setOf_eq]
         iff_rintro ⟨_, _, _, ⟨_, _, _, _, _, _, _|_⟩, _, _, _, rfl⟩ ⟨⟩
 
-      theorem IterativeDomain.parallel_assoc [IMetricSpace δ] {m n o} {p : (IterativeDomain «Σ» Γ α β m).carrier} {q : (IterativeDomain «Σ» Γ α γ n).carrier} {r : (IterativeDomain «Σ» Γ α δ o).carrier} :
+      theorem IterativeDomain.parallel_assoc [IMetricSpace δ] {m n o} {p : IterativeDomain «Σ» Γ α β m} {q : IterativeDomain «Σ» Γ α γ n} {r : IterativeDomain «Σ» Γ α δ o} :
           IterativeDomain.parallel (IterativeDomain.parallel p q) r = Nat.add_assoc m n o ▸ IterativeDomain.map (λ (x, y, z) ↦ ((x, y), z)) (IterativeDomain.parallel p (IterativeDomain.parallel q r)) := by
         match _hm : m, p with
         | 0, IterativeDomain.leaf v | m + 1, IterativeDomain.leaf v =>

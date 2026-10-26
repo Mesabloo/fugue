@@ -622,7 +622,7 @@ theorem PseudoIMetricSpace.edist_eq {α} [PseudoIMetricSpace α] {x y : α} :
   rw [← PseudoIMetricSpace.dist_eq, edist_dist]
 
 @[instance_reducible]
-noncomputable def PseudoIMetricSpace.discrete {α} [DecidableEq α] : PseudoIMetricSpace α where
+def PseudoIMetricSpace.discrete {α} [DecidableEq α] : PseudoIMetricSpace α where
   idist x y := if x = y then ⊥ else ⊤
   idist_self x := by rw [if_pos rfl]; rfl
   idist_comm x y := by conv_lhs => enter [1]; rw [eq_comm]
@@ -631,7 +631,7 @@ noncomputable def PseudoIMetricSpace.discrete {α} [DecidableEq α] : PseudoIMet
       unitInterval.half_mul_toReal_eq_div_two]
 
 @[instance_reducible]
-noncomputable def IMetricSpace.discrete {α} [DecidableEq α] : IMetricSpace α where
+def IMetricSpace.discrete {α} [DecidableEq α] : IMetricSpace α where
   __ := PseudoIMetricSpace.discrete
   eq_of_idist_eq_zero {x y} h := by
     change (if x = y then ⊥ else ⊤) = ⊥ at h

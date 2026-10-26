@@ -3,7 +3,7 @@ public import Extra.Topology.IMetricSpace
 
 public section
 
-instance Prod.instPseudoIMetricSpace {α β} [PseudoIMetricSpace α] [PseudoIMetricSpace β] : PseudoIMetricSpace (α × β) :=
+instance (priority := low) Prod.instPseudoIMetricSpace {α β} [PseudoIMetricSpace α] [PseudoIMetricSpace β] : PseudoIMetricSpace (α × β) :=
   .of_metric_space_of_dist_le_one (inst := Prod.pseudoMetricSpaceMax) λ x y ↦ by
     change max (idist x.1 y.1) (idist x.2 y.2) ≤ 1
     apply max_le
@@ -24,12 +24,14 @@ theorem Prod.idist_eq {α β} [PseudoIMetricSpace α] [PseudoIMetricSpace β] {x
     idist x y = idist x.1 y.1 ⊔ idist x.2 y.2 := by
   rfl
 
-instance Prod.instIMetricSpace {α β} [IMetricSpace α] [IMetricSpace β] : IMetricSpace (α × β) :=
-  .of_metric_space_of_dist_le_one (inst := Prod.metricSpaceMax) λ x y ↦ by
-    change max (idist x.1 y.1) (idist x.2 y.2) ≤ 1
-    apply max_le
-    · exact unitInterval.le_one'
-    · exact unitInterval.le_one'
+instance Prod.instIMetricSpace {α β} [IMetricSpace α] [IMetricSpace β] : IMetricSpace (α × β) where
+  __ := Prod.instPseudoIMetricSpace
+  eq_of_idist_eq_zero x y h := by
+    erw [Prod.idist_eq, max_eq_bot] at h
+    ext1 <;> apply eq_of_idist_eq_zero <;> [
+      exact h.1
+    | exact h.2
+    ]
 
 theorem Isometry.prodMap' {α β γ δ} [PseudoIMetricSpace α] [PseudoIMetricSpace β] [PseudoIMetricSpace γ] [PseudoIMetricSpace δ]
   {f : α → β} {g : γ → δ} (hf : ∀ x y, idist (f x) (f y) = idist x y) (hg : ∀ x y, idist (g x) (g y) = idist x y) :

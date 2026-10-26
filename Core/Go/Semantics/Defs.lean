@@ -113,6 +113,60 @@ noncomputable section
     instance : HasDefaultInit Store.type Channel (Value.Send𝕍 Address Go.Typ) where
       zero c σ := zero σ (Prod.snd c)
 
+    def evalRef (ξ : List Channel) (ς : String → Option Channel) :
+        Ref (Expression Typ) → Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) (Option Address × List ((Value.𝕍 Store.type Channel Address Go.Typ).type ⊕ String))
+      | .wildcard => Domain.branch λ σ ↦ {.next σ ⟨Domain.pure (.none, [])⟩}
+      | .var x => Domain.branch λ σ ↦ if let .some addr := Store.addrOf σ x then {.next σ ⟨Domain.pure (.some addr, [])⟩} else {.next σ ⟨Domain.abort⟩}
+      | .field r name => evalRef ξ ς r >>= λ ⟨addr, args⟩ ↦ Domain.pure ⟨addr, args ++ [.inr name]⟩
+      | .index r e => evalRef ξ ς r >>= λ ⟨addr, args⟩ ↦ Go.Expression.denotation ξ ς e >>= λ v ↦ Domain.pure ⟨addr, args ++ [.inl v]⟩
+
+    -- termination metric: depth addr@σ - List.length idx (depth addr@σ is finite from well-formedness of σ)
+    mutual
+      partial def updateRef (addr : Address) (v : (Value.𝕍 Store.type Channel Address Go.Typ).type) (idx : List ((Value.𝕍 Store.type Channel Address Go.Typ).type ⊕ String))
+        (σ : Store.type) :
+          Option Store.type :=
+        match idx with
+        | [] => Store.update σ addr v
+        | .inr r :: idx => do
+          let v' ← Store.deref σ addr
+          let ⟨σ', v'⟩ ← updateVal v' v (.inr r :: idx) σ
+          Store.update σ' addr v'
+        | .inl v'' :: idx => do
+          let v' ← Store.deref σ addr
+          Value.𝕍.casesOn (motive := λ _ ↦ Option Store.type)
+            (λ _ ↦ .none) (λ _ ↦ .none) (λ _ ↦ .none)
+            (λ cap low high buf ↦
+              integer v'' (default := .none) λ v''' ↦ do
+                guard (0 ≤ v''' ∧ v''' < high - low)
+                updateRef buf v (.inl v'' :: idx) σ
+            )
+            (λ _ _ _ _ ↦ .none) (λ _ ↦ .none)
+            (λ len arr ↦
+              integer v'' (default := .none) λ v''' ↦ do
+                guard (0 ≤ v''' ∧ v''' < len)
+                let ⟨σ, v_⟩ ← updateVal v' v (.inl v'' :: idx) σ
+                Store.update σ addr v_
+            )
+            (λ map isNil ↦ do
+              guard (¬isNil ∧ idx.isEmpty)
+              match map v'' with
+              | .some addr => updateRef addr v idx σ
+              | .none =>
+                let addr' := Store.freshAddr σ
+                Store.insert (← Store.insert σ addr' v) addr (Value.𝕍.map (Function.update map v'' addr') isNil)
+            )
+            (λ _ ↦ .none) (λ _ ↦ .none)
+            v'
+
+      partial def updateVal (v' v : (Value.𝕍 Store.type Channel Address Go.Typ).type) (idx : List ((Value.𝕍 Store.type Channel Address Go.Typ).type ⊕ String))
+        (σ : Store.type) :
+          Option (Store.type × (Value.𝕍 Store.type Channel Address Go.Typ).type) :=
+        match idx with
+        | [] => .some (σ, v)
+        | .inr name :: idx => sorry
+        | .inl e :: idx => sorry
+    end
+
     def guard (ξ : List Channel) (ς : String → Option Channel) (e : Go.Expression Go.Typ) :
         Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) PUnit :=
       Go.Expression.denotation ξ ς e >>= λ v ↦ Domain.branch λ σ ↦
@@ -286,70 +340,70 @@ noncomputable section
       | .switch e «cases» defaul :: ss => sorry
       | .select «cases» defaul :: ss => sorry
 
-      theorem for_seq_F_nonexpansive {ξ ς e q} :
-          ∀ p p', edist (for_seq_F ξ ς e q p) (for_seq_F ξ ς e q p') ≤ (1/2) * edist p p' := by
-        intros p p'
-        repeat rw [Domain.edist_eq]
+    theorem for_seq_F_nonexpansive {ξ ς e q} :
+        ∀ p p', edist (for_seq_F ξ ς e q p) (for_seq_F ξ ς e q p') ≤ (1/2) * edist p p' := by
+      intros p p'
+      repeat rw [Domain.edist_eq]
 
-        have : 1 / 2 = ENNReal.ofReal (1 / 2) := by simp only [one_div, zero_lt_two, ENNReal.ofReal_inv_of_pos, ENNReal.ofReal_ofNat]
-        rw [this, ← ENNReal.ofReal_mul (by norm_num)]
-        apply ENNReal.ofReal_le_ofReal
+      have : 1 / 2 = ENNReal.ofReal (1 / 2) := by simp only [one_div, zero_lt_two, ENNReal.ofReal_inv_of_pos, ENNReal.ofReal_ofNat]
+      rw [this, ← ENNReal.ofReal_mul (by norm_num)]
+      apply ENNReal.ofReal_le_ofReal
 
-        repeat rw [Domain.dist_eq]
-        change idist _ _ ≤ unitInterval.half * idist _ _
+      repeat rw [Domain.dist_eq]
+      change idist _ _ ≤ unitInterval.half * idist _ _
 
-        unfold for_seq_F
-        apply le_trans (Domain.choice_lipschitz_left.to_idist_le _ _)
-        erw [one_mul, Domain.seq'_assoc, Domain.seq'_assoc]
+      unfold for_seq_F
+      apply le_trans (Domain.choice_lipschitz_left.to_idist_le _ _)
+      erw [one_mul, Domain.seq'_assoc, Domain.seq'_assoc]
 
-        obtain ⟨f, hf⟩ : ∃ f, (q ⬰ guard ξ ς e) = Domain.branch f := by
-          obtain ⟨f', hf'⟩ := guard.is_branch (ξ := ξ) (ς := ς) (e := e)
-          apply Domain.seq'_is_branch_of_branch
-          exact hf'
+      obtain ⟨f, hf⟩ : ∃ f, (q ⬰ guard ξ ς e) = Domain.branch f := by
+        obtain ⟨f', hf'⟩ := guard.is_branch (ξ := ξ) (ς := ς) (e := e)
+        apply Domain.seq'_is_branch_of_branch
+        exact hf'
 
-        rw [hf]
-        apply Domain.seq'_branch_contracting_left
+      rw [hf]
+      apply Domain.seq'_branch_contracting_left
 
-      theorem for_seq_F_contracting {ξ ς e q} : ContractingWith (1/2) (for_seq_F ξ ς e q) := by
-        constructor
-        · exact one_half_lt_one
-        · intros p p'
+    theorem for_seq_F_contracting {ξ ς e q} : ContractingWith (1/2) (for_seq_F ξ ς e q) := by
+      constructor
+      · exact one_half_lt_one
+      · intros p p'
 
-          have : ENNReal.ofNNReal (1 / 2) = 1 / 2 := by norm_num
-          rw [this]
+        have : ENNReal.ofNNReal (1 / 2) = 1 / 2 := by norm_num
+        rw [this]
 
-          exact for_seq_F_nonexpansive p p'
+        exact for_seq_F_nonexpansive p p'
 
-      theorem for_seq_eq {out ξ ς e S n} :
-          for_seq ξ ς e (Go.Statement.denotation out ξ ς S) n =
-          (for_seq_F ξ ς e (Go.Statement.denotation out ξ ς S))^[n] (Domain.branch λ σ ↦ {.next σ { val := .pure .unit }}) := by
-        induction n with
-        | zero => rfl
-        | succ n IH =>
-          unfold for_seq
-          rw [IH, Nat.add_comm, Function.iterate_add, Function.iterate_one]
-          rfl
+    theorem for_seq_eq {out ξ ς e S n} :
+        for_seq ξ ς e (Go.Statement.denotation out ξ ς S) n =
+        (for_seq_F ξ ς e (Go.Statement.denotation out ξ ς S))^[n] (Domain.branch λ σ ↦ {.next σ { val := .pure .unit }}) := by
+      induction n with
+      | zero => rfl
+      | succ n IH =>
+        unfold for_seq
+        rw [IH, Nat.add_comm, Function.iterate_add, Function.iterate_one]
+        rfl
 
-      theorem for_seq_cauchy (out : Channel) (ξ : List Channel) (ς : String → Option Channel) (e : Go.Expression Go.Typ) (S : List ComputableGo.Statement) :
-          CauchySeq (for_seq ξ ς e (Go.Statement.denotation out ξ ς S)) := by
-        let p₀ : Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) PUnit :=
-          Domain.branch λ σ ↦ {.next σ { val := .pure .unit }}
+    theorem for_seq_cauchy (out : Channel) (ξ : List Channel) (ς : String → Option Channel) (e : Go.Expression Go.Typ) (S : List ComputableGo.Statement) :
+        CauchySeq (for_seq ξ ς e (Go.Statement.denotation out ξ ς S)) := by
+      let p₀ : Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) PUnit :=
+        Domain.branch λ σ ↦ {.next σ { val := .pure .unit }}
 
-        have edist_ne_top : edist p₀ (for_seq_F ξ ς e (Go.Statement.denotation out ξ ς S) p₀) ≠ ⊤ := by
-          rw [Domain.edist_eq]
-          exact ENNReal.ofReal_ne_top
+      have edist_ne_top : edist p₀ (for_seq_F ξ ς e (Go.Statement.denotation out ξ ς S) p₀) ≠ ⊤ := by
+        rw [Domain.edist_eq]
+        exact ENNReal.ofReal_ne_top
 
-        obtain ⟨q, -, tendsto_nhds, -⟩ := for_seq_F_contracting.exists_fixedPoint p₀ edist_ne_top
-        conv at tendsto_nhds => enter [1, n]; rw [← for_seq_eq]
-        exact Filter.Tendsto.cauchySeq tendsto_nhds
+      obtain ⟨q, -, tendsto_nhds, -⟩ := for_seq_F_contracting.exists_fixedPoint p₀ edist_ne_top
+      conv at tendsto_nhds => enter [1, n]; rw [← for_seq_eq]
+      exact Filter.Tendsto.cauchySeq tendsto_nhds
 
-      theorem for_seq_cauchy' (out : Channel) (ξ : List Channel) (ς : String → Option Channel) (e : Go.Expression Go.Typ) (S : List ComputableGo.Statement) :
-          ∃ p, Filter.lim (Filter.atTop.map (for_seq ξ ς e (Go.Statement.denotation out ξ ς S))) = p := by
-        apply Exists.imp
-        · intros p
-          apply Filter.Tendsto.limUnder_eq
-        · apply cauchySeq_tendsto_of_complete
-          apply for_seq_cauchy out
+    theorem for_seq_cauchy' (out : Channel) (ξ : List Channel) (ς : String → Option Channel) (e : Go.Expression Go.Typ) (S : List ComputableGo.Statement) :
+        ∃ p, Filter.lim (Filter.atTop.map (for_seq ξ ς e (Go.Statement.denotation out ξ ς S))) = p := by
+      apply Exists.imp
+      · intros p
+        apply Filter.Tendsto.limUnder_eq
+      · apply cauchySeq_tendsto_of_complete
+        apply for_seq_cauchy out
   end Go.Statement
 end
 
