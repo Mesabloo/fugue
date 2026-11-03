@@ -79,6 +79,13 @@ noncomputable section
       (λ _ ↦ default)
       v
 
+  def Domain.branches {α β Γ «Σ»} [IMetricSpace β] [IMetricSpace «Σ»] [IMetricSpace Γ] [IMetricSpace α] [CompleteSpace «Σ»] [CompleteSpace Γ] [CompleteSpace α] [CompleteSpace β]
+    (p : Domain «Σ» Γ α β) (σ : «Σ») :
+      Option (Set (Branch «Σ» Γ α (Domain «Σ» Γ α β))) :=
+    match isSolution p with
+    | .inl _ | .inr (.inl _) => .none
+    | .inr (.inr f) => .some <| f σ
+
   /-! # The main semantics -/
 
   open Classical
@@ -408,7 +415,27 @@ noncomputable section
           -- Asynchronous case
           async
       | .switch e «cases» defaul :: ss => sorry
-      | .select «cases» defaul :: ss => sorry
+      | .select «cases» defaul :: ss =>
+        let case_denotation (c : SelectClause ComputableGo.Statement) : Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) PUnit :=
+          Go.Statement.denotation out ξ ς (c.guard :: c.body)
+
+        Go.Statement.denotation out ξ ς ss ⬰ if h : «cases».length = 0 then
+          match defaul with
+          | .some defaul => Domain.branch λ σ ↦ {.next σ ⟨Go.Statement.denotation out ξ ς defaul⟩}
+          | .none => Domain.branch λ σ ↦ ∅
+        else
+          let p := «cases».tail.foldl (init := case_denotation («cases».head (by grind only [=List.length_nil]))) λ acc c ↦ acc ⊻ case_denotation c
+          match defaul with
+          | .some defaul =>
+            Domain.branch λ σ ↦
+              if let .some br := p.branches σ then
+                if br = ∅ then
+                  {.next σ ⟨Go.Statement.denotation out ξ ς defaul⟩}
+                else
+                  ∅
+              else
+                {.next σ ⟨Go.Statement.denotation out ξ ς defaul⟩}
+          | .none => p
 
     theorem for_seq_F_nonexpansive {ξ ς e q} :
         ∀ p p', edist (for_seq_F ξ ς e q p) (for_seq_F ξ ς e q p') ≤ (1/2) * edist p p' := by
