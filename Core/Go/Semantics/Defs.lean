@@ -137,21 +137,29 @@ noncomputable section
   namespace Go.Statement
     variable (out : Channel)
 
-    def zero (σ : Store.type) : Go.Typ → Store.type × (Value.Send𝕍 Address Go.Typ)
-      | .bool => (σ, .bool false)
-      | .int => (σ, .int 0)
-      | .str => (σ, .str "")
-      | .map _ _ => (σ, .map [] true)
-      | .chan _ => sorry
-      | .slice _ => sorry
-      | .array _ _ => sorry
-      | .struct _ => sorry
+    -- TODO: what do we do of the cases where the type does not describe something that is sendable?
+    def zero : Go.Typ → Value.Send𝕍 Address Go.Typ
+      | .bool => .bool false
+      | .int => .int 0
+      | .str => .str ""
+      | .map _ _ => .map [] true
+      | .chan τ => .chan nil τ nil nil
+      | .slice τ => .slice 0 0 0 nil
+      | .array n τ => .array n λ i ↦ zero τ
+      | .struct fs => .struct <| fs.attach.map λ ⟨⟨x, τ⟩, _⟩ ↦
+        have _termination : sizeOf τ < 1 + sizeOf fs := by
+          calc
+            _ < sizeOf (x, τ) := by decreasing_trivial
+            _ < _ := by decreasing_trivial
+
+        ⟨x, zero τ⟩
       | .func _ _ => sorry
       | .named _ _ => sorry
       | .var _ => sorry
+    termination_by τ => sizeOf τ
 
     instance : HasDefaultInit Store.type Channel (Value.Send𝕍 Address Go.Typ) where
-      zero c σ := zero σ (Prod.snd c)
+      zero c σ := (σ, zero (Prod.snd c))
 
     /-- Value equality, for comparable values. -/
     inductive Value.𝕍.Eq : (Value.𝕍 Store.type Channel Address Go.Typ).type → (Value.𝕍 Store.type Channel Address Go.Typ).type → Prop
@@ -332,8 +340,8 @@ noncomputable section
       | .var x τ :: ss =>
         Go.Statement.denotation out ξ ς ss ⬰ Domain.branch λ σ ↦
         if ∃ h : (Store.type.ϙ σ).length > 0, (Store.type.ϙ σ)[(Store.type.ϙ σ).length - 1] x matches .none then
-          let ⟨σ', v⟩ := zero σ τ
-          if let .some σ' := Store.newVar σ' x v.to𝕍 then
+          let v := zero τ
+          if let .some σ' := Store.newVar σ x v.to𝕍 then
             {.next σ' ⟨.pure .unit⟩}
           else
             {.next σ ⟨.abort⟩}
@@ -400,7 +408,7 @@ noncomputable section
                 Go.Statement.denotation out ξ (Function.update ς c (.some γc)) ss ∖ γc
               else -- if cap > 0 then
                 Go.Statement.denotation out ξ ς ss ⬰ Domain.branch λ σ ↦
-                  let ⟨σ, array⟩ := zero σ (.array cap.toNat τ)
+                  let array := zero (.array cap.toNat τ)
                   let addr₁ := Store.freshAddr σ
                   let σ := Store.insert σ addr₁ array.to𝕍
                   let addr₂ := Store.freshAddr σ
@@ -488,8 +496,8 @@ noncomputable section
                         ∅
                       else if len = 0 ∧ closed?' then
                         -- NOTE: channel closed, no more messages to receive
-                        let (σ', v) := Go.Statement.zero σ τ
-                        if let .some σ' := upd v.to𝕍 (Value.𝕍.bool false) σ' then
+                        let v := Go.Statement.zero τ
+                        if let .some σ' := upd v.to𝕍 (Value.𝕍.bool false) σ then
                           {.next σ' ⟨.pure .unit⟩}
                         else
                           {.next σ ⟨.abort⟩}
