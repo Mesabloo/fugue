@@ -120,6 +120,14 @@ noncomputable section
     instance : HasDefaultInit Store.type Channel (Value.Send𝕍 Address Go.Typ) where
       zero c σ := zero σ (Prod.snd c)
 
+    /-- Value equality, for comparable values. -/
+    inductive Value.𝕍.Eq : (Value.𝕍 Store.type Channel Address Go.Typ).type → (Value.𝕍 Store.type Channel Address Go.Typ).type → Prop
+    -- TODO
+
+    /-- Value disequality, for comparable values. -/
+    inductive Value.𝕍.DisEq : (Value.𝕍 Store.type Channel Address Go.Typ).type → (Value.𝕍 Store.type Channel Address Go.Typ).type → Prop
+    -- TODO
+
     def evalRef (ξ : List Channel) (ς : String → Option Channel) :
         Ref (Expression Typ) → Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) (Option Address × List ((Value.𝕍 Store.type Channel Address Go.Typ).type ⊕ String))
       | .wildcard => Domain.branch λ σ ↦ {.next σ ⟨Domain.pure (.none, [])⟩}
@@ -414,9 +422,31 @@ noncomputable section
         else
           -- Asynchronous case
           async
-      | .switch e «cases» defaul :: ss => sorry
+      | .switch e «cases» defaul :: ss =>
+        Go.Expression.denotation ξ ς e >>= λ v ↦
+
+        let p₀ := Go.Statement.denotation out ξ ς defaul
+        let rec go : List (SwitchClause (Expression Typ) ComputableGo.Statement) → Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) PUnit
+          | [] => p₀
+          | ⟨head, body⟩ :: cs =>
+            Go.Expression.denotation ξ ς head >>= λ v' ↦
+            if Value.𝕍.Eq v v' then
+              Go.Statement.denotation out ξ ς body
+            else if Value.𝕍.DisEq v v' then
+              go cs
+            else
+              Domain.branch λ σ ↦ {.next σ ⟨Domain.abort⟩}
+        termination_by cs => sizeOf cs
+
+        Go.Statement.denotation out ξ ς ss ⬰ go «cases»
       | .select «cases» defaul :: ss =>
-        let case_denotation (c : SelectClause ComputableGo.Statement) : Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) PUnit :=
+        let case_denotation (c : SelectClause ComputableGo.Statement) (_h : c ∈ «cases») : Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) PUnit :=
+          have _termination : 1 + sizeOf c.guard + sizeOf c.body < 1 + (1 + sizeOf «cases» + sizeOf defaul) + sizeOf ss := by
+            calc
+              _ = sizeOf c := by rfl
+              _ < sizeOf «cases» := by decreasing_trivial
+              _ < _ := by simp +arith only
+
           Go.Statement.denotation out ξ ς (c.guard :: c.body)
 
         Go.Statement.denotation out ξ ς ss ⬰ if h : «cases».length = 0 then
@@ -424,7 +454,8 @@ noncomputable section
           | .some defaul => Domain.branch λ σ ↦ {.next σ ⟨Go.Statement.denotation out ξ ς defaul⟩}
           | .none => Domain.branch λ σ ↦ ∅
         else
-          let p := «cases».tail.foldl (init := case_denotation («cases».head (by grind only [=List.length_nil]))) λ acc c ↦ acc ⊻ case_denotation c
+          let p := «cases».tail.attach.foldl (init := case_denotation («cases».head (by grind only [=List.length_nil])) (List.head_mem _)) λ acc ⟨c, h⟩ ↦
+            acc ⊻ case_denotation c (List.mem_of_mem_tail h)
           match defaul with
           | .some defaul =>
             Domain.branch λ σ ↦
@@ -436,6 +467,7 @@ noncomputable section
               else
                 {.next σ ⟨Go.Statement.denotation out ξ ς defaul⟩}
           | .none => p
+    termination_by cs => sizeOf cs
 
     theorem for_seq_F_nonexpansive {ξ ς e q} :
         ∀ p p', edist (for_seq_F ξ ς e q p) (for_seq_F ξ ς e q p') ≤ (1/2) * edist p p' := by
