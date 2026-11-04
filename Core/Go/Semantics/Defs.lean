@@ -257,25 +257,24 @@ noncomputable section
       | .return es :: ss => match ss with
         | [] => match ξ with
           | ret :: _ => Go.Expression.denotations ξ ς es >>= λ vs ↦ Domain.branch λ σ ↦ match Store.popϙ σ with
-            | .none => {.next σ { val := .abort }}
-            | .some σ => {.next σ {
-              val :=
+            | .none => {.next σ ⟨.abort⟩}
+            | .some σ => {.next σ ⟨
                 if h₁ : vs.length = 1 then
                   if h₂ : Value.𝕍_isSend vs[0] then
-                    .branch λ _ ↦ {.send ret (Value.𝕍_extract vs[0] h₂) ⟨.pure .unit⟩}
+                    Domain.branch λ _ ↦ {.send ret (Value.𝕍_extract vs[0] h₂) ⟨.pure .unit⟩}
                   else
                     .abort
                 else if h₂ : ∀ v ∈ vs, Value.𝕍_isSend v then
-                  .branch λ _ ↦ {.send ret (Value.𝕍_extract (Value.𝕍.tuple vs) (Value.𝕍_isSend.tuple h₂)) { val := .pure .unit }}
+                  Domain.branch λ _ ↦ {.send ret (Value.𝕍_extract (Value.𝕍.tuple vs) (Value.𝕍_isSend.tuple h₂)) ⟨.pure .unit⟩}
                 else
-                  .abort
-            }}
+                  Domain.abort
+            ⟩}
           | [] => .branch λ σ ↦ {.next σ { val := .abort }} -- empty call stack
         | _ => .branch λ σ ↦ {.next σ { val := .abort }} -- some statements after a `return`
       | .print e :: ss =>
         Go.Statement.denotation out ξ ς ss ⬰ (Go.Expression.denotation ξ ς e >>= λ v ↦
           if h : Value.𝕍_isSend v then
-            Domain.branch λ _ ↦ {.send out (Value.𝕍_extract v h) { val := .pure .unit }}
+            Domain.branch λ _ ↦ {.send out (Value.𝕍_extract v h) ⟨.pure .unit⟩}
           else
             Domain.abort)
       | .if e S₁ S₂ :: ss =>
@@ -288,11 +287,11 @@ noncomputable section
         if ∃ h : (Store.type.ϙ σ).length > 0, (Store.type.ϙ σ)[(Store.type.ϙ σ).length - 1] x matches .none then
           let ⟨σ', v⟩ := zero σ τ
           if let .some σ' := Store.newVar σ' x v.to𝕍 then
-            {.next σ' ⟨Domain.pure .unit⟩}
+            {.next σ' ⟨.pure .unit⟩}
           else
-            {.next σ ⟨Domain.abort⟩}
+            {.next σ ⟨.abort⟩}
         else
-          {.next σ ⟨Domain.abort⟩}
+          {.next σ ⟨.abort⟩}
       | .assign rs es :: ss =>
         Go.Statement.denotation out ξ ς ss ⬰ (
           -- evaluate all references from left to right
@@ -300,34 +299,34 @@ noncomputable section
           -- then evaluate all values from left to right
           Go.Expression.denotations ξ ς es >>= λ vs ↦
           if h₁ : vs.length = 0 then
-            Domain.branch λ σ ↦ {.next σ ⟨Domain.abort⟩}
+            Domain.branch λ σ ↦ {.next σ ⟨.abort⟩}
           else if h₂ : vs.length = 1 then
             -- if a single value, check the length of the returned tuple and assign each component to the references
             if h₃ : rs.length = 0 then
-              Domain.branch λ σ ↦ {.next σ ⟨Domain.abort⟩}
+              Domain.branch λ σ ↦ {.next σ ⟨.abort⟩}
             else if h₄ : rs.length = 1 then
               -- if a single reference, assign directly (no tuple)
               tuple vs[0] (default := Domain.branch λ σ ↦
                 if let ⟨.some addr, args⟩ := rs[0] then
                   if let .some σ' := updateRef addr vs[0] args σ then
-                    {.next σ' ⟨Domain.pure .unit⟩}
+                    {.next σ' ⟨.pure .unit⟩}
                   else
-                    {.next σ ⟨Domain.abort⟩}
+                    {.next σ ⟨.abort⟩}
                 else
-                  {.next σ ⟨Domain.pure .unit⟩}
+                  {.next σ ⟨.pure .unit⟩}
               )
-                (λ _ ↦ Domain.branch λ σ ↦ {.next σ ⟨Domain.abort⟩})
+                (λ _ ↦ Domain.branch λ σ ↦ {.next σ ⟨.abort⟩})
             else
               -- otherwise assign each component of the tuple to the corresponding reference
-              tuple vs[0] (default := Domain.branch λ σ ↦ {.next σ ⟨Domain.abort⟩})
+              tuple vs[0] (default := Domain.branch λ σ ↦ {.next σ ⟨.abort⟩})
                 (λ vs ↦ Domain.branch λ σ ↦ if h₅ : vs.length = rs.length then
                     let ⟨addrs, idxs, vss⟩ := rs.zip vs |>.filterMap (λ ⟨⟨addr, idx⟩, v⟩ ↦ (·, idx, v) <$> addr) |>.unzip₃
                     if let .some σ' := updateRefs addrs vss idxs σ then
-                      {.next σ' ⟨Domain.pure .unit⟩}
+                      {.next σ' ⟨.pure .unit⟩}
                     else
-                      {.next σ ⟨Domain.abort⟩}
+                      {.next σ ⟨.abort⟩}
                   else
-                    {.next σ ⟨Domain.abort⟩}
+                    {.next σ ⟨.abort⟩}
                 )
           else
             -- otherwise, check that all values are not tuples, that there are enough values, and assign to the references
@@ -335,20 +334,20 @@ noncomputable section
               if h₅ : vs.length = rs.length then
                 let ⟨addrs, idxs, vss⟩ := rs.zip vs |>.filterMap (λ ⟨⟨addr, idx⟩, v⟩ ↦ (·, idx, v) <$> addr) |>.unzip₃
                 if let .some σ' := updateRefs addrs vss idxs σ then
-                  {.next σ' ⟨Domain.pure .unit⟩}
+                  {.next σ' ⟨.pure .unit⟩}
                 else
-                  {.next σ ⟨Domain.abort⟩}
+                  {.next σ ⟨.abort⟩}
               else
-                {.next σ ⟨Domain.abort⟩}
+                {.next σ ⟨.abort⟩}
             else
-              {.next σ ⟨Domain.abort⟩}
+              {.next σ ⟨.abort⟩}
         )
       | .make c τ cap :: ss =>
-        (cap.elim (Domain.pure <| Value.𝕍.int 0) (Go.Expression.denotation ξ ς)) >>= λ cap ↦
-          integer cap (default := Domain.branch λ σ ↦ {.next σ ⟨Domain.abort⟩})
+        (cap.elim (.pure <| Value.𝕍.int 0) (Go.Expression.denotation ξ ς)) >>= λ cap ↦
+          integer cap (default := Domain.branch λ σ ↦ {.next σ ⟨.abort⟩})
             (λ cap ↦
               if cap < 0 then
-                Domain.branch λ σ ↦ {.next σ ⟨Domain.abort⟩}
+                Domain.branch λ σ ↦ {.next σ ⟨.abort⟩}
               else if cap = 0 then
                 let γc : Channel := Classical.epsilon λ γ ↦ (∀ c, ς c ≠ .some γ) ∧ γ ∉ ξ
                 Go.Statement.denotation out ξ (Function.update ς c (.some γc)) ss ∖ γc
@@ -362,34 +361,34 @@ noncomputable section
                   let addr₃ := Store.freshAddr σ
                   let σ := Store.insert σ addr₃ (Value.𝕍.int 0)
                   if let .some σ := Store.newVar σ c (Value.𝕍.chan addr₃ τ addr₁ addr₂) then
-                    {.next σ ⟨Domain.pure .unit⟩}
+                    {.next σ ⟨.pure .unit⟩}
                   else
-                    {.next σ ⟨Domain.abort⟩}
+                    {.next σ ⟨.abort⟩}
             )
       | .send c e :: ss =>
         let async : Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) PUnit :=
           Go.Expression.denotation ξ ς e >>= λ v ↦
           Go.Expression.denotation ξ ς c >>= λ c ↦
           Domain.branch λ σ ↦
-            channel c (default := {.next σ { val := .abort }})
+            channel c (default := {.next σ ⟨.abort⟩})
               (λ len' τ buf closed? ↦
                 match (Store.deref σ closed?).bind λ closed? ↦ (Store.deref σ len').bind λ len ↦ (Store.deref σ buf).bind λ buf ↦ pure (closed?, len, buf) with
-                | .none => {.next σ { val := .abort }}
+                | .none => {.next σ ⟨.abort⟩}
                 | .some (closed?, len, buf') =>
-                  boolean closed? (default := {.next σ { val := .abort }})
-                    λ closed? ↦ integer len (default := {.next σ { val := .abort }})
-                    λ len ↦ array buf' (default := {.next σ { val := .abort }})
+                  boolean closed? (default := {.next σ ⟨.abort⟩})
+                    λ closed? ↦ integer len (default := {.next σ ⟨.abort⟩})
+                    λ len ↦ array buf' (default := {.next σ ⟨.abort⟩})
                     λ cap indices ↦
                       if h : closed? ∧ len ≥ 0 ∧ len < cap then
                         let i : Fin cap := ⟨len.toNat, propext (Int.toNat_lt h.2.1) ▸ h.2.2⟩
                         let σ' := Store.update σ buf (Value.𝕍.array cap (Function.update indices i v)) |>.bind λ σ ↦ Store.update σ len' (Value.𝕍.int <| len + 1)
                         match σ' with
-                        | .some σ' => {.next σ' { val := .pure .unit }}
-                        | .none => {.next σ { val := .abort }}
+                        | .some σ' => {.next σ' ⟨.pure .unit⟩}
+                        | .none => {.next σ ⟨.abort⟩}
                       else if closed? ∧ len ≥ cap then
                         ∅
                       else
-                        {.next σ { val := .abort }}
+                        {.next σ ⟨.abort⟩}
               )
 
         Go.Statement.denotation out ξ ς ss ⬰ if let .var x := c then
@@ -398,9 +397,9 @@ noncomputable section
             Go.Expression.denotation ξ ς e >>= λ v ↦
             Domain.branch λ σ ↦
             if h : Value.𝕍_isSend v then
-              {.send c (Value.𝕍_extract v h) ⟨Domain.pure .unit⟩}
+              {.send c (Value.𝕍_extract v h) ⟨.pure .unit⟩}
             else
-              {.next σ ⟨Domain.abort⟩}
+              {.next σ ⟨.abort⟩}
           else
             -- Asynchronous case
             async
@@ -417,14 +416,14 @@ noncomputable section
           let async : Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) PUnit :=
             Go.Expression.denotation ξ ς c >>= λ c ↦
             Domain.branch λ σ ↦
-              channel c (default := {.next σ { val := .abort }})
+              channel c (default := {.next σ ⟨.abort⟩})
               (λ len' τ buf closed? ↦
                 match (Store.deref σ closed?).bind λ closed? ↦ (Store.deref σ len').bind λ len ↦ (Store.deref σ buf).bind λ buf ↦ pure (closed?, len, buf) with
-                | .none => {.next σ { val := .abort }}
+                | .none => {.next σ ⟨.abort⟩}
                 | .some (closed?', len, buf') =>
-                  boolean closed?' (default := {.next σ { val := .abort }})
-                    λ closed?' ↦ integer len (default := {.next σ { val := .abort }})
-                    λ len ↦ array buf' (default := {.next σ { val := .abort }})
+                  boolean closed?' (default := {.next σ ⟨.abort⟩})
+                    λ closed?' ↦ integer len (default := {.next σ ⟨.abort⟩})
+                    λ len ↦ array buf' (default := {.next σ ⟨.abort⟩})
                     λ cap indices ↦
                       if h : cap > 0 ∧ len > 0 then -- memory well-formedness could give that len ≤ cap?
                         -- NOTE: there are messages to be received still
@@ -434,9 +433,9 @@ noncomputable section
                           let σ ← Store.update σ len' (Value.𝕍.int (len - 1))
                           upd v₀ (Value.𝕍.bool true) σ
                         if let .some σ' := σ' then
-                          {.next σ' ⟨Domain.pure .unit⟩}
+                          {.next σ' ⟨.pure .unit⟩}
                         else
-                          {.next σ ⟨Domain.abort⟩}
+                          {.next σ ⟨.abort⟩}
                       else if len = 0 ∧ ¬closed?' then
                         -- NOTE: no message to receive, but channel not closed so wait
                         ∅
@@ -444,11 +443,11 @@ noncomputable section
                         -- NOTE: channel closed, no more messages to receive
                         let (σ', v) := Go.Statement.zero σ τ
                         if let .some σ' := upd v.to𝕍 (Value.𝕍.bool false) σ' then
-                          {.next σ' ⟨Domain.pure .unit⟩}
+                          {.next σ' ⟨.pure .unit⟩}
                         else
-                          {.next σ ⟨Domain.abort⟩}
+                          {.next σ ⟨.abort⟩}
                       else
-                        {.next σ ⟨Domain.abort⟩}
+                        {.next σ ⟨.abort⟩}
               )
 
           if let .var x := c then
@@ -457,9 +456,9 @@ noncomputable section
               Domain.branch λ σ ↦ {
                 .recv c λ v ok ↦ ⟨Domain.branch λ σ ↦ {
                     if let .some σ := upd v.to𝕍 (Value.𝕍.bool ok) σ then
-                      .next σ ⟨Domain.pure .unit⟩
+                      .next σ ⟨.pure .unit⟩
                     else
-                      .next σ ⟨Domain.abort⟩
+                      .next σ ⟨.abort⟩
                   }⟩
               }
             else
@@ -473,27 +472,27 @@ noncomputable section
         let async : Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) PUnit :=
           Go.Expression.denotation ξ ς c >>= λ c ↦
           Domain.branch λ σ ↦
-            channel c (default := {.next σ { val := .abort }})
+            channel c (default := {.next σ ⟨.abort⟩})
               (λ len' τ buf closed? ↦
                 match (Store.deref σ closed?).bind λ closed? ↦ (Store.deref σ len').bind λ len ↦ (Store.deref σ buf).bind λ buf ↦ pure (closed?, len, buf) with
-                | .none => {.next σ { val := .abort }}
+                | .none => {.next σ ⟨.abort⟩}
                 | .some (closed?', len, buf) =>
-                  boolean closed?' (default := {.next σ { val := .abort }})
-                    λ closed?' ↦ integer len (default := {.next σ { val := .abort }})
-                    λ len ↦ array buf (default := {.next σ { val := .abort }})
+                  boolean closed?' (default := {.next σ ⟨.abort⟩})
+                    λ closed?' ↦ integer len (default := {.next σ ⟨.abort⟩})
+                    λ len ↦ array buf (default := {.next σ ⟨.abort⟩})
                     λ cap indices ↦
                       if h : ¬closed?' ∧ cap > 0 then
                         match Store.update σ closed? (Value.𝕍.bool true) with
-                        | .some σ' => {.next σ' { val := .pure .unit }}
-                        | .none => {.next σ { val := .abort }}
+                        | .some σ' => {.next σ' ⟨.pure .unit⟩}
+                        | .none => {.next σ ⟨.abort⟩}
                       else -- if closed? ∨ cap = 0 then
-                        {.next σ { val := .abort }}
+                        {.next σ ⟨.abort⟩}
               )
 
         Go.Statement.denotation out ξ ς ss ⬰ if let .var x := c then
           if let .some c := ς x then
             -- Synchronous case
-            Domain.branch λ σ ↦ {.close c ⟨Domain.pure .unit⟩}
+            Domain.branch λ σ ↦ {.close c ⟨.pure .unit⟩}
           else
             -- Asynchronous case
             async
@@ -513,7 +512,7 @@ noncomputable section
             else if Value.𝕍.DisEq v v' then
               go cs
             else
-              Domain.branch λ σ ↦ {.next σ ⟨Domain.abort⟩}
+              Domain.branch λ σ ↦ {.next σ ⟨.abort⟩}
         termination_by cs => sizeOf cs
 
         Go.Statement.denotation out ξ ς ss ⬰ go «cases»
