@@ -5,6 +5,7 @@ public import Core.Go.Semantics.Operations
 public import Core.Go.Syntax
 import Mathlib.Analysis.SpecificLimits.Basic
 public import Mathlib.Topology.MetricSpace.Contracting
+public import Extra.List
 
 @[expose] public section
 
@@ -79,6 +80,22 @@ noncomputable section
       (λ _ ↦ default)
       v
 
+  def tuple {α} (v : (Value.𝕍 Store.type Channel Address Go.Typ).type) (default : α)
+    (tup : List (Value.𝕍 Store.type Channel Address Go.Typ).type → α) :
+      α :=
+    Value.𝕍.casesOn (motive := λ _ ↦ α)
+      (λ _ ↦ default)
+      (λ _ ↦ default)
+      (λ _ ↦ default)
+      (λ _ _ _ _ ↦ default)
+      (λ _ _ _ _ ↦ default)
+      (λ _ ↦ default)
+      (λ _ _ ↦ default)
+      (λ _ _ ↦ default)
+      (λ _ ↦ default)
+      tup
+      v
+
   def Domain.branches {α β Γ «Σ»} [IMetricSpace β] [IMetricSpace «Σ»] [IMetricSpace Γ] [IMetricSpace α] [CompleteSpace «Σ»] [CompleteSpace Γ] [CompleteSpace α] [CompleteSpace β]
     (p : Domain «Σ» Γ α β) (σ : «Σ») :
       Option (Set (Branch «Σ» Γ α (Domain «Σ» Γ α β))) :=
@@ -135,6 +152,14 @@ noncomputable section
       | .field r name => evalRef ξ ς r >>= λ ⟨addr, args⟩ ↦ Domain.pure ⟨addr, args ++ [.inr name]⟩
       | .index r e => evalRef ξ ς r >>= λ ⟨addr, args⟩ ↦ Go.Expression.denotation ξ ς e >>= λ v ↦ Domain.pure ⟨addr, args ++ [.inl v]⟩
 
+    def evalRefs (ξ : List Channel) (ς : String → Option Channel) :
+        List (Ref (Expression Typ)) → Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) (List (Option Address × List ((Value.𝕍 Store.type Channel Address Go.Typ).type ⊕ String)))
+      | [] => Domain.pure []
+      | r :: rs =>
+        evalRef ξ ς r >>= λ r ↦
+        evalRefs ξ ς rs >>= λ rs ↦
+        Domain.pure (r :: rs)
+
     -- termination metric: depth addr@σ - List.length idx (depth addr@σ is finite from well-formedness of σ)
     mutual
       partial def updateRef (addr : Address) (v : (Value.𝕍 Store.type Channel Address Go.Typ).type) (idx : List ((Value.𝕍 Store.type Channel Address Go.Typ).type ⊕ String))
@@ -183,6 +208,11 @@ noncomputable section
         | .inl e :: idx =>
           sorry
     end
+
+    def updateRefs (addrs : List Address) (vs : List (Value.𝕍 Store.type Channel Address Go.Typ).type) (idxs : List (List ((Value.𝕍 Store.type Channel Address Go.Typ).type ⊕ String)))
+        (σ : Store.type) :
+          Option Store.type :=
+      List.zip₃ addrs vs idxs |>.foldlM (init := σ) λ σ ⟨addr, v, idx⟩ ↦ updateRef addr v idx σ
 
     def guard (ξ : List Channel) (ς : String → Option Channel) (e : Go.Expression Go.Typ) :
         Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) PUnit :=
@@ -260,10 +290,52 @@ noncomputable section
       | .assign rs es :: ss =>
         Go.Statement.denotation out ξ ς ss ⬰ (
           -- evaluate all references from left to right
+          evalRefs ξ ς rs >>= λ rs ↦
           -- then evaluate all values from left to right
-          -- if a single value, check the length of the returned tuple and assign each component to the references
-          -- otherwise, check that all values are not tuples, that there are enough values, and assign to the references
-          sorry
+          Go.Expression.denotations ξ ς es >>= λ vs ↦
+          if h₁ : vs.length = 0 then
+            Domain.branch λ σ ↦ {.next σ ⟨Domain.abort⟩}
+          else if h₂ : vs.length = 1 then
+            -- if a single value, check the length of the returned tuple and assign each component to the references
+            if h₃ : rs.length = 0 then
+              Domain.branch λ σ ↦ {.next σ ⟨Domain.abort⟩}
+            else if h₄ : rs.length = 1 then
+              -- if a single reference, assign directly (no tuple)
+              tuple vs[0] (default := Domain.branch λ σ ↦
+                if let ⟨.some addr, args⟩ := rs[0] then
+                  if let .some σ' := updateRef addr vs[0] args σ then
+                    {.next σ' ⟨Domain.pure .unit⟩}
+                  else
+                    {.next σ ⟨Domain.abort⟩}
+                else
+                  {.next σ ⟨Domain.pure .unit⟩}
+              )
+                (λ _ ↦ Domain.branch λ σ ↦ {.next σ ⟨Domain.abort⟩})
+            else
+              -- otherwise assign each component of the tuple to the corresponding reference
+              tuple vs[0] (default := Domain.branch λ σ ↦ {.next σ ⟨Domain.abort⟩})
+                (λ vs ↦ Domain.branch λ σ ↦ if h₅ : vs.length = rs.length then
+                    let ⟨addrs, idxs, vss⟩ := rs.zip vs |>.filterMap (λ ⟨⟨addr, idx⟩, v⟩ ↦ (·, idx, v) <$> addr) |>.unzip₃
+                    if let .some σ' := updateRefs addrs vss idxs σ then
+                      {.next σ' ⟨Domain.pure .unit⟩}
+                    else
+                      {.next σ ⟨Domain.abort⟩}
+                  else
+                    {.next σ ⟨Domain.abort⟩}
+                )
+          else
+            -- otherwise, check that all values are not tuples, that there are enough values, and assign to the references
+            Domain.branch λ σ ↦ if h_nottup : ∀ v ∈ vs, tuple v (default := True) (λ _ ↦ False) then
+              if h₅ : vs.length = rs.length then
+                let ⟨addrs, idxs, vss⟩ := rs.zip vs |>.filterMap (λ ⟨⟨addr, idx⟩, v⟩ ↦ (·, idx, v) <$> addr) |>.unzip₃
+                if let .some σ' := updateRefs addrs vss idxs σ then
+                  {.next σ' ⟨Domain.pure .unit⟩}
+                else
+                  {.next σ ⟨Domain.abort⟩}
+              else
+                {.next σ ⟨Domain.abort⟩}
+            else
+              {.next σ ⟨Domain.abort⟩}
         )
       | .make c τ cap :: ss =>
         (cap.elim (Domain.pure <| Value.𝕍.int 0) (Go.Expression.denotation ξ ς)) >>= λ cap ↦
