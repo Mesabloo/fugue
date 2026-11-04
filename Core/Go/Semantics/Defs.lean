@@ -259,10 +259,16 @@ noncomputable section
           | ret :: _ => Go.Expression.denotations ξ ς es >>= λ vs ↦ Domain.branch λ σ ↦ match Store.popϙ σ with
             | .none => {.next σ { val := .abort }}
             | .some σ => {.next σ {
-              val := if h : ∀ v ∈ vs, Value.𝕍_isSend v then
-                .branch λ _ ↦ {.send ret (Value.𝕍_extract (Value.𝕍.tuple vs) (Value.𝕍_isSend.tuple h)) { val := .pure .unit }}
-              else
-                .abort
+              val :=
+                if h₁ : vs.length = 1 then
+                  if h₂ : Value.𝕍_isSend vs[0] then
+                    .branch λ _ ↦ {.send ret (Value.𝕍_extract vs[0] h₂) ⟨.pure .unit⟩}
+                  else
+                    .abort
+                else if h₂ : ∀ v ∈ vs, Value.𝕍_isSend v then
+                  .branch λ _ ↦ {.send ret (Value.𝕍_extract (Value.𝕍.tuple vs) (Value.𝕍_isSend.tuple h₂)) { val := .pure .unit }}
+                else
+                  .abort
             }}
           | [] => .branch λ σ ↦ {.next σ { val := .abort }} -- empty call stack
         | _ => .branch λ σ ↦ {.next σ { val := .abort }} -- some statements after a `return`
