@@ -96,6 +96,22 @@ noncomputable section
       tup
       v
 
+  def struct {α} (v : (Value.𝕍 Store.type Channel Address Go.Typ).type) (default : α)
+    (struct : (String →ᵤ Option (Value.𝕍 Store.type Channel Address Go.Typ).type) → α) :
+      α :=
+    Value.𝕍.casesOn (motive := λ _ ↦ α)
+      (λ _ ↦ default)
+      (λ _ ↦ default)
+      (λ _ ↦ default)
+      (λ _ _ _ _ ↦ default)
+      (λ _ _ _ _ ↦ default)
+      struct
+      (λ _ _ ↦ default)
+      (λ _ _ ↦ default)
+      (λ _ ↦ default)
+      (λ _ ↦ default)
+      v
+
   def Domain.branches {α β Γ «Σ»} [IMetricSpace β] [IMetricSpace «Σ»] [IMetricSpace Γ] [IMetricSpace α] [CompleteSpace «Σ»] [CompleteSpace Γ] [CompleteSpace α] [CompleteSpace β]
     (p : Domain «Σ» Γ α β) (σ : «Σ») :
       Option (Set (Branch «Σ» Γ α (Domain «Σ» Γ α β))) :=
@@ -175,13 +191,13 @@ noncomputable section
           let v' ← Store.deref σ addr
           Value.𝕍.casesOn (motive := λ _ ↦ Option Store.type)
             (λ _ ↦ .none) (λ _ ↦ .none) (λ _ ↦ .none)
-            (λ cap low high buf ↦
+            (λ _ low high buf ↦
               integer v'' (default := .none) λ v''' ↦ do
                 guard (0 ≤ v''' ∧ v''' < high - low)
                 updateRef buf v (.inl v'' :: idx) σ
             )
             (λ _ _ _ _ ↦ .none) (λ _ ↦ .none)
-            (λ len arr ↦
+            (λ len _ ↦
               integer v'' (default := .none) λ v''' ↦ do
                 guard (0 ≤ v''' ∧ v''' < len)
                 let ⟨σ, v_⟩ ← updateVal v' v (.inl v'' :: idx) σ
@@ -204,9 +220,40 @@ noncomputable section
         match idx with
         | [] => .some (σ, v)
         | .inr name :: idx =>
-          sorry
+          struct v' (default := .none) λ fs ↦ do
+            let v'' ← fs name
+            let ⟨σ, v''⟩ ← updateVal v'' v idx σ
+            pure ⟨σ, Value.𝕍.struct (Function.update fs name v'')⟩
         | .inl e :: idx =>
-          sorry
+          Value.𝕍.casesOn (motive := λ _ ↦ Option (Store.type × (Value.𝕍 Store.type Channel Address Go.Typ).type))
+            (λ _ ↦ .none) (λ _ ↦ .none) (λ _ ↦ .none)
+            (λ cap low high buf ↦
+              integer e (default := .none) (λ e' ↦ do
+                guard (0 ≤ e' ∧ e' < high - low)
+                let σ ← updateRef buf v (.inl e :: idx) σ
+                pure (σ, Value.𝕍.slice cap low high buf)
+            ))
+            (λ _ _ _ _ ↦ .none) (λ _ ↦ .none)
+            (λ len indices ↦
+              integer e (default := .none) (λ e' ↦ do
+                if h : 0 ≤ e' ∧ e' < len then
+                  let i : Fin len := ⟨e'.toNat, propext (Int.toNat_lt h.1) ▸ h.2⟩
+                  let ⟨σ, v''⟩ ← updateVal (indices i) v idx σ
+                  pure ⟨σ, Value.𝕍.array len (Function.update indices i v'')⟩
+                else
+                  .none
+            ))
+            (λ fs isNil ↦ do
+              guard (¬isNil ∧ idx = [])
+              if let .some addr := fs e then
+                let σ ← updateRef addr v [] σ
+                pure ⟨σ, Value.𝕍.map fs isNil⟩
+              else
+                let addr := Store.freshAddr σ
+                pure ⟨Store.insert σ addr v, Value.𝕍.map (Function.update fs e addr) isNil⟩
+            )
+            (λ _ ↦ .none) (λ _ ↦ .none)
+            v'
     end
 
     def updateRefs (addrs : List Address) (vs : List (Value.𝕍 Store.type Channel Address Go.Typ).type) (idxs : List (List ((Value.𝕍 Store.type Channel Address Go.Typ).type ⊕ String)))
