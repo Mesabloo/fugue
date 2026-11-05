@@ -112,6 +112,22 @@ noncomputable section
       (λ _ ↦ default)
       v
 
+  def func {α} (v : (Value.𝕍 Store.type Channel Address Go.Typ).type) (default : α)
+    (fn : (List Address × List Channel → Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) PUnit) → α) :
+      α :=
+    Value.𝕍.casesOn (motive := λ _ ↦ α)
+      (λ _ ↦ default)
+      (λ _ ↦ default)
+      (λ _ ↦ default)
+      (λ _ _ _ _ ↦ default)
+      (λ _ _ _ _ ↦ default)
+      (λ _ ↦ default)
+      (λ _ _ ↦ default)
+      (λ _ _ ↦ default)
+      fn
+      (λ _ ↦ default)
+      v
+
   def Domain.branches {α β Γ «Σ»} [IMetricSpace β] [IMetricSpace «Σ»] [IMetricSpace Γ] [IMetricSpace α] [CompleteSpace «Σ»] [CompleteSpace Γ] [CompleteSpace α] [CompleteSpace β]
     (p : Domain «Σ» Γ α β) (σ : «Σ») :
       Option (Set (Branch «Σ» Γ α (Domain «Σ» Γ α β))) :=
@@ -287,17 +303,50 @@ noncomputable section
     mutual
       protected def Expression.denotation (ξ : List Channel) (ς : String → Option Channel) :
           Go.Expression Go.Typ → Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) (Value.𝕍 Store.type Channel Address Go.Typ).type
-        | .funcLit params _ body => Domain.pure <| Value.𝕍.func λ ⟨hs, ξ⟩ ↦
-          if hs.length = params.length then
+        | .nat n => Domain.pure (Value.𝕍.int n.toInt!)
+        | .str s => Domain.pure (Value.𝕍.str s)
+        | .true => Domain.pure (Value.𝕍.bool true)
+        | .false => Domain.pure (Value.𝕍.bool false)
+        | .var x => Domain.branch λ σ ↦
+          if let .some v := do Store.deref σ (← Store.addrOf σ x) then
+            {.next σ ⟨.pure v⟩}
+          else
+            {.next σ ⟨.abort⟩}
+        | .unary op e => sorry
+        | .binary op e₁ e₂ => sorry
+        | .index e₁ e₂ => sorry
+        | .field e x =>
+          Go.Expression.denotation ξ ς e >>= λ v ↦ struct v (default := Domain.branch λ σ ↦ {.next σ ⟨.abort⟩}) λ fs ↦
+            if let .some v := fs x then
+              Domain.branch λ σ ↦ {.next σ ⟨.pure v⟩}
+            else
+              Domain.branch λ σ ↦ {.next σ ⟨.abort⟩}
+        | .call f es =>
+          Go.Expression.denotation ξ ς f >>= λ f ↦
+          func f (default := Domain.branch λ σ ↦ {.next σ ⟨Domain.abort⟩}) λ f ↦
+            Go.Expression.denotations ξ ς es >>= λ vs ↦
+            let γret := Classical.epsilon λ γ ↦ γ ∉ ξ ∧ (∀ c, ς c ≠ γ)
             Domain.branch λ σ ↦
-              let σ' : Option Store.type := params.zip hs |>.foldlM (init := σ) λ σ ⟨(p, _), h⟩ ↦ Store.register σ p h
-              if let .some σ' := σ' then
+              let (addrs, σ') := vs.foldl (init := ([], σ)) λ (addrs, σ) v ↦
+                let addr := Store.freshAddr σ
+                (addrs ++ [addr], Store.insert σ addr v)
+              {.next σ' ⟨
+                Prod.snd <$> (f (addrs, γret :: ξ) ∥ Domain.branch λ σ ↦ {.recv γret λ v ok ↦ ⟨.pure v.to𝕍⟩}) ∖ γret
+              ⟩}
+        | .builtin f es => sorry
+        | .structLit τ es => sorry
+        | .sliceLit τ es => sorry
+        | .mapLit τ es => sorry
+        | .make τ es => sorry
+        | .funcLit params _ body => Domain.pure <| Value.𝕍.func λ ⟨hs, ξ⟩ ↦
+          Domain.branch λ σ ↦
+            if hs.length = params.length then
+              if let .some σ' := params.zip hs |>.foldlM (init := σ) λ σ ⟨(p, _), h⟩ ↦ Store.register σ p h then
                 {.next σ' ⟨Go.Statement.denotation ξ (λ _ ↦ .none) body⟩}
               else
                 {.next σ ⟨.abort⟩}
-          else
-            Domain.abort
-        | _ => Domain.branch sorry
+            else
+              {.next σ ⟨.abort⟩}
       termination_by e => sizeOf e
 
       protected def Expression.denotations (ξ : List Channel) (ς : String → Option Channel) :
@@ -626,6 +675,8 @@ noncomputable section
       termination_by cs => sizeOf cs
     end
 
+    variable {out}
+
     theorem guard.is_branch {e} : ∃ f, guard true e = Domain.branch f := by
       unfold guard
       apply Domain.bind_branch' (K := 1)
@@ -671,7 +722,7 @@ noncomputable section
 
         exact for_seq_F_nonexpansive p p'
 
-    theorem for_seq_eq {out ξ ς e S n} :
+    theorem for_seq_eq {ξ ς e S n} :
         for_seq e (Go.Statement.denotation out ξ ς S) n =
         (for_seq_F e (Go.Statement.denotation out ξ ς S))^[n] (Domain.branch λ σ ↦ {.next σ ⟨.pure .unit⟩}) := by
       induction n with
@@ -681,7 +732,7 @@ noncomputable section
         rw [IH, Nat.add_comm, Function.iterate_add, Function.iterate_one]
         rfl
 
-    theorem for_seq_cauchy (out : Channel) (ξ : List Channel) (ς : String → Option Channel) (e : _) (S : List ComputableGo.Statement) :
+    theorem for_seq_cauchy (ξ : List Channel) (ς : String → Option Channel) (e : _) (S : List ComputableGo.Statement) :
         CauchySeq (for_seq e (Go.Statement.denotation out ξ ς S)) := by
       let p₀ : Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) PUnit :=
         Domain.branch λ σ ↦ {.next σ ⟨.pure .unit⟩}
@@ -694,13 +745,13 @@ noncomputable section
       conv at tendsto_nhds => enter [1, n]; rw [← for_seq_eq]
       exact Filter.Tendsto.cauchySeq tendsto_nhds
 
-    theorem for_seq_cauchy' (out : Channel) (ξ : List Channel) (ς : String → Option Channel) (e : _) (S : List ComputableGo.Statement) :
+    theorem for_seq_cauchy' (ξ : List Channel) (ς : String → Option Channel) (e : _) (S : List ComputableGo.Statement) :
         ∃ p, Filter.lim (Filter.atTop.map (for_seq e (Go.Statement.denotation out ξ ς S))) = p := by
       apply Exists.imp
       · intros p
         apply Filter.Tendsto.limUnder_eq
       · apply cauchySeq_tendsto_of_complete
-        apply for_seq_cauchy out
+        apply for_seq_cauchy
   end Go
 end
 
