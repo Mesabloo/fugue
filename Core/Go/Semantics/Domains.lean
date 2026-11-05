@@ -1899,6 +1899,19 @@ noncomputable def Store.addrOf (σ : Store.type) (x : String) : Option Address :
     | ϙ' :: _ => ϙ' x -- <|> go ϙ's
 
 open Classical in
+noncomputable def Store.register (σ : Store.type) (x : String) (addr : Address) : Option Store.type :=
+  match Store.type.ϙ σ with
+  | [] => .none
+  | ϙ' :: ϙ's =>
+    if ϙ' x matches none then
+      .some <| Store_iso.symm ⟨
+        Store.type.h σ,
+        Function.update ϙ' x (.some addr) :: ϙ's
+      ⟩
+    else
+      .none
+
+open Classical in
 noncomputable def Store.newVar (σ : Store.type) (x : String) (v : (Value.𝕍 Store.type Channel Address Go.Typ).type) : Option Store.type :=
   let addr := Store.freshAddr σ
   match Store.type.ϙ σ with
