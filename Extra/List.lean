@@ -256,6 +256,9 @@ namespace List
     | nil => trivial
     | cons _ _ IH => simp [unzip₃, IH]
 
+  lemma unzip_length {α β} {xs : List (α × β)} : (unzip xs).fst.length = (unzip xs).snd.length := by
+    simp only [unzip_fst, length_map, unzip_snd]
+
   lemma unzip₃_snd {α β γ} {xs : List (α × β × γ)} : (unzip₃ xs).snd = unzip (unzip xs).snd := by
     induction xs with
     | nil => rfl
@@ -884,6 +887,23 @@ namespace List
       rw [h _ List.mem_cons_self, IH]
       · intros x x_in
         apply h _ <| List.mem_cons_of_mem _ x_in
+
+  theorem sizeOf_cons_le_sizeOf_cons {α : Type*} [SizeOf α] {l r : List α} (a : α)
+    (h : SizeOf.sizeOf l ≤ SizeOf.sizeOf r) :
+      SizeOf.sizeOf (a :: l) ≤ SizeOf.sizeOf (a :: r) := by
+    rw [cons.sizeOf_spec, cons.sizeOf_spec]
+    exact Nat.add_le_add_iff_left.mpr h
+
+  lemma sizeOf_unzip_fst_le {α β} [SizeOf α] [SizeOf β] {xs : List (α × β)} : sizeOf xs.unzip.1 ≤ sizeOf xs := by
+    induction xs with
+    | nil => rfl
+    | cons x xs IH => grind only [= List.unzip_fst, = List.cons.sizeOf_spec, = Prod.mk.sizeOf_spec, = List.map_cons]
+
+  lemma sizeOf_unzip_snd_le {α β} [SizeOf α] [SizeOf β] {xs : List (α × β)} : sizeOf xs.unzip.2 ≤ sizeOf xs := by
+    induction xs with
+    | nil => rfl
+    | cons x xs IH => grind only [= List.unzip_snd, = List.cons.sizeOf_spec, = Prod.mk.sizeOf_spec, = List.map_cons]
+
 end List
 
 end

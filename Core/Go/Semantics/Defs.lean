@@ -312,9 +312,12 @@ noncomputable section
             {.next σ ⟨.pure v⟩}
           else
             {.next σ ⟨.abort⟩}
-        | .unary op e => sorry
-        | .binary op e₁ e₂ => sorry
-        | .index e₁ e₂ => sorry
+        | .unary op e =>
+          sorry
+        | .binary op e₁ e₂ =>
+          sorry
+        | .index e₁ e₂ =>
+          sorry
         | .field e x =>
           Go.Expression.denotation ξ ς e >>= λ v ↦ struct v (default := Domain.branch λ σ ↦ {.next σ ⟨.abort⟩}) λ fs ↦
             if let .some v := fs x then
@@ -333,11 +336,43 @@ noncomputable section
               {.next σ' ⟨
                 Prod.snd <$> (f (addrs, γret :: ξ) ∥ Domain.branch λ σ ↦ {.recv γret λ v ok ↦ ⟨.pure v.to𝕍⟩}) ∖ γret
               ⟩}
-        | .builtin f es => sorry
-        | .structLit τ es => sorry
-        | .sliceLit τ es => sorry
-        | .mapLit τ es => sorry
-        | .make τ es => sorry
+        | .builtin f es =>
+          sorry
+        | .structLit τ es' =>
+          let (eq := h) (xs, es) := es'.unzip
+
+          have _termination : sizeOf es ≤ sizeOf es' := by
+            grind only [!List.sizeOf_unzip_snd_le]
+
+          Go.Expression.denotations ξ ς es >>= λ vs ↦
+          Domain.branch λ σ ↦
+            {.next σ ⟨.pure (Value.𝕍.struct (List.lookup · (xs.zip vs)))⟩}
+        | .sliceLit τ es =>
+          Go.Expression.denotations ξ ς es >>= λ vs ↦
+          let arr := Value.𝕍.array _ (List.get vs)
+          Domain.branch λ σ ↦
+            let addr := Store.freshAddr σ
+            let σ' := Store.insert σ addr arr
+            {.next σ' ⟨.pure (Value.𝕍.slice vs.length 0 vs.length addr)⟩}
+        | .mapLit τ es' =>
+          let (eq := h) (ks, es) := es'.unzip
+
+          have _termination₁ : sizeOf ks ≤ sizeOf es' := by
+            grind only [!List.sizeOf_unzip_fst_le]
+          have _termination₂ : sizeOf es ≤ sizeOf es' := by
+            grind only [!List.sizeOf_unzip_snd_le]
+
+          -- NOTE: Evaluation order between the keys and values is not specified (<https://go.dev/ref/spec#Order_of_evaluation>);
+          -- here we evaluate all keys before the values
+          Go.Expression.denotations ξ ς ks >>= λ ks ↦
+          Go.Expression.denotations ξ ς es >>= λ vs ↦
+          Domain.branch λ σ ↦
+            let (addrs, σ') := vs.foldl (init := ([], σ)) λ (addrs, σ) v ↦
+              let addr := Store.freshAddr σ
+              (addrs ++ [addr], Store.insert σ addr v)
+            {.next σ' ⟨.pure (Value.𝕍.map (List.lookup · (ks.zip addrs)) false)⟩}
+        | .make τ es =>
+          sorry
         | .funcLit params _ body => Domain.pure <| Value.𝕍.func λ ⟨hs, ξ⟩ ↦
           Domain.branch λ σ ↦
             if hs.length = params.length then
