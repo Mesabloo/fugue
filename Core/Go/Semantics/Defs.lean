@@ -163,11 +163,28 @@ noncomputable section
 
     /-- Value equality, for comparable values. -/
     inductive Value.𝕍.Eq : (Value.𝕍 Store.type Channel Address Go.Typ).type → (Value.𝕍 Store.type Channel Address Go.Typ).type → Prop
-    -- TODO
+      | int {n : ℤ} : Value.𝕍.Eq (Value.𝕍.int n) (Value.𝕍.int n)
+      | str {s : String} : Value.𝕍.Eq (Value.𝕍.str s) (Value.𝕍.str s)
+      | bool {b : Bool} : Value.𝕍.Eq (Value.𝕍.bool b) (Value.𝕍.bool b)
+      | chan {l τ r b} : Value.𝕍.Eq (Value.𝕍.chan l τ r b) (Value.𝕍.chan l τ r b)
+      | struct {fs fs'} : (∀ x, (fs x).isSome ↔ (fs' x).isSome) → (∀ x v v', x ≠ "_" → fs x = .some v → fs' x = .some v' → Value.𝕍.Eq v v') → Value.𝕍.Eq (Value.𝕍.struct fs) (Value.𝕍.struct fs')
+      | array {len f f'} : (∀ i : Fin len, Value.𝕍.Eq (f i) (f' i)) → Value.𝕍.Eq (Value.𝕍.array len f) (Value.𝕍.array len f')
+      | slice {c c' l l' h h'} : Value.𝕍.Eq (Value.𝕍.slice c l h nil) (Value.𝕍.slice c' l' h' nil)
+      | map : Value.𝕍.Eq (Value.𝕍.map (λ _ ↦ .none) true) (Value.𝕍.map (λ _ ↦ .none) true)
+      -- `λ _ ↦ Domain.abort` cannot be obtained from the semantics alone, see below
+      | func : Value.𝕍.Eq (Value.𝕍.func λ _ ↦ Domain.abort) (Value.𝕍.func λ _ ↦ Domain.abort)
 
     /-- Value disequality, for comparable values. -/
     inductive Value.𝕍.DisEq : (Value.𝕍 Store.type Channel Address Go.Typ).type → (Value.𝕍 Store.type Channel Address Go.Typ).type → Prop
-    -- TODO
+      | int {n₁ n₂ : ℤ} : n₁ ≠ n₂ → Value.𝕍.DisEq (Value.𝕍.int n₁) (Value.𝕍.int n₂)
+      | str {s₁ s₂ : String} : s₁ ≠ s₂ → Value.𝕍.DisEq (Value.𝕍.str s₁) (Value.𝕍.str s₂)
+      | bool {b₁ b₂ : Bool} : b₁ ≠ b₂ → Value.𝕍.DisEq (Value.𝕍.bool b₁) (Value.𝕍.bool b₂)
+      | chan {l l' τ r r' b b'} : r ≠ r' → Value.𝕍.DisEq (Value.𝕍.chan l τ r b) (Value.𝕍.chan l' τ r' b')
+      | struct {fs fs' x v v'} : (∀ x, (fs x).isSome ↔ (fs' x).isSome) → x ≠ "_" → fs x = .some v → fs' x = .some v' → Value.𝕍.DisEq v v' → Value.𝕍.DisEq (Value.𝕍.struct fs) (Value.𝕍.struct fs')
+      | array {len f f' i} : Value.𝕍.DisEq (f i) (f' i) → Value.𝕍.DisEq (Value.𝕍.array len f) (Value.𝕍.array len f')
+      | slice {c c' l l' h h' r r'} : (r = nil ↔ r' ≠ nil) → Value.𝕍.DisEq (Value.𝕍.slice c l h r) (Value.𝕍.slice c' l' h' r')
+      | map {f f' b b'} : (b = ¬b') → Value.𝕍.DisEq (Value.𝕍.map f b) (Value.𝕍.map f' b')
+      | func {f f'} : (f = (λ _ ↦ Domain.abort) ↔ f' ≠ (λ _ ↦ Domain.abort)) → Value.𝕍.DisEq (Value.𝕍.func f) (Value.𝕍.func f')
 
     def evalRef (ξ : List Channel) (ς : String → Option Channel) :
         Ref (Expression Typ) → Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) (Option Address × List ((Value.𝕍 Store.type Channel Address Go.Typ).type ⊕ String))
