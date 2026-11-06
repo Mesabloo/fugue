@@ -522,7 +522,29 @@ noncomputable section
                 Prod.snd <$> (f (addrs, γret :: ξ) ∥ Domain.branch λ σ ↦ {.recv γret λ v ok ↦ ⟨.pure v.to𝕍⟩}) ∖ γret
               ⟩}
         | .builtin f es =>
-          sorry
+          Go.Expression.denotations ξ ς es >>= λ vs ↦
+          match f with
+          | .len => match vs with
+            | [v] => Domain.branch λ σ ↦ Value.𝕍.casesOn (motive := λ _ ↦ Set (Branch _ _ _ (Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) (Value.𝕍 Store.type Channel Address Go.Typ).type)))
+              (λ _ ↦ {.next σ ⟨.abort⟩})
+              (λ _ ↦ {.next σ ⟨.abort⟩})
+              (λ s ↦ {.next σ ⟨.pure (Value.𝕍.int s.utf8ByteSize)⟩})
+              (λ _ low high _ ↦ {.next σ ⟨.pure (Value.𝕍.int (high - low))⟩})
+              (λ len _ _ _ ↦
+                if let .some v := Store.deref σ len then
+                  {.next σ ⟨.pure v⟩}
+                else
+                  {.next σ ⟨.abort⟩}
+              )
+              (λ _ ↦ {.next σ ⟨.abort⟩})
+              (λ len _ ↦ {.next σ ⟨.pure (Value.𝕍.int len)⟩})
+              (λ fs _ _ ↦ {.next σ ⟨.pure (Value.𝕍.int <| Set.ncard {x | ∃ h, fs x = .some h})⟩})
+              (λ _ ↦ {.next σ ⟨.abort⟩})
+              (λ _ ↦ {.next σ ⟨.abort⟩})
+              v
+            | _ => Domain.branch λ σ ↦ {.next σ ⟨.abort⟩}
+          | .cap => sorry
+          | .append => sorry
         | .structLit τ es' =>
           let (eq := h) (xs, es) := es'.unzip
 
