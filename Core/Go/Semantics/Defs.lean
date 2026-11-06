@@ -48,6 +48,20 @@ noncomputable section
       (λ _ ↦ default)
       v
 
+  def string {α} (v : (Value.𝕍 Store.type Channel Address Go.Typ).type) (default : α) (f : String → α) : α :=
+    Value.𝕍.casesOn (motive := λ _ ↦ α)
+      (λ _ ↦ default)
+      (λ _ ↦ default)
+      f
+      (λ _ _ _ _ ↦ default)
+      (λ _ _ _ _ ↦ default)
+      (λ _ ↦ default)
+      (λ _ _ ↦ default)
+      (λ _ _ _ ↦ default)
+      (λ _ ↦ default)
+      (λ _ ↦ default)
+      v
+
   def array {α} (v : (Value.𝕍 Store.type Channel Address Go.Typ).type) (default : α)
     (f : (n : ℕ) → (Fin n →ᵤ (Value.𝕍 Store.type Channel Address Go.Typ).type) → α) :
       α :=
@@ -313,9 +327,127 @@ noncomputable section
           else
             {.next σ ⟨.abort⟩}
         | .unary op e =>
-          sorry
+          Go.Expression.denotation ξ ς e >>= λ v ↦ Domain.branch λ σ ↦ match op with
+          | .neg => integer v (default := {.next σ ⟨.abort⟩}) λ v ↦ {.next σ ⟨.pure (Value.𝕍.int (-v))⟩}
+          | .not => boolean v (default := {.next σ ⟨.abort⟩}) λ v ↦ {.next σ ⟨.pure (Value.𝕍.bool (¬v))⟩}
+        -- special cases: `&&` and `||`, for short-circuiting purpose
+        | .binary .and e₁ e₂ =>
+          Go.Expression.denotation ξ ς e₁ >>= λ v₁ ↦
+            boolean v₁ (default := Domain.abort) λ b₁ ↦
+              if b₁ then
+                Go.Expression.denotation ξ ς e₂
+              else
+                .pure (Value.𝕍.bool false)
+        | .binary .or e₁ e₂ =>
+          Go.Expression.denotation ξ ς e₁ >>= λ v₁ ↦
+            boolean v₁ (default := Domain.abort) λ b₁ ↦
+              if b₁ then
+                .pure (Value.𝕍.bool true)
+              else
+                Go.Expression.denotation ξ ς e₂
         | .binary op e₁ e₂ =>
-          sorry
+          Go.Expression.denotation ξ ς e₁ >>= λ v₁ ↦
+          Go.Expression.denotation ξ ς e₂ >>= λ v₂ ↦
+          match op with
+          | .and | .or => unreachable!
+          | .add =>
+            integer v₁ (default := Domain.abort) λ v₁ ↦
+            integer v₂ (default := Domain.abort) λ v₂ ↦
+            .pure (Value.𝕍.int (v₁ + v₂))
+          | .sub =>
+            integer v₁ (default := Domain.abort) λ v₁ ↦
+            integer v₂ (default := Domain.abort) λ v₂ ↦
+            .pure (Value.𝕍.int (v₁ - v₂))
+          | .mul =>
+            integer v₁ (default := Domain.abort) λ v₁ ↦
+            integer v₂ (default := Domain.abort) λ v₂ ↦
+            .pure (Value.𝕍.int (v₁ * v₂))
+          | .div =>
+            integer v₁ (default := Domain.abort) λ v₁ ↦
+            integer v₂ (default := Domain.abort) λ v₂ ↦
+            .pure (Value.𝕍.int (v₁ / v₂))
+          | .mod =>
+            integer v₁ (default := Domain.abort) λ v₁ ↦
+            integer v₂ (default := Domain.abort) λ v₂ ↦
+            .pure (Value.𝕍.int (v₁ % v₂))
+          | .eq => if Value.𝕍.Eq v₁ v₂ then .pure (Value.𝕍.bool true) else .pure (Value.𝕍.bool false)
+          | .ne => if Value.𝕍.DisEq v₁ v₂ then .pure (Value.𝕍.bool true) else .pure (Value.𝕍.bool false)
+          | .lt =>
+            Value.𝕍.casesOn (motive := λ _ ↦ Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) (Value.𝕍 Store.type Channel Address Go.Typ).type)
+              (λ _ ↦ Domain.abort)
+              (λ v₁ ↦
+                integer v₂ (default := Domain.abort) λ v₂ ↦
+                  .pure (Value.𝕍.bool (decide <| v₁ < v₂))
+              )
+              (λ v₁ ↦
+                string v₂ (default := Domain.abort) λ v₂ ↦
+                  .pure (Value.𝕍.bool (decide <| v₁ < v₂))
+              )
+              (λ _ _ _ _ ↦ Domain.abort)
+              (λ _ _ _ _ ↦ Domain.abort)
+              (λ _ ↦ Domain.abort)
+              (λ _ _ ↦ Domain.abort)
+              (λ _ _ _ ↦ Domain.abort)
+              (λ _ ↦ Domain.abort)
+              (λ _ ↦ Domain.abort)
+              v₁
+          | .le =>
+            Value.𝕍.casesOn (motive := λ _ ↦ Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) (Value.𝕍 Store.type Channel Address Go.Typ).type)
+              (λ _ ↦ Domain.abort)
+              (λ v₁ ↦
+                integer v₂ (default := Domain.abort) λ v₂ ↦
+                  .pure (Value.𝕍.bool (decide <| v₁ ≤ v₂))
+              )
+              (λ v₁ ↦
+                string v₂ (default := Domain.abort) λ v₂ ↦
+                  .pure (Value.𝕍.bool (decide <| v₁ ≤ v₂))
+              )
+              (λ _ _ _ _ ↦ Domain.abort)
+              (λ _ _ _ _ ↦ Domain.abort)
+              (λ _ ↦ Domain.abort)
+              (λ _ _ ↦ Domain.abort)
+              (λ _ _ _ ↦ Domain.abort)
+              (λ _ ↦ Domain.abort)
+              (λ _ ↦ Domain.abort)
+              v₁
+          | .gt =>
+            Value.𝕍.casesOn (motive := λ _ ↦ Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) (Value.𝕍 Store.type Channel Address Go.Typ).type)
+              (λ _ ↦ Domain.abort)
+              (λ v₁ ↦
+                integer v₂ (default := Domain.abort) λ v₂ ↦
+                  .pure (Value.𝕍.bool (decide <| v₁ > v₂))
+              )
+              (λ v₁ ↦
+                string v₂ (default := Domain.abort) λ v₂ ↦
+                  .pure (Value.𝕍.bool (decide <| v₁ > v₂))
+              )
+              (λ _ _ _ _ ↦ Domain.abort)
+              (λ _ _ _ _ ↦ Domain.abort)
+              (λ _ ↦ Domain.abort)
+              (λ _ _ ↦ Domain.abort)
+              (λ _ _ _ ↦ Domain.abort)
+              (λ _ ↦ Domain.abort)
+              (λ _ ↦ Domain.abort)
+              v₁
+          | .ge =>
+            Value.𝕍.casesOn (motive := λ _ ↦ Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) (Value.𝕍 Store.type Channel Address Go.Typ).type)
+              (λ _ ↦ Domain.abort)
+              (λ v₁ ↦
+                integer v₂ (default := Domain.abort) λ v₂ ↦
+                  .pure (Value.𝕍.bool (decide <| v₁ ≥ v₂))
+              )
+              (λ v₁ ↦
+                string v₂ (default := Domain.abort) λ v₂ ↦
+                  .pure (Value.𝕍.bool (decide <| v₁ ≥ v₂))
+              )
+              (λ _ _ _ _ ↦ Domain.abort)
+              (λ _ _ _ _ ↦ Domain.abort)
+              (λ _ ↦ Domain.abort)
+              (λ _ _ ↦ Domain.abort)
+              (λ _ _ _ ↦ Domain.abort)
+              (λ _ ↦ Domain.abort)
+              (λ _ ↦ Domain.abort)
+              v₁
         | .index e₁ e₂ =>
           Go.Expression.denotation ξ ς e₁ >>= λ v₁ ↦
           Go.Expression.denotation ξ ς e₂ >>= λ v₂ ↦
@@ -330,7 +462,7 @@ noncomputable section
                     integer v₂ (default := {.next σ ⟨.abort⟩}) λ idx ↦
                       if h : 0 ≤ low ∧ low ≤ idx ∧ idx < high ∧ high ≤ len then
                         -- TODO: in a well-formed memory, `low ≤ idx < high` implies that `0 ≤ idx < len`
-                        -- so some of these checks are useless
+                        -- so some of these checks will eventually be useless
                         let v := indices ⟨idx.toNat, by
                           calc
                             idx.toNat < high := by
@@ -424,7 +556,7 @@ noncomputable section
               let addr := Store.freshAddr σ
               (addrs ++ [addr], Store.insert σ addr v)
             if let .map _ τ := τ then
-              -- NOTE: Assume that this will always be the case here, but type aliases break this...
+              -- NOTE: Assume that this will always be the case here, but type aliases and newtypes break this...
               {.next σ' ⟨.pure (Value.𝕍.map (List.lookup · (ks.zip addrs)) τ false)⟩}
             else
               {.next σ ⟨.abort⟩}

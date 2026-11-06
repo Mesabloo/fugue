@@ -1454,6 +1454,8 @@ noncomputable section Domain
       def Domain.branch (f : «Σ» →ᵤ Set (Branch «Σ» Γ α (Domain «Σ» Γ α β))) : Domain «Σ» Γ α β :=
         ⇑Domain.isSolution.symm (.inr (.inr λ σ ↦ ⟨closure (f σ), isClosed_closure⟩))
 
+      instance : Inhabited (Domain «Σ» Γ α β) := ⟨Domain.abort⟩
+
       theorem Domain.idist_leaf_leaf {v v' : β} :
           idist (Domain.leaf («Σ» := «Σ») (Γ := Γ) (α := α) v) (Domain.leaf v') = idist v v' := by
         unfold Domain.leaf
