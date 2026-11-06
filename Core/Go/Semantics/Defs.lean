@@ -29,7 +29,7 @@ noncomputable section
       (λ _ _ _ _ ↦ default)
       (λ _ ↦ default)
       (λ _ _ ↦ default)
-      (λ _ _ ↦ default)
+      (λ _ _ _ ↦ default)
       (λ _ ↦ default)
       (λ _ ↦ default)
       v
@@ -43,7 +43,7 @@ noncomputable section
       (λ _ _ _ _ ↦ default)
       (λ _ ↦ default)
       (λ _ _ ↦ default)
-      (λ _ _ ↦ default)
+      (λ _ _ _ ↦ default)
       (λ _ ↦ default)
       (λ _ ↦ default)
       v
@@ -59,7 +59,7 @@ noncomputable section
       (λ _ _ _ _ ↦ default)
       (λ _ ↦ default)
       f
-      (λ _ _ ↦ default)
+      (λ _ _ _ ↦ default)
       (λ _ ↦ default)
       (λ _ ↦ default)
       v
@@ -75,7 +75,7 @@ noncomputable section
       async
       (λ _ ↦ default)
       (λ _ _ ↦ default)
-      (λ _ _ ↦ default)
+      (λ _ _ _ ↦ default)
       (λ _ ↦ default)
       (λ _ ↦ default)
       v
@@ -91,7 +91,7 @@ noncomputable section
       (λ _ _ _ _ ↦ default)
       (λ _ ↦ default)
       (λ _ _ ↦ default)
-      (λ _ _ ↦ default)
+      (λ _ _ _ ↦ default)
       (λ _ ↦ default)
       tup
       v
@@ -107,7 +107,7 @@ noncomputable section
       (λ _ _ _ _ ↦ default)
       struct
       (λ _ _ ↦ default)
-      (λ _ _ ↦ default)
+      (λ _ _ _ ↦ default)
       (λ _ ↦ default)
       (λ _ ↦ default)
       v
@@ -123,7 +123,7 @@ noncomputable section
       (λ _ _ _ _ ↦ default)
       (λ _ ↦ default)
       (λ _ _ ↦ default)
-      (λ _ _ ↦ default)
+      (λ _ _ _ ↦ default)
       fn
       (λ _ ↦ default)
       v
@@ -146,7 +146,7 @@ noncomputable section
       | .bool => .bool false
       | .int => .int 0
       | .str => .str ""
-      | .map _ _ => .map [] true
+      | .map _ τ => .map [] τ true
       | .chan τ => .chan nil τ nil nil
       | .slice τ => .slice 0 0 0 nil
       | .array n τ => .array n λ i ↦ zero τ
@@ -174,7 +174,7 @@ noncomputable section
       | struct {fs fs'} : (∀ x, (fs x).isSome ↔ (fs' x).isSome) → (∀ x v v', x ≠ "_" → fs x = .some v → fs' x = .some v' → Value.𝕍.Eq v v') → Value.𝕍.Eq (Value.𝕍.struct fs) (Value.𝕍.struct fs')
       | array {len f f'} : (∀ i : Fin len, Value.𝕍.Eq (f i) (f' i)) → Value.𝕍.Eq (Value.𝕍.array len f) (Value.𝕍.array len f')
       | slice {c c' l l' h h'} : Value.𝕍.Eq (Value.𝕍.slice c l h nil) (Value.𝕍.slice c' l' h' nil)
-      | map : Value.𝕍.Eq (Value.𝕍.map (λ _ ↦ .none) true) (Value.𝕍.map (λ _ ↦ .none) true)
+      | map {τ} : Value.𝕍.Eq (Value.𝕍.map (λ _ ↦ .none) τ true) (Value.𝕍.map (λ _ ↦ .none) τ true)
       -- `λ _ ↦ Domain.abort` cannot be obtained from the semantics alone, see below
       | func : Value.𝕍.Eq (Value.𝕍.func λ _ ↦ Domain.abort) (Value.𝕍.func λ _ ↦ Domain.abort)
 
@@ -187,7 +187,7 @@ noncomputable section
       | struct {fs fs' x v v'} : (∀ x, (fs x).isSome ↔ (fs' x).isSome) → x ≠ "_" → fs x = .some v → fs' x = .some v' → Value.𝕍.DisEq v v' → Value.𝕍.DisEq (Value.𝕍.struct fs) (Value.𝕍.struct fs')
       | array {len f f' i} : Value.𝕍.DisEq (f i) (f' i) → Value.𝕍.DisEq (Value.𝕍.array len f) (Value.𝕍.array len f')
       | slice {c c' l l' h h' r r'} : (r = nil ↔ r' ≠ nil) → Value.𝕍.DisEq (Value.𝕍.slice c l h r) (Value.𝕍.slice c' l' h' r')
-      | map {f f' b b'} : (b = ¬b') → Value.𝕍.DisEq (Value.𝕍.map f b) (Value.𝕍.map f' b')
+      | map {f f' b b' τ} : (b = ¬b') → Value.𝕍.DisEq (Value.𝕍.map f τ b) (Value.𝕍.map f' τ b')
       | func {f f'} : (f = (λ _ ↦ Domain.abort) ↔ f' ≠ (λ _ ↦ Domain.abort)) → Value.𝕍.DisEq (Value.𝕍.func f) (Value.𝕍.func f')
 
     -- termination metric: depth addr@σ - List.length idx (depth addr@σ is finite from well-formedness of σ)
@@ -217,13 +217,13 @@ noncomputable section
                 let ⟨σ, v_⟩ ← updateVal v' v (.inl v'' :: idx) σ
                 Store.update σ addr v_
             )
-            (λ map isNil ↦ do
+            (λ map τ isNil ↦ do
               guard (¬isNil ∧ idx.isEmpty)
               match map v'' with
               | .some addr => updateRef addr v idx σ
               | .none =>
                 let addr' := Store.freshAddr σ
-                Store.insert (← Store.insert σ addr' v) addr (Value.𝕍.map (Function.update map v'' addr') isNil)
+                Store.insert (← Store.insert σ addr' v) addr (Value.𝕍.map (Function.update map v'' addr') τ isNil)
             )
             (λ _ ↦ .none) (λ _ ↦ .none)
             v'
@@ -257,14 +257,14 @@ noncomputable section
                 else
                   .none
             ))
-            (λ fs isNil ↦ do
+            (λ fs τ isNil ↦ do
               guard (¬isNil ∧ idx = [])
               if let .some addr := fs e then
                 let σ ← updateRef addr v [] σ
-                pure ⟨σ, Value.𝕍.map fs isNil⟩
+                pure ⟨σ, Value.𝕍.map fs τ isNil⟩
               else
                 let addr := Store.freshAddr σ
-                pure ⟨Store.insert σ addr v, Value.𝕍.map (Function.update fs e addr) isNil⟩
+                pure ⟨Store.insert σ addr v, Value.𝕍.map (Function.update fs e addr) τ isNil⟩
             )
             (λ _ ↦ .none) (λ _ ↦ .none)
             v'
@@ -317,7 +317,60 @@ noncomputable section
         | .binary op e₁ e₂ =>
           sorry
         | .index e₁ e₂ =>
-          sorry
+          Go.Expression.denotation ξ ς e₁ >>= λ v₁ ↦
+          Go.Expression.denotation ξ ς e₂ >>= λ v₂ ↦
+          Domain.branch λ σ ↦
+            Value.𝕍.casesOn (motive := λ _ ↦ Set (Branch _ _ _ (Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) (Value.𝕍 Store.type Channel Address Go.Typ).type)))
+              (λ _ ↦ {.next σ ⟨.abort⟩})
+              (λ _ ↦ {.next σ ⟨.abort⟩})
+              (λ _ ↦ {.next σ ⟨.abort⟩})
+              (λ cap low high buf ↦
+                if let .some arr := Store.deref σ buf then
+                  array arr (default := {.next σ ⟨.abort⟩}) λ len indices ↦
+                    integer v₂ (default := {.next σ ⟨.abort⟩}) λ idx ↦
+                      if h : 0 ≤ low ∧ low ≤ idx ∧ idx < high ∧ high ≤ len then
+                        -- TODO: in a well-formed memory, `low ≤ idx < high` implies that `0 ≤ idx < len`
+                        -- so some of these checks are useless
+                        let v := indices ⟨idx.toNat, by
+                          calc
+                            idx.toNat < high := by
+                              rw [Int.toNat_lt]
+                              · exact h.2.2.1
+                              · trans (low : ℤ)
+                                · exact Int.natCast_nonneg low
+                                · exact h.2.1
+                            high ≤ len := h.2.2.2
+                        ⟩
+                        {.next σ ⟨.pure v⟩}
+                      else
+                        {.next σ ⟨.abort⟩}
+                else
+                  {.next σ ⟨.abort⟩}
+              )
+              (λ _ _ _ _ ↦ {.next σ ⟨.abort⟩})
+              (λ _ ↦ {.next σ ⟨.abort⟩})
+              (λ len indices ↦
+                integer v₂ (default := {.next σ ⟨.abort⟩}) λ idx ↦
+                  if h : 0 ≤ idx ∧ idx < len then
+                    {.next σ ⟨.pure (indices ⟨idx.toNat, propext (Int.toNat_lt h.1) ▸ h.2⟩)⟩}
+                  else
+                    {.next σ ⟨.abort⟩}
+              )
+              (λ fs τ isNil ↦
+                if ¬isNil then
+                  if let .some addr := fs v₂ then
+                    if let .some v₂ := Store.deref σ addr then
+                      {.next σ ⟨.pure v₂⟩}
+                    else
+                      {.next σ ⟨.abort⟩}
+                  else
+                    {.next σ ⟨.pure (Go.zero τ).to𝕍⟩}
+                else
+                  {.next σ ⟨.pure (Go.zero τ).to𝕍⟩}
+              )
+              (λ _ ↦ {.next σ ⟨.abort⟩})
+              (λ _ ↦ {.next σ ⟨.abort⟩})
+              v₁
         | .field e x =>
           Go.Expression.denotation ξ ς e >>= λ v ↦ struct v (default := Domain.branch λ σ ↦ {.next σ ⟨.abort⟩}) λ fs ↦
             if let .some v := fs x then
@@ -326,7 +379,7 @@ noncomputable section
               Domain.branch λ σ ↦ {.next σ ⟨.abort⟩}
         | .call f es =>
           Go.Expression.denotation ξ ς f >>= λ f ↦
-          func f (default := Domain.branch λ σ ↦ {.next σ ⟨Domain.abort⟩}) λ f ↦
+          func f (default := Domain.branch λ σ ↦ {.next σ ⟨.abort⟩}) λ f ↦
             Go.Expression.denotations ξ ς es >>= λ vs ↦
             let γret := Classical.epsilon λ γ ↦ γ ∉ ξ ∧ (∀ c, ς c ≠ γ)
             Domain.branch λ σ ↦
@@ -370,7 +423,11 @@ noncomputable section
             let (addrs, σ') := vs.foldl (init := ([], σ)) λ (addrs, σ) v ↦
               let addr := Store.freshAddr σ
               (addrs ++ [addr], Store.insert σ addr v)
-            {.next σ' ⟨.pure (Value.𝕍.map (List.lookup · (ks.zip addrs)) false)⟩}
+            if let .map _ τ := τ then
+              -- NOTE: Assume that this will always be the case here, but type aliases break this...
+              {.next σ' ⟨.pure (Value.𝕍.map (List.lookup · (ks.zip addrs)) τ false)⟩}
+            else
+              {.next σ ⟨.abort⟩}
         | .make τ es =>
           sorry
         | .funcLit params _ body => Domain.pure <| Value.𝕍.func λ ⟨hs, ξ⟩ ↦

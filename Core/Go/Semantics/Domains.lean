@@ -1594,7 +1594,7 @@ noncomputable section Domain
       | chan (len : ℍ) (τ : Typ) (arr closed? : ℍ)
       | struct (fields : List (String × Send𝕍))
       | array (len : ℕ) (indices : Fin len → Send𝕍)
-      | map (fields : List (Send𝕍 × ℍ)) (nil : Bool)
+      | map (fields : List (Send𝕍 × ℍ)) (τ : Typ) (nil : Bool)
       | tuple (fields : List Send𝕍)
 
     instance : DecidableEq (Send𝕍 ℍ Typ) :=
@@ -1621,7 +1621,7 @@ noncomputable section Domain
       -- array
       ⊕ (Σ n : ℕ, Fin n →ᵤ 𝕍)
       -- map
-      ⊕ (Restriction 𝕍 unitInterval.half →ᵤ Option ℍ) × Bool
+      ⊕ (Restriction 𝕍 unitInterval.half →ᵤ Option ℍ) × Typ × Bool
       -- func
       ⊕ (List ℍ × List Γ →ᵤ Domain «Σ» Γ (Send𝕍 ℍ Typ) PUnit.{x + 1})
       -- tuples
@@ -1693,8 +1693,8 @@ noncomputable section Domain
     def 𝕍.array (len : ℕ) (indices : Fin len →ᵤ (𝕍 «Σ» Γ ℍ Typ).type) : (𝕍 «Σ» Γ ℍ Typ).type :=
       𝕍_iso.symm (.inr <| .inr <| .inr <| .inr <| .inr <| .inr <| .inl ⟨len, indices⟩)
 
-    def 𝕍.map (maps : (𝕍 «Σ» Γ ℍ Typ).type →ᵤ Option ℍ) (isNil : Bool) : (𝕍 «Σ» Γ ℍ Typ).type :=
-      𝕍_iso.symm (.inr <| .inr <| .inr <| .inr <| .inr <| .inr <| .inr <| .inl ⟨maps ∘ Restriction.val, isNil⟩)
+    def 𝕍.map (maps : (𝕍 «Σ» Γ ℍ Typ).type →ᵤ Option ℍ) (τ : Typ) (isNil : Bool) : (𝕍 «Σ» Γ ℍ Typ).type :=
+      𝕍_iso.symm (.inr <| .inr <| .inr <| .inr <| .inr <| .inr <| .inr <| .inl ⟨maps ∘ Restriction.val, τ, isNil⟩)
 
     def 𝕍.func (call : List ℍ × List Γ →ᵤ Domain «Σ» Γ (Send𝕍 ℍ Typ) PUnit) : (𝕍 «Σ» Γ ℍ Typ).type :=
       𝕍_iso.symm (.inr <| .inr <| .inr <| .inr <| .inr <| .inr <| .inr <| .inr <| .inl (λ ⟨vs, ξ⟩ ↦ call ⟨vs, ξ⟩))
@@ -1716,7 +1716,7 @@ noncomputable section Domain
         (λ len τ arr closed? ↦ 𝕍.chan len τ arr closed?)
         (λ _ fs ↦ 𝕍.struct λ x ↦ List.lookup x fs)
         (λ len _ idx ↦ 𝕍.array len idx)
-        (λ _ isNil fs ↦ 𝕍.map (λ x ↦ List.lookup x fs) isNil)
+        (λ _ τ isNil fs ↦ 𝕍.map (λ x ↦ List.lookup x fs) τ isNil)
         (λ _ vs ↦ 𝕍.tuple vs)
         []
         (λ ⟨x, _⟩ _ v vs ↦ ⟨x, v⟩ :: vs)
@@ -1756,7 +1756,7 @@ noncomputable section Domain
       (chan : ∀ len τ array closed, motive (𝕍.chan len τ array closed))
       (struct : ∀ fields, motive (𝕍.struct fields))
       (array : ∀ len indices, motive (𝕍.array len indices))
-      (map : ∀ maps isNil, motive (𝕍.map maps isNil))
+      (map : ∀ maps τ isNil, motive (𝕍.map maps τ isNil))
       (func : ∀ call, motive (𝕍.func call))
       (tuple : ∀ vs, motive (𝕍.tuple vs))
       (v : (𝕍 «Σ» Γ ℍ Typ).type) :
@@ -1797,11 +1797,11 @@ noncomputable section Domain
           apply_fun 𝕍_iso.symm at h
           rwa [IsometryEquiv.symm_apply_apply] at h
         h' ▸ array len indices
-      | .inr (.inr (.inr (.inr (.inr (.inr (.inr (.inl ⟨maps, isNil⟩))))))) =>
-        have h' : v = 𝕍.map (maps ∘ Restriction.mk) isNil := by
+      | .inr (.inr (.inr (.inr (.inr (.inr (.inr (.inl ⟨maps, τ, isNil⟩))))))) =>
+        have h' : v = 𝕍.map (maps ∘ Restriction.mk) τ isNil := by
           apply_fun 𝕍_iso.symm at h
           rwa [IsometryEquiv.symm_apply_apply] at h
-        h' ▸ map (maps ∘ Restriction.mk) isNil
+        h' ▸ map (maps ∘ Restriction.mk) τ isNil
       | .inr (.inr (.inr (.inr (.inr (.inr (.inr (.inr (.inl call)))))))) =>
         have h' : v = 𝕍.func (λ ⟨vs, ξ⟩ ↦ call ⟨vs, ξ⟩) := by
           apply_fun 𝕍_iso.symm at h
