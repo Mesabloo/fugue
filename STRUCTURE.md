@@ -424,7 +424,8 @@ here on purpose — see this directory directly for contents.
 - `doctor` — prints a checklist for instruction-compliance review; does not check anything itself.
 
 ## `.github/`
-- `workflows/ci.yml` — build+test matrix, release publish, documentation deploy.
+- `workflows/ci.yml` — Lean build+test matrix, Go runtime test matrix, release publish,
+  documentation deploy.
 - `act-events/push-master.json` — event payload for local `act` runs of the master-only jobs.
 
 ## `.claude/`

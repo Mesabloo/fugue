@@ -543,8 +543,29 @@ noncomputable section
               (λ _ ↦ {.next σ ⟨.abort⟩})
               v
             | _ => Domain.branch λ σ ↦ {.next σ ⟨.abort⟩}
-          | .cap => sorry
-          | .append => sorry
+          | .cap =>
+            match vs with
+            | [v] => Domain.branch λ σ ↦ Value.𝕍.casesOn (motive := λ _ ↦ Set (Branch _ _ _ (Domain Store.type Channel (Value.Send𝕍 Address Go.Typ) (Value.𝕍 Store.type Channel Address Go.Typ).type)))
+              (λ _ ↦ {.next σ ⟨.abort⟩})
+              (λ _ ↦ {.next σ ⟨.abort⟩})
+              (λ s ↦ {.next σ ⟨.pure (Value.𝕍.int s.utf8ByteSize)⟩})
+              (λ cap _ _ _ ↦ {.next σ ⟨.pure (Value.𝕍.int cap)⟩})
+              (λ _ _ buf _ ↦
+                if let .some v := Store.deref σ buf then
+                  array v (default := {.next σ ⟨.abort⟩}) λ len _ ↦
+                    {.next σ ⟨.pure (Value.𝕍.int len)⟩}
+                else
+                  {.next σ ⟨.abort⟩}
+              )
+              (λ _ ↦ {.next σ ⟨.abort⟩})
+              (λ len _ ↦ {.next σ ⟨.pure (Value.𝕍.int len)⟩})
+              (λ fs _ _ ↦ {.next σ ⟨.abort⟩})
+              (λ _ ↦ {.next σ ⟨.abort⟩})
+              (λ _ ↦ {.next σ ⟨.abort⟩})
+              v
+            | _ => Domain.branch λ σ ↦ {.next σ ⟨.abort⟩}
+          | .append =>
+            sorry
         | .structLit τ es' =>
           let (eq := h) (xs, es) := es'.unzip
 
