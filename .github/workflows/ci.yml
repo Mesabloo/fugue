@@ -11,6 +11,26 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # What the `lake-build-…` cache holds: this package's build output and every dependency outside
+  # Mathlib's closure, source and build together. Mathlib and the packages its own cache covers
+  # are left out (Lake clones them, `lake exe cache get` fetches their oleans): they come to
+  # ~2.5 GB per OS, and three such entries per commit overflow the 10 GB repository cache limit,
+  # evicting the docs job's `Docs-…` entry (doc-gen4's output for the dependencies).
+  # `.lake/config` (the compiled lakefiles) is left out too, so each job elaborates
+  # `lakefile.lean` afresh.
+  LAKE_CACHE_PATHS: |
+    .lake/build
+    .lake/packages/*
+    !.lake/packages/mathlib
+    !.lake/packages/batteries
+    !.lake/packages/aesop
+    !.lake/packages/Qq
+    !.lake/packages/proofwidgets
+    !.lake/packages/importGraph
+    !.lake/packages/LeanSearchClient
+    !.lake/packages/plausible
+
 jobs:
   build:
     name: build and test ${{ matrix.os }}
@@ -29,6 +49,16 @@ jobs:
         with:
           go-version: '1.25'
 
+      # No GitHub Actions cache service under `act` (env.ACT=true); skip it locally.
+      - name: Restore Lake build cache
+        if: ${{ env.ACT != 'true' }}
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.LAKE_CACHE_PATHS }}
+          key: lake-build-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('lean-toolchain') }}-${{ hashFiles('lake-manifest.json') }}-${{ github.sha }}
+          # No entry for this commit: start from the latest one with the same toolchain and manifest.
+          restore-keys: lake-build-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('lean-toolchain') }}-${{ hashFiles('lake-manifest.json') }}
+
       - name: Build (release) and test
         uses: leanprover/lean-action@c544e89643240c6b398f14a431bcdc6309e36b3e # v1.4.0
         with:
@@ -38,17 +68,25 @@ jobs:
           lint: false
           mk_all-check: false
           use-mathlib-cache: true
-          # No GitHub Actions cache service under `act` (env.ACT=true); skip it locally.
-          use-github-cache: ${{ env.ACT != 'true' }}
+          # The `Restore`/`Save Lake build cache` steps around this one cache a slimmer `.lake`
+          # than lean-action's own cache (see `LAKE_CACHE_PATHS`).
+          use-github-cache: false
           # `fugue` is no longer a default target (the libraries are, for doc-gen4), so name it.
           # `linter.missingDocs` is off by default (see lakefile.lean); no flag needed.
-          # `-R` on this first `lake` of the job re-elaborates `lakefile.lean` rather than trusting
-          # a cached `lakefile.olean`: the GitHub Actions cache is keyed on `lake-manifest.json`,
-          # not the config, so a config-only change (and the `run_cmd` that bootstraps
-          # `.lake/version` / `.lake/diagnostics`) is otherwise skipped on a cache hit. Every later
-          # `lake` in the job reuses the reconfigured olean this writes.
+          # `-R` re-elaborates `lakefile.lean` rather than trusting a compiled `lakefile.olean`, so
+          # a config-only change (and the `run_cmd` that bootstraps `.lake/version` /
+          # `.lake/diagnostics`) always takes effect. Every later `lake` in the job reuses the
+          # reconfigured olean this writes.
           build-args: '-R fugue -KBUILD_TYPE=release'
           test-args: ''
+
+      # Also after a failed build or test: the modules that did build are reused by the next run.
+      - name: Save Lake build cache
+        if: ${{ !cancelled() && env.ACT != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.LAKE_CACHE_PATHS }}
+          key: lake-build-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('lean-toolchain') }}-${{ hashFiles('lake-manifest.json') }}-${{ github.sha }}
 
       - name: Read version
         id: version
@@ -214,6 +252,16 @@ jobs:
         if: ${{ env.ACT == 'true' }}
         run: echo "DOCGEN_SRC=file" >> "$GITHUB_ENV"
 
+      # The Linux `build` job saved this commit's entry; doc-gen4 reuses its oleans.
+      - name: Restore Lake build cache
+        if: ${{ env.ACT != 'true' }}
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.LAKE_CACHE_PATHS }}
+          key: lake-build-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('lean-toolchain') }}-${{ hashFiles('lake-manifest.json') }}-${{ github.sha }}
+          restore-keys: lake-build-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('lean-toolchain') }}-${{ hashFiles('lake-manifest.json') }}
+
+      # Clones the dependencies the cache leaves out and fetches Mathlib's oleans.
       - name: Set up Lake
         uses: leanprover/lean-action@c544e89643240c6b398f14a431bcdc6309e36b3e # v1.4.0
         with:
@@ -222,18 +270,34 @@ jobs:
           test: false
           lint: false
           mk_all-check: false
-          use-mathlib-cache: false
-          use-github-cache: ${{ env.ACT != 'true' }}
+          use-mathlib-cache: true
+          use-github-cache: false
 
       # doc-gen4 / docgen-action read lakefile.toml; this project ships lakefile.lean.
       # `translate-config` errors if a lakefile.toml already exists — non-fatal, docgen-action
-      # reports clearly if the toml is genuinely missing. `-R` (first `lake` of this job — the
-      # `Set up Lake` step above runs none, with build/test/lint all off) re-elaborates the config
-      # so its `run_cmd` writes `.lake/diagnostics/DiagnosticPages.lean`; a cache-restored
-      # `lakefile.olean` would otherwise skip it and leave that module unresolvable.
+      # reports clearly if the toml is genuinely missing. `-R` re-elaborates the config even when
+      # a compiled `lakefile.olean` is present, so its `run_cmd` always writes
+      # `.lake/diagnostics/DiagnosticPages.lean`; without that file the module is unresolvable.
       - name: Translate lakefile.lean to lakefile.toml
         continue-on-error: true
         run: lake -R translate-config toml
+
+      # Documenting the whole Mathlib closure leaves `lake` with a commit charge above RAM + swap,
+      # so the `git` children that doc-gen4's `srcUri.github` facet spawns per package fail at
+      # `fork` with ENOMEM ("resource exhausted (error code: 12, cannot allocate memory)").
+      # `overcommit_memory=1` drops that accounting check (each child execs `git` at once); the
+      # extra swap is headroom for the doc-gen4 workers' real memory. A container under `act`
+      # can set neither, so the step is skipped there.
+      - name: Raise memory headroom for doc-gen4
+        if: ${{ env.ACT != 'true' }}
+        run: |
+          set -eux
+          sudo sysctl -w vm.overcommit_memory=1
+          sudo fallocate -l 12G /mnt/docgen.swap
+          sudo chmod 600 /mnt/docgen.swap
+          sudo mkswap /mnt/docgen.swap
+          sudo swapon /mnt/docgen.swap
+          free -h
 
       - name: Build API docs (doc-gen4) and deploy to Pages
         uses: leanprover-community/docgen-action@56023ee2a4b3630c1071825be5bafdb43f540bbd # main
